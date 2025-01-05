@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مشاور: {{ advisor.profile.first_name }} {{ advisor.profile.last_name }}</title>
+</head>
+<body>
+    <h1>مشاور: {{ advisor.profile.first_name }} {{ advisor.profile.last_name }}</h1>
+    <h2>دانش‌آموزان زیر نظر این مشاور:</h2>
+    <ul>
+        {% for student in students %}
+            <li>{{ student.profile.first_name }} {{ student.profile.last_name }} - {{ student.major.name }} - {{ student.grade.name }}</li>
+        {% empty %}
+            <li>هیچ دانش‌آموزی به این مشاور اختصاص ندارد.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
