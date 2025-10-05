@@ -13,6 +13,7 @@ class Profile(models.Model):
     last_name = models.CharField(max_length=100)
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
+    profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True, verbose_name="عکس پروفایل")
 
     def __str__(self):
         return f'{self.first_name} {self.last_name} ({self.role})'
@@ -22,14 +23,21 @@ class School(models.Model):
     name = models.CharField(max_length=255)
 
     def __str__(self):
-        return self.name
+        return self.name 
 
 class Major(models.Model):
     name = models.CharField(max_length=255)
 
     def __str__(self):
         return self.name
-    
+    @property
+    def code(self):
+        mapping = {
+            'تجربی': 'T',
+            'ریاضی': 'R',
+            'انسانی': 'E',
+        }
+        return mapping.get(self.name, '')
 class Grade(models.Model):
     name = models.CharField(max_length=100)
 

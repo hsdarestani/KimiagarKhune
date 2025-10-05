@@ -1,0 +1,4992 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>برنامه هفتگی مدرسه</title>
+  <!-- فونت وزیر -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
+  <!-- jQuery UI CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.css">
+  <!-- Add this in your HTML template -->
+
+<!-- Styles -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" />
+<!-- Or for RTL support -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.rtl.min.css" />
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- html2canvas -->
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<!-- Chart.js (if using for charts in summary) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+  <link rel="stylesheet" href="https://unpkg.com/persian-datepicker@latest/dist/css/persian-datepicker.min.css" />
+
+</head>
+<body class="font-[Vazir] bg-gradient-to-r from-blue-100 to-green-100  relative  p-1" dir="rtl">
+  <!-- Floating animated circles in background -->
+  <div class="floating-circle bg-pink-300 w-24 h-24 top-10 left-10"></div>
+  <div class="floating-circle bg-yellow-300 w-16 h-16 top-40 right-10 animation-delay-2000"></div>
+  <div class="floating-circle bg-purple-300 w-32 h-32 bottom-10 left-20"></div>
+<div class="nav-bar">
+
+    <div class="top-header">
+             <div style="display:flex; align-items: center;
+    gap: 10px;">
+      <span class="consultant-name">مشاور: {{ request.user.profile.first_name }}  {{ request.user.profile.last_name }}</span>
+<label for="student-select">دانش‌آموز:</label>
+<select id="student-select" name="student">
+    {% for student in students %}
+        <option value="{{ student.id }}">{{ student.profile.first_name }} {{ student.profile.last_name }}</option>
+    {% endfor %}
+</select> 
+
+<!-- Your week selector input -->
+<div class="week-selector" style="margin-bottom: 15px; text-align:center;">
+  <input type="text" id="weekSelector" placeholder="تاریخ شروع هفته">
+  <button class="download-btn" id="loadWeek">بارگذاری هفته</button>
+ 
+<!-- Your PDF download buttons -->
+<button id="download-week-output" class="download-btn">دانلود PDF - خروجی هفته</button>
+<button id="download-week-summary" class="download-btn">دانلود PDF - خلاصه هفته</button>
+<button id="download-empty-matrix" class="download-btn">دانلود PDF - ماتریس خالی</button>
+<button id="download-all-pdf" class="download-btn">
+  دانلود PDF همه گزارش‌ها
+</button>
+</div>
+</div>
+<!-- Include this CSS in your <head> or a dedicated CSS file -->
+<style>
+/* پترن خال‌خال */
+/* پترن خال‌خال */
+.calendar-task.exam-pattern-1 {
+  background-color: #f0f0f0 !important;
+  background-image: radial-gradient(circle, #ccc 20%, transparent 20%) !important;
+  background-size: 10px 10px !important;
+}
+
+/* پترن خط‌کشی مورب */
+.calendar-task.exam-pattern-2 {
+  background-color: #f8f9fa !important;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0,0,0,0.05) 0,
+    rgba(0,0,0,0.05) 1px,
+    transparent 1px,
+    transparent 5px
+  ) !important;
+}
+
+/* پترن شطرنجی ریز */
+.calendar-task.exam-pattern-3 {
+  background-color: #eef2f5 !important;
+  background-image:
+    linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(0,0,0,0.05) 1px, transparent 1px) !important;
+  background-size: 10px 10px !important;
+}
+
+/* کوچک کردن فاصله و ظاهر clean برای لیست تسک‌ها */
+#otherStudentTasks .task {
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+/* اختصاصی برای حالت دوم */
+.other-plan-task {
+  background: #ffe082;
+  border: 1px solid #ffca28;
+  color: #333;
+}
+
+/* نمایش متنی فصل و تعداد تست */
+.chapter-display,
+.tests-display {
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+/* دکمه‌ی مداد */
+.edit-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.edit-btn svg {
+  width: 14px;
+  height: 14px;
+  color: #0d6efd;
+}
+.edit-btn:hover svg {
+  color: #0a58ca;
+}
+
+
+.tick-btn{
+    position: absolute;
+    top: 5px;
+    font-size:10px;
+    right: 5px;
+}
+.select2-results__option{
+    font-size:11px !important;
+}
+  .download-btn {
+    display: inline-block;
+padding: 0px 12px;
+    margin: 10px;
+    font-size: 10px;
+    color: #ffffff;
+    background: linear-gradient(45deg, #4CAF50, #2E7D32);
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: background 0.3s, transform 0.2s;
+    cursor: pointer;
+  }
+  .download-btn:hover {
+    background: linear-gradient(45deg, #66BB6A, #388E3C);
+    transform: translateY(-2px);
+  }
+  .download-btn:active {
+    transform: translateY(0);
+  }
+  /* لیست ایونت: خودِ دکمه باکس شناور */
+.floating-box {
+  background: #ffeb3b;
+  border: 1px solid #fbc02d;
+  color: #333;
+}
+
+/* وقتی به تقویم سقوط کنه */
+.calendar-task.floating {
+  background: #fff176 !important;      /* زرد روشن */
+  border-bottom: 3px solid #f9a825 !important;
+}
+
+</style>
+
+  <!-- نوار ناوبری بالا: تکالیف و ایونت -->
+
+</div>
+<!-- Include Persian Datepicker CSS -->
+
+    <div class="assignments-box">
+      <h4>تکالیف</h4>
+      <div class="task-list rowlign">
+      </div>
+    </div>
+    <div class="events-box">
+      <h4>ایونت</h4>
+      <label style="font-size: 12px; margin-right: 10px;">
+        <input type="checkbox" id="examWeekCheckbox"> هفته آزمون دار
+      </label>
+      <div class="task-list rowlign">
+        <div class="task">ایونت </div>
+        <div class="task floating-box">باکس شناور</div>
+      </div>
+    </div>
+ 
+
+</div>
+
+
+
+  <!-- ناحیه اصلی: تقویم هفتگی و باکس دروس -->
+  <div class="main-content">
+    <!-- تقویم هفتگی -->
+    <div class="calendar-wrapper">
+            <style>
+            .rowlign{
+                flex-direction: row !important;
+            }
+            .nav-bar{
+                display:flex;
+                gap: 10px;
+    margin-bottom: 10px;
+        font-size: x-small !important;
+            }
+    /* ---------------- تنظیمات عمومی ---------------- */
+    body {
+      font-family: 'Vazir', sans-serif;
+      background-color: #f5f5f5;
+      margin: 0;
+      padding: 20px;
+      direction: rtl;
+    }
+    h2, h4 {
+      margin: 0 0 10px;
+    }
+    /* ---------------- هدر بالا: نام مشاور و دانش‌آموز ---------------- */
+    .top-header {
+            display: block;
+
+      background: #fff;
+      border-radius: 5px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    .top-header span {
+      margin: 0 2px;
+      font-weight: bold;
+    }
+
+
+    .assignments-box, .events-box {
+      flex: 1;
+      background: #fff;
+      padding: 5px;
+      border-radius: 5px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+    }
+    .assignments-box h4, .events-box h4 {
+      margin-bottom: 5px;
+      text-align: center;
+    }
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .task {
+      background: #e3f2fd;
+      padding: 8px 12px;
+      border: 1px solid #90caf9;
+      border-radius: 5px;
+      cursor: move;
+      text-align: center;
+    }
+    /* ---------------- ناحیه اصلی: تقویم و باکس دروس ---------------- */
+    .main-content {
+      display: flex;
+      gap: 20px;
+    }
+    .calendar-wrapper {
+      flex-grow: 1;
+    }
+    .subjects-box {
+        overflow:scroll;
+      width: 200px;
+      background: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      max-height: 700px;
+    }
+    .subjects-box h4 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    /* ---------------- تقویم هفتگی ---------------- */
+    .calendar-container {
+      display: flex;
+      gap: 5px;
+      flex-direction: row-reverse;
+    }
+    /* ستون زمان */
+    .timeline {
+      width: 30px;
+      border-right: 1px solid #ddd;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      padding-right: 5px;
+      margin-right: 10px;
+      margin-top:50px;
+    }
+    .time-slot {
+      height: 35px;
+      font-size: 12px;
+      color: #666;
+      border-bottom: 1px solid #eee;
+      line-height: 35px;
+    }
+    /* ستون‌های روز */
+    .calendar {
+      display: flex;
+      flex-grow: 1;
+      gap: 10px;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .day-column {
+      flex: 1;
+      position: relative;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      height: 700px; 
+      padding: 5px;
+      box-sizing: border-box;
+    }
+    .day-column h4 {
+        font-size: 12px;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    /* پس‌زمینه با خطوط ساعتی */
+.task-container {
+  position: relative;
+  height: calc(100% - 0px);
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 14px,
+    #eee 14px,
+    #eee 15px
+  );
+}
+
+    /* ---------------- باکس‌های تقویمی (دراگ و ریسایز) ---------------- */
+    .calendar-task {
+      position: absolute;
+      background: #d1e7dd;
+      border-radius: 10px;
+     padding-top: 17px;
+    padding-right: 10px;
+      box-sizing: border-box;
+      cursor: move;
+      width: 90%;
+      border-bottom: 3px solid darkgreen !important;
+    }
+    /* باکس‌های درس (extended-task) */
+    .extended-task .task-title {
+        position: absolute;
+  top: 2px;
+  right: 5px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .repeat-btn{
+                position: absolute;
+  top: 2px;
+  left: 15px;
+    }
+    .extra-info , .task-title{
+          font-size: 10px;
+    }
+    .hidden{
+        display:none;
+    }
+    .chapter-info{
+         font-size: 10px;
+    }
+    .task-extra, .task-dropdown,.task-inp  {
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      padding: 2px 4px;
+      font-size: 12px;
+      width: calc(100% - 8px);
+      margin-top: 4px;
+    }
+.task-extra{
+    width;100%;
+}
+    .time-label {
+position: absolute;
+    top: 60%;
+    left: 0;
+    font-size: 9px;
+    color: #0f5132;
+    background-color: rgba(255, 255, 255, 0.7);
+    transform: rotate(-90deg) translateY(-50%);
+    padding: 2px 4px;
+    border-radius: 3px;
+    transform-origin: left;
+    }
+    /* ---------------- دکمه ذخیره ---------------- */
+    .save-btn {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      display: block;
+    }
+    .remove-btn {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  background: transparent;
+  border: none;
+  color: #0f5132;
+  font-size: 16px;
+  cursor: pointer;
+  z-index: 10;
+}
+.remove-btn:hover {
+  color: red;
+}
+/* Style for day-column when disabled */
+.day-column.disabled-day {
+  background-color: #ddd;
+  opacity: 0.7;
+}
+
+
+
+/* Visual indication for event boxes that are turned off */
+.calendar-task.event-off {
+  background-color: #f8d7da;
+  border-color: #f5c2c7;
+  opacity: 0.7;
+}
+    .floating-circle {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.3;
+      animation: float 8s infinite ease-in-out;
+      z-index:-35;
+    }
+    @keyframes float {
+      0% { transform: translate(0, 0); }
+      50% { transform: translate(20px, -20px); }
+      100% { transform: translate(0, 0); }
+    }
+    /* Optional: Delay animations */
+    .animation-delay-2000 {
+      animation-delay: 2s;
+    }
+    
+  </style>
+  <!--<button type="button" class="btn btn-sm btn-outline-primary open-copy-day" data-day="شنبه" data-weekstart="{{ current_weekstart }}">کپی از دانش‌آموز دیگر</button> -->
+      <div class="calendar-container">
+          
+
+        <!-- ستون زمان -->
+        <div class="timeline">
+           
+  <div class="time-slot">06:00</div>
+  <div class="time-slot">07:00</div>
+  <div class="time-slot">08:00</div>
+  <div class="time-slot">09:00</div>
+  <div class="time-slot">10:00</div>
+  <div class="time-slot">11:00</div>
+  <div class="time-slot">12:00</div>
+  <div class="time-slot">13:00</div>
+  <div class="time-slot">14:00</div>
+  <div class="time-slot">15:00</div>
+  <div class="time-slot">16:00</div>
+  <div class="time-slot">17:00</div>
+  <div class="time-slot">18:00</div>
+  <div class="time-slot">19:00</div>
+  <div class="time-slot">20:00</div>
+  <div class="time-slot">21:00</div>
+  <div class="time-slot">22:00</div>
+  <div class="time-slot">23:00</div>
+  <div class="time-slot">00:00</div>
+        </div>
+        <!-- ستون‌های روز (تقویم) -->
+        <div class="calendar">
+          <!-- نمونه ستون شنبه -->
+          <div class="day-column" data-day="شنبه">
+            <h4>شنبه</h4>
+            <label style="font-size: 12px; margin-right: 5px;">
+              <input type="checkbox" class="disable-day-checkbox"> استراحت
+            </label>
+              <label style="font-size: 12px; margin-right: 5px;">
+    <input type="checkbox" class="remove-events-checkbox"> تعطیلی
+  </label>
+            <div class="task-container">
+
+            </div>
+          </div>
+          <!-- نمونه ستون یکشنبه -->
+          <div class="day-column" data-day="یک‌شنبه">
+            <h4>یک‌شنبه</h4>
+            <label style="font-size: 12px; margin-right: 5px;">
+              <input type="checkbox" class="disable-day-checkbox"> استراحت
+            </label>
+                          <label style="font-size: 12px; margin-right: 5px;">
+    <input type="checkbox" class="remove-events-checkbox"> تعطیلی
+  </label>
+            <div class="task-container"></div>
+          </div>
+          <!-- نمونه ستون دوشنبه -->
+          <div class="day-column" data-day="دوشنبه">
+            <h4>دوشنبه</h4>
+            <label style="font-size: 12px; margin-right: 5px;">
+              <input type="checkbox" class="disable-day-checkbox"> استراحت
+            </label>
+                          <label style="font-size: 12px; margin-right: 5px;">
+    <input type="checkbox" class="remove-events-checkbox"> تعطیلی
+  </label>
+            <div class="task-container"></div>
+          </div>
+          <!-- نمونه ستون سه‌شنبه -->
+          <div class="day-column" data-day="سه‌شنبه">
+            <h4>سه‌شنبه</h4>
+            <label style="font-size: 12px; margin-right: 5px;">
+              <input type="checkbox" class="disable-day-checkbox"> استراحت
+            </label>
+                          <label style="font-size: 12px; margin-right: 5px;">
+    <input type="checkbox" class="remove-events-checkbox"> تعطیلی
+  </label>
+            <div class="task-container"></div>
+          </div>
+          <!-- نمونه ستون چهارشنبه -->
+          <div class="day-column" data-day="چهارشنبه">
+            <h4>چهارشنبه</h4>
+            <label style="font-size: 12px; margin-right: 5px;">
+              <input type="checkbox" class="disable-day-checkbox"> استراحت
+            </label>
+                          <label style="font-size: 12px; margin-right: 5px;">
+    <input type="checkbox" class="remove-events-checkbox"> تعطیلی
+  </label>
+            <div class="task-container"></div>
+          </div>
+          <div class="day-column" data-day="پنج‌شنبه">
+            <h4>پنج‌شنبه</h4>
+            <label style="font-size: 12px; margin-right: 5px;">
+              <input type="checkbox" class="disable-day-checkbox"> استراحت
+            </label>
+                          <label style="font-size: 12px; margin-right: 5px;">
+    <input type="checkbox" class="remove-events-checkbox"> تعطیلی
+  </label>
+            <div class="task-container">
+
+            </div>
+          </div>
+          <!-- نمونه ستون جمعه: نمونه باکس‌های آزمون و تحلیل -->
+          <div class="day-column" data-day="جمعه">
+            <h4>جمعه</h4>
+            <label style="font-size: 12px; margin-right: 5px;">
+              <input type="checkbox" class="disable-day-checkbox"> استراحت
+            </label>
+                          <label style="font-size: 12px; margin-right: 5px;">
+    <input type="checkbox" class="remove-events-checkbox"> تعطیلی
+  </label>
+            <div class="task-container">
+
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>
+         #subjectTabs {
+      display: flex;
+      margin-bottom: 1rem;
+    }
+    #subjectTabs .nav-item {
+      flex: 1;
+    }
+    #subjectTabs .nav-link {
+      width: 100%;
+      text-align: center;
+      border-radius: 0;
+    }
+    /* جداکننده‌ی تب‌ها */
+    #subjectTabs .nav-link + .nav-link {
+      border-left: 1px solid #dee2e6;
+    }
+    </style>
+    <!-- باکس دروس (سمت راست) -->
+<div class="subjects-box">
+  <h4>دروس</h4>
+<div class="grade-filters mb-3">
+  <label class="me-2"><input type="checkbox" class="grade-filter" value="1"> دهم</label>
+  <label class="me-2"><input type="checkbox" class="grade-filter" value="2"> یازدهم</label>
+  <label><input type="checkbox" class="grade-filter" value="3"> دوازدهم</label>
+</div>
+
+  <!-- Nav tabs -->
+  <ul class="nav nav-tabs" id="subjectTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <a class="nav-link active" id="all-subjects-tab" data-bs-toggle="tab" href="#allSubjects" role="tab">همه دروس</a>
+    </li>
+    <li class="nav-item" role="presentation">
+      <a class="nav-link" id="other-plan-tab" data-bs-toggle="tab" href="#otherPlan" role="tab">برنامه دانش‌آموز دیگر</a>
+    </li>
+  </ul>
+
+  <!-- Tab panes -->
+  <div class="tab-content mt-2">
+    <!-- حالت اول: همه دروس -->
+    <div class="tab-pane fade show active" id="allSubjects" role="tabpanel">
+      <h4>دروس تخصصی</h4>
+      <div class="task-list" id="specialized-task-list"> 
+            {% for lesson in specialized_lessons %}
+      <div class="task" 
+           data-lesson-id="{{ lesson.id }}"  data-lesson-name="{{ lesson.name }}"
+           data-grade="{{ lesson.grade.id }}">
+        {{ lesson.name }} {{ lesson.grade }}
+      </div>
+    {% endfor %}
+      </div>
+      <h4 class="mt-3">دروس عمومی</h4>
+      <div class="task-list" id="general-task-list">
+          {% for lesson in general_lessons %}
+      <div class="task" 
+           data-lesson-id="{{ lesson.id }}"  data-lesson-name="{{ lesson.name }}"
+           data-grade="{{ lesson.grade.id }}">
+        {{ lesson.name }} {{ lesson.grade }}
+      </div>
+    {% endfor %}
+      </div>
+    </div>
+
+    <!-- حالت دوم: برنامه دانش‌آموز دیگر -->
+    <div class="tab-pane fade" id="otherPlan" role="tabpanel">
+      <div class="mb-2">
+        <label for="otherStudentSelect" class="form-label">انتخاب دانش‌آموز:</label>
+        <select id="otherStudentSelect" class="form-select" style="width:100%;">
+          <option></option>
+          {% for student in students %}
+            <option value="{{ student.id }}">{{ student.profile.first_name }} {{ student.profile.last_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="task-list" id="otherStudentTasks">
+        <!-- اینجا تسک‌های هفتهٔ انتخاب‌شده ظاهر می‌شوند -->
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+  </div>
+<div style="margin-bottom: 10px;">
+  <textarea id="important-events" placeholder="رویدادهای مهم هفته" style="width:100%; height:80px;"></textarea>
+</div>
+  <button class="save-btn">ذخیره</button>
+
+  <!-- jQuery و jQuery UI -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.0.13/dist/js/select2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment-jalaali@0.9.2/moment-jalaali.js"></script>
+<script src="https://unpkg.com/persian-date@latest/dist/persian-date.min.js"></script>
+<script src="https://unpkg.com/persian-datepicker@latest/dist/js/persian-datepicker.min.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+  let currentMajorCode = "{{ major_code }}";
+  var subjectColors = {
+  "ادبیات": "#E57373",         // قرمز کم‌رنگ
+  "اقتصاد": "#F06292",          // صورتی متوسط
+  "آمار": "#BA68C8",            // بنفش متوسط
+  "تاریخ": "#9575CD",           // بنفش کمرنگ
+  "جامعه شناسی": "#7986CB",     // آبی کم‌رنگ
+  "جغرافیا": "#64B5F6",         // آبی روشن
+  "حسابان": "#4FC3F7",          // آبی آسمانی
+  "دینی": "#4DD0E1",            // فیروزه‌ای
+  "روانشناسی": "#4DB6AC",       // سبز زمردی
+  "ریاضی": "#81C784",           // سبز کم‌رنگ
+  "زبان": "#AED581",            // سبز روشن
+  "زیست": "#DCE775",           // زرد سبز
+  "سلامت و بهداشت": "#FFF176",  // زرد روشن
+  "شیمی": "#FFD54F",           // نارنجی روشن
+  "عربی": "#FFB74D",           // نارنجی متوسط
+  "علوم و فنون": "#FF8A65",     // نارنجی متمایل به قرمز
+  "فلسفه": "#A1887F",           // قهوه‌ای کم‌رنگ
+  "فیزیک": "#E0E0E0",           // خاکستری روشن
+  "گسسته": "#90A4AE",          // خاکستری آبی
+  "منطق": "#F48FB1",           // صورتی ملایم
+  "نگارش": "#CE93D8",          // بنفش روشن
+  "هندسه": "#9FA8DA",           // آبی بنفش
+  "هویت": "#80CBC4"            // فیروزه‌ای ملایم
+};
+
+  var chapterCache = {};
+
+
+
+$(document).on('change', '.remove-events-checkbox', function() {
+  var $col = $(this).closest('.day-column');
+  var $cont = $col.find('.task-container');
+
+  if (this.checked) {
+    // Detach کردن فقط ایونت‌ها و ذخیره در data ستون
+    var evts = $cont.find('.calendar-task[data-box-type="ایونت"]').detach();
+    $col.data('cachedEvents', evts);
+  } else {
+    // وقتی تیک برداشته شد، برگردونی
+    var evts = $col.data('cachedEvents');
+    if (evts && evts.length) {
+      $cont.append(evts);
+      // دوباره فعال‌سازی درگ/ریزایز و آپدیت لیبل زمان
+      evts.each(function() {
+        initCalendarTask($(this));
+        updateTimeLabel($(this));
+      });
+    }
+  }
+});
+
+  var readOnlyMode = false;  // Global flag for read-only mode
+
+// Helper functions – assuming each hour equals 60px
+  var baseHour = 6;  // calendar starts at 6:00
+function calculateTop(timeStr) {
+  var m;
+  if (timeStr.indexOf("T") !== -1) {
+    // It’s a full ISO datetime string.
+    m = moment.utc(timeStr);
+  } else {
+    // It’s a time-only string.
+    m = moment.utc(timeStr, "HH:mm");
+  }
+  return (m.hour() - baseHour) * 35 + m.minute() * 0.58333333;
+}
+
+function calculateHeight(startStr, endStr) {
+  var mStart, mEnd;
+  if (startStr.indexOf("T") !== -1) {
+    mStart = moment.utc(startStr);
+    mEnd = moment.utc(endStr);
+  } else {
+    mStart = moment.utc(startStr, "HH:mm");
+    mEnd = moment.utc(endStr, "HH:mm");
+  }
+  return mEnd.diff(mStart, 'minutes') * 0.58333333;
+}
+
+
+$(document).ready(function(){
+    // Utility function to check if a candidate time slot is free in the given container.
+function isTimeSlotFree($container, candidateTop, candidateHeight) {
+  var candidateBottom = candidateTop + candidateHeight;
+  var free = true;
+  $container.find('.calendar-task').each(function() {
+    var otherTop = parseInt($(this).css('top'), 10);
+    var otherHeight = $(this).outerHeight();
+    var otherBottom = otherTop + otherHeight;
+    // If the candidate interval overlaps with any existing task then the slot is not free.
+    if (!(candidateBottom <= otherTop || candidateTop >= otherBottom)) {
+      free = false;
+      return false; // break the loop
+    }
+  });
+  return free;
+}
+
+// Event listener for the repeat button on tasks from the subject box.
+$(document).on('click', '.repeat-btn', function(e) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  var $originalTask = $(this).closest('.calendar-task');
+  // Read its current time slot (top position and height)
+  var taskTop = parseInt($originalTask.css('top'), 10);
+  var taskHeight = $originalTask.outerHeight();
+
+  // Loop through each day column and try to add the task if the slot is free.
+  $('.day-column').each(function() {
+    var $dayColumn = $(this);
+
+    // Optionally skip disabled days
+    if ($dayColumn.hasClass('disabled-day')) {
+      return; // Skip this day column.
+    }
+
+    // Check in the day’s task container.
+    var $container = $dayColumn.find('.task-container');
+
+    // If the candidate slot is free in this day column...
+    if (isTimeSlotFree($container, taskTop, taskHeight)) {
+      // Clone the original task.
+      var $newTask = $originalTask.clone();
+      // Optionally, remove the repeat button from the clone to avoid further propagation.
+      $newTask.find('.repeat-btn').remove();
+      // Append the new task into the container.
+      $container.append($newTask);
+      // Reinitialize dragging and resizing for the cloned task.
+      initCalendarTask($newTask);
+      setupEditableSelects($newTask,0);
+    }
+  });
+});
+
+
+  $("#specialized-task-list, #general-task-list").sortable({
+    connectWith: ".task-list",
+    placeholder: "sortable-placeholder",
+    update: function(event, ui) {
+
+    }
+  }).disableSelection();
+  // Calculate weekStart (and pass it as needed)
+  const weekStart = moment().startOf('day'); 
+  // Convert to ISO string in the format expected by the backend
+  var weekStartIso = weekStart.toISOString().replace("Z", "+00:00");
+    var weekEnd = moment(weekStart).add(6, 'days').endOf('day');
+  var weekEndIso = weekEnd.toISOString().replace("Z", "+00:00");
+      student_id= $('#student-select').val();
+
+  // Fetch saved report details for the current week
+
+});
+
+
+
+
+
+    // Handle exam week checkbox changes
+$('#examWeekCheckbox').on('change', function() {
+  var $taskList = $(this).closest('.events-box').find('.task-list');
+  if ($(this).is(':checked')) {
+    // Define the exam tasks with their durations (in hours)
+    var examTasks = [
+      { title: "آزمون آزمایشی", duration: "3.5" },
+      { title: "تحلیل آزمون", duration: "4" },
+      { title: "پیش آزمون و تحلیل آن", duration: "6" },
+      { title: "مرور و آمادگی آزمون", duration: "4" }
+    ];
+    // Append each task to the events task list and initialize draggable
+    examTasks.forEach(function(task) {
+      var $task = $('<div class="task exam-task">' + task.title +'</div>');
+      $taskList.append($task);
+      // Initialize draggable so it works like the others
+      $task.draggable({
+        helper: "clone",
+        revert: "invalid",
+        zIndex: 100,
+        start: function(event, ui) {
+          ui.helper.css('width', $(this).outerWidth());
+        }
+      });
+    });
+  } else {
+    // Remove only the exam tasks
+    $taskList.find('.exam-task').remove();
+  }
+});
+
+
+
+    // Handle remove button click on calendar tasks
+$(document).on('click', '.remove-btn', function(e) {
+  e.stopPropagation(); // Prevent interfering with drag events
+  $(this).closest('.calendar-task').remove();
+});
+
+    /* تابع به‌روز رسانی برچسب زمان (نمایش شروع - پایان) */
+function updateTimeLabel($task) {
+  var top    = parseFloat($task.css('top'));
+  var height = parseFloat($task.css('height'));
+
+  var startHourRaw = Math.floor(top / 35);
+  var startMinRaw  = (top % 35) / 35 * 60;        // 35px == 60min
+  var startMin = Math.round(startMinRaw);
+  // اگر دقیقه به 60 رسیده، یک ساعت اضافه کن و دقیقه رو صفر کن
+  if (startMin >= 60) {
+    startHourRaw += 1;
+    startMin -= 60;
+  }
+
+  var endTotal     = top + height;
+  var endHourRaw   = Math.floor(endTotal / 35);
+  var endMinRaw    = (endTotal % 35) / 35 * 60;
+  var endMin = Math.round(endMinRaw);
+  if (endMin >= 60) {
+    endHourRaw += 1;
+    endMin -= 60;
+  }
+
+  var startHour = (startHourRaw + 6) % 24;
+  var endHour   = (endHourRaw   + 6) % 24;
+
+  var startStr = ("0" + startHour).slice(-2) + ":" + ("0" + startMin).slice(-2);
+  var endStr   = ("0" + endHour).slice(-2)   + ":" + ("0" + endMin).slice(-2);
+
+  $task.find('.time-label').text(startStr + " - " + endStr);
+}
+
+
+    /* تابع بررسی اوورلپ (همپوشانی) باکس‌های تقویمی در یک کانتینر */
+    function checkOverlap($task) {
+      var taskTop = parseInt($task.css('top'), 10);
+      var taskHeight = $task.outerHeight();
+      var taskBottom = taskTop + taskHeight;
+      var overlap = false;
+      $task.parent().find('.calendar-task').not($task).each(function() {
+        var otherTop = parseInt($(this).css('top'), 10);
+        var otherHeight = $(this).outerHeight();
+        var otherBottom = otherTop + otherHeight;
+        if (!(taskBottom <= otherTop || taskTop >= otherBottom)) {
+          overlap = true;
+          return false;
+        }
+      });
+      return overlap;
+    }
+    
+
+    /* راه‌اندازی قابلیت درگ و ریسایز برای باکس‌های تقویمی */
+function initCalendarTask($task) {
+  $task.draggable({
+    grid: [8.75, 8.75],
+    revert: "invalid",
+    start: function(event, ui) {
+      $(this).data('origTop', $(this).css('top'));
+    },
+    // ← این بخش را اضافه کن
+    drag: function(event, ui) {
+      // اسنپ روی گرید 8.75px معادل 15 دقیقه
+      var newTop = Math.round(ui.position.top / 8.75) * 8.75;
+      newTop = Math.max(0, newTop);
+      $(this).css('top', newTop);
+      // به‌روز کردن برچسبِ زمان
+      updateTimeLabel($(this));
+    },
+    stop: function(event, ui) {
+      var newTop = Math.round(ui.position.top / 8.75) * 8.75;
+      newTop = Math.max(0, newTop);
+      $(this).css('top', newTop);
+      if (checkOverlap($(this))) {
+        $(this).css('top', $(this).data('origTop'));
+      }
+      updateTimeLabel($(this));
+    }
+  }).resizable({
+    handles: 's',
+    grid: [8.75, 8.75],
+    start: function(event, ui) {
+      $(this).data('origHeight', $(this).css('height'));
+    },
+    // ← اینجا resize رو اضافه می‌کنیم:
+    resize: function(event, ui) {
+      // گرد کردن ارتفاع روی گرید 8.75px (15 دقیقه)
+      var newHeight = Math.round(ui.size.height / 8.75) * 8.75;
+      $(this).css('height', newHeight);
+      // هر بار ابعاد عوض شد، لیبل زمان رو آپدیت کن
+      updateTimeLabel($(this));
+    },
+    stop: function(event, ui) {
+      var newHeight = Math.round(ui.size.height / 8.75) * 8.75;
+      $(this).css('height', newHeight);
+      if (checkOverlap($(this))) {
+        $(this).css('height', $(this).data('origHeight'));
+      }
+      updateTimeLabel($(this));
+    }
+  });
+}
+
+
+    $(function(){
+
+
+
+$(document).on('change', '.disable-day-checkbox', function() {
+  var $col = $(this).closest('.day-column');
+  var $cont = $col.find('.task-container');
+
+  if (this.checked) {
+    // Detach می‌کنیم (تمام المنت‌ها با state‌شون) و توی data ستون نگه‌ می‌داریم
+    var tasks = $cont.children().detach();
+    $col.data('cachedTasks', tasks);
+
+    $col.addClass('disabled-day');
+  } else {
+    $col.removeClass('disabled-day');
+    var tasks = $col.data('cachedTasks');
+    if (tasks && tasks.length) {
+      // دوباره Append می‌کنیم، پلاگین و eventها سر جاشونن
+      $cont.append(tasks);
+
+      // فقط یک بار initCalendarTask و آپدیت لیبل زمان لازم داریم
+      $cont.find('.calendar-task').each(function() {
+        var $t = $(this);
+        initCalendarTask($t);
+        updateTimeLabel($t);
+      });
+    }
+  }
+});
+
+
+
+
+      // ---------------- دکمه ذخیره: ساخت JSON شامل زمان شروع، پایان و اطلاعات اضافی ----------------
+
+
+    });
+
+
+            $('#student-select').select2({
+                placeholder: "دانش آموز",
+                width: 'fit-content', 
+                theme: 'bootstrap-5', 
+
+            });
+
+
+</script>
+<!-- Load Moment.js and Moment-Jalaali -->
+<script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/moment-jalaali@0.9.2/build/moment-jalaali.min.js"></script>
+
+<script>
+  $(document).ready(function() {
+    // Check if moment and moment-jalaali are loaded
+    if (typeof moment === 'undefined') {
+  //    console.error('Moment.js is not loaded');
+      return;
+    }
+    if (typeof moment().format('jD') === 'undefined') {
+    //  console.error('moment-jalaali is not loaded correctly');
+      return;
+    }
+
+// Load Persian dialect
+    moment.loadPersian({ dialect: 'persian-modern' });
+    // Get today's Jalali date
+    let today = moment();
+    let todayJalali = today.format('jD jMMMM'); // e.g., "11 بهمن"
+    let todayWeekday = today.format('dddd'); // e.g., "پنج‌شنبه"
+
+    // Days of the week in Persian
+    const persianWeekdays = ["شنبه", "یک‌شنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"];
+
+    // Find index of today in Persian weekdays
+    let todayIndex = persianWeekdays.indexOf(todayWeekday);
+
+    // Create a **reordered** array starting from today's weekday
+    let reorderedWeekdays = persianWeekdays.slice(todayIndex).concat(persianWeekdays.slice(0, todayIndex));
+
+ //   console.log("Today:", todayWeekday, todayJalali);
+ //   console.log("Reordered Weekdays:", reorderedWeekdays);
+
+    // Loop through the calendar and correctly assign dates
+    reorderedWeekdays.forEach((weekday, offset) => {
+      let adjustedDate = moment().add(offset, 'days'); // Correctly shift dates forward
+      let dayJalali = adjustedDate.format('jD jMMMM');
+
+      //console.log("Assigning", dayJalali, "to", weekday);
+
+      // Find the correct `.day-column[data-day]`
+      $(`.day-column[data-day="${weekday}"] h4`).append(` - ${dayJalali}`);
+    });
+  });
+
+// Update day column headers based on the chosen week start date
+
+$(document).ready(function() {
+  var topHeaderHeight = $(".top-header").outerHeight();
+
+  // Create an overlay that covers everything except the top-header.
+  var overlayStyle = "position: fixed; top: " + topHeaderHeight + "px; left: 0; width: 100%; " +
+                     "height: calc(100% - " + topHeaderHeight + "px); background: rgba(255,255,255,0.9); " +
+                     "z-index: 9999; display: flex; align-items: center; justify-content: center; " +
+                     "font-size: 24px; color: #333;";
+  
+  var $overlay = $('<div id="pageOverlay" style="' + overlayStyle + '">لطفا تاریخ و دانش‌آموز را انتخاب کنید و روی "بارگذاری هفته" کلیک کنید.</div>');
+  $('body').append($overlay);
+  
+  
+        $("#weekSelector").pDatepicker({
+      format: "YYYY-MM-DD",
+      initialValue: false,
+      persianDigit :false,
+      calendar: {
+        persian: {
+          enabled: true,
+          locale: "fa",
+          leapYearMode: 'astronomical',
+        },
+        gregorian: {
+          enabled: false
+        }
+      }
+    });
+  // Calculate week start (today) and week end (today + 6 days for a 7-day period)
+  const weekStart = moment().startOf('day'); 
+  const weekEnd = moment(weekStart).add(6, 'days').endOf('day');
+
+
+
+$('.save-btn').on('click', function(){
+  // Build the report data object
+  var reportData = {
+    student_id: $('#student-select').val(),
+    week_start: weekStart.toISOString().replace("Z", "+00:00"),
+    week_end: weekEnd.toISOString().replace("Z", "+00:00"),
+    important_events: $('#important-events').val(),
+    days: []
+  };
+
+  // Define the base hour offset (if your calendar starts at 6:00)
+  var baseHour = 6;
+
+  // Iterate through each day column to collect task details
+  $('.day-column').each(function(){
+    var $dayColumn = $(this);
+    var dayName = $dayColumn.data('day'); // e.g. "شنبه", "یکشنبه", etc.
+    var dayDate = $dayColumn.data('date');  // e.g. "2025-03-02"
+    // Determine if the day is disabled (checkbox checked or CSS class applied)
+    var disabled = $dayColumn.find('.disable-day-checkbox').is(':checked') || $dayColumn.hasClass('disabled-day');
+
+    var dayTasks = [];
+    $dayColumn.find('.calendar-task').each(function(){
+      var $task = $(this);
+      // Get the task's top and height (in pixels)
+      var top = parseInt($task.css('top'), 10);
+      var height = parseInt($task.css('height'), 10);
+
+      var cellHeight = 35;              // پیکسل در ساعت
+      var pxToMinute = 60 / cellHeight; // حدود 1.714 دقیقه در پیکسل
+    
+      // زمان شروعِ کامل (بر حسب دقیقه از نیمه‌شب)
+      var totalStartMins = Math.round(top * pxToMinute) + baseHour * 60;
+      var startHour      = Math.floor(totalStartMins / 60) % 24;
+      var startMinute    = totalStartMins % 60;
+    
+      // زمان پایانِ کامل
+      var totalEndMins   = Math.round((top + height) * pxToMinute) + baseHour * 60;
+      var endHour        = Math.floor(totalEndMins / 60) % 24;
+      var endMinute      = totalEndMins % 60;
+    
+      // رشته‌های HH:mm:ss
+      var startFull = 
+        ("0"+startHour).slice(-2) + ":" +
+        ("0"+startMinute).slice(-2) + ":00";
+      var endFull =
+        ("0"+endHour).slice(-2)   + ":" +
+        ("0"+endMinute).slice(-2) + ":00";
+
+      // Calculate duration in minutes
+      var duration = moment(endFull, "HH:mm:ss").diff(moment(startFull, "HH:mm:ss"), 'minutes');
+
+      // Collect additional info for this task.
+      var boxType = $task.data("box-type"); // e.g. "ایونت", "تکلیف", "مطالعه"
+      var lessonId = $task.data("lesson-id");
+      var chapterId = $task.find('.task-chapter').val() || null;
+      var optionalTestsCount = 0;
+      $task.find('.task-extra').each(function(){
+        optionalTestsCount += parseInt($(this).val(), 10) || 0;
+      });
+      var $titleElem = $task.find('.task-title');
+      var title = $titleElem.is('input') ? $titleElem.val().trim() : $titleElem.text().trim();
+
+      dayTasks.push({
+        title: title,
+        start: startFull,  // full ISO datetime string (time portion)
+        end: endFull,      // full ISO datetime string (time portion)
+        extra: $task.find('.task-extra').val() || "",
+        dropdown: $task.find('.task-dropdown').val() || "",
+        box_type: $task.data("box-type") || "مطالعه",
+        lesson_id: lessonId,
+        chapter_id: chapterId,
+        optional_tests_count: optionalTestsCount,
+        duration_minutes: duration
+      });
+    });
+
+    reportData.days.push({
+      day: dayName,
+      disabled: disabled,
+      tasks: dayTasks
+    });
+  });
+
+  // Send the JSON data via AJAX to your Django view
+  $.ajax({
+    url: "/save-weekly-report/",  // adjust URL as needed
+    type: "POST",
+    data: JSON.stringify(reportData),
+    contentType: "application/json",
+    headers: { "X-CSRFToken": "{{ csrf_token }}" },
+    success: function(response) {
+      alert("Report saved successfully!");
+    },
+    error: function(xhr, status, error) {
+      alert("Error saving report.");
+    }
+  });
+});
+
+});
+$(document).on('click', '.tick-btn', function(e) {
+  e.stopPropagation();
+  var $eventTask = $(this).closest('.calendar-task');
+  // Get the current title from the input field
+  var $titleElem = $eventTask.find('.task-title');
+var eventTitle = "";
+if ($titleElem.is("input, textarea")) {
+    eventTitle = $titleElem.val().trim();
+} else {
+    eventTitle = $titleElem.text().trim();
+}
+
+  // Construct the new title with the prefix
+  var newTitle = "آمادگی و تکلیف " + eventTitle;
+  // Create a new draggable task element
+  // 1) ساخت المان تکلیف جدید و الصاق به لیست
+  var $newDraggableTask = $('<div class="task">' + newTitle + '</div>');
+  $('.assignments-box .task-list').append($newDraggableTask);
+
+  // 2) تنظیم درگ با helper تابعی + appendTo + cursorAt + عرض ثابت
+  $newDraggableTask.draggable({
+    helper: function() {
+      // کلون می‌سازیم
+      var $clone = $(this).clone();
+      // روی بادی بنداز تا CSS باکس پدر روش اثر نکنه
+      $clone.appendTo('body');
+      // عرض دلخواه (مثلاً 100px) ست می‌کنیم
+      $clone.css({
+        width: '100px',
+        'white-space': 'nowrap',
+        overflow: 'hidden',
+        'text-overflow': 'ellipsis'
+      });
+      return $clone;
+    },
+    appendTo: 'body',
+    cursorAt: { top: 0, left: 50 }, // نصف عرضِ 100px
+    revert: "invalid",
+    zIndex: 100
+    // دیگه نیازی به start/stop نداریم
+  });
+});
+
+function convertPersianDigitsToEnglish(str) {
+  var persianDigits = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+  for (var i = 0; i < persianDigits.length; i++) {
+    str = str.replace(new RegExp(persianDigits[i], 'g'), i);
+  }
+  return str;
+}
+  // When the user clicks "Load Week"
+$("#loadWeek").on("click", function(){
+          var selectedDate = $("#weekSelector").val();
+      var student = $("#student-select").val();
+      
+      if(!selectedDate || !student){
+          alert("لطفا تاریخ و دانش‌آموز را انتخاب کنید.");
+          return false;
+      }
+      // Selections are made, so remove the overlay so that the page becomes active.
+      $("#pageOverlay").remove();
+      var student_id = $("#student-select").val();
+    
+
+    // 1. Get the selected Jalali date from the pDatepicker.
+    var selectedJalaliRaw = $("#weekSelector").val(); // e.g., "۱۴۰۲-۱۱-۰۱"
+    var selectedJalali = convertPersianDigitsToEnglish(selectedJalaliRaw);
+    // Parse the selected date using moment-jalaali (set to midnight)
+    var selectedDate = moment(selectedJalali, 'jYYYY-jMM-jDD').startOf('day');
+    var student_id = $('#student-select').val();
+    
+    // 2. Check for an existing plan using the backend endpoint.
+    $.ajax({
+        url: "/check-weekly-report/",
+        data: { 
+            selected_date: selectedDate.format("YYYY-MM-DD"), 
+            student_id: student_id 
+        },
+        dataType: "json",
+        success: function(resp){
+            var planStart, planEnd;
+            if(resp.exists === "current") {
+                // Case 2: A current plan exists covering the selected date.
+                planStart = moment(resp.week_start).startOf('day');
+                planEnd = moment(resp.week_end).startOf('day');
+            } else if(resp.exists === "future") {
+                // Case 3: A future plan exists.
+                alert("A plan already exists starting from " + moment(resp.week_start).format("jD jMMMM") +
+                      ". You cannot create a new plan for the selected day.");
+                return; // abort further processing.
+            } else {
+                // Case 1: No plan exists. Use the selected date as the plan's start.
+                planStart = selectedDate.clone();
+                planEnd = selectedDate.clone().add(6, 'days');
+            }
+            
+// 1. بساز headers شامل ۷ روز پشت‌سرهم از planStart
+const headers = [];
+for (let i = 0; i < 7; i++) {
+  const day = planStart.clone().add(i, 'days');
+  const weekday = day.format('jdddd').replace(/^j/, '');  // "سه‌شنبه"، "چهارشنبه" و …
+  headers.push({
+    weekday,
+    iso: day.format('YYYY-MM-DD'),
+    label: day.format('jD jMMMM')
+  });
+}
+
+// 2. یک Map از ستون‌های موجود بساز
+const $container = $('.calendar');  // جایی که .day-columnها هستند
+const cols = {};
+$container.find('.day-column').each(function() {
+  const key = $(this).data('day');  // مثلاً "شنبه"
+  cols[key] = $(this);
+});
+
+// 3. خالی کن و بر اساس headers append کن
+$container.empty();
+headers.forEach(h => {
+  const $col = cols[h.weekday];
+  if (!$col) return;
+  // هدر و data-date را بروز کن
+  $col
+    .attr('data-day', h.weekday)
+    .attr('data-date', h.iso)
+    .find('h4')
+      .text(`${h.weekday} - ${h.label}`);
+  // ستون را دوباره وارد DOM کن
+  $container.append($col);
+});
+
+      // ---------------- قابلیت دراپ در کانتینرهای تقویمی ----------------
+$('.task-container').droppable({
+  accept: ".task, .calendar-task, .other-plan-task", 
+  drop: function(event, ui) {
+        if (ui.draggable.hasClass('other-plan-task')) {
+    return;  // از اجرا شدن منطق پیش‌فرض جلوگیری می‌کنه
+  }
+      if (readOnlyMode) return;
+    var $dayColumn = $(this).closest('.day-column');
+    if ($dayColumn.hasClass('disabled-day')) {
+      if (ui.draggable.hasClass("calendar-task")) {
+        ui.draggable.animate({ top: ui.draggable.data('origTop') }, 200);
+      }
+      return;
+    }
+    
+    var $dropped = $(ui.draggable);
+    var containerOffset = $(this).offset();
+    var dropTop = ui.offset.top - containerOffset.top;
+dropTop = Math.round(dropTop / 8.75) * 8.75;
+            var lessonId = $dropped.data("lesson-id"); // Get lesson ID from dropped box
+        var grade = $dropped.data("grade"); 
+        
+       // -------------------------------
+    // NEW BRANCH for exam tasks:
+    // -------------------------------
+    if ($dropped.hasClass("exam-task")) {
+      var title = $dropped.text().trim();
+      // Set default height based on exam task title using a scale factor (1 hour = 30px)
+      var defaultHeight = 52.5; // fallback value
+      if (title.indexOf("آزمون آزمایشی") !== -1) {
+        defaultHeight = 3.5 * 35;  // 3.5 hours → 105px
+      } else if (title.indexOf("تحلیل آزمون") !== -1) {
+        defaultHeight = 4 * 35;    // 4 hours   → 120px
+      } else if (title.indexOf("پیش آزمون") !== -1) {
+        defaultHeight = 6 * 35;    // 6 hours   → 180px
+      } else if (title.indexOf("مرور و آمادگی آزمون") !== -1) {
+        defaultHeight = 4 * 35;    // 4 hours   → 120px
+      }
+      
+      // Create a new calendar task element for the exam task.
+      // Here we add contenteditable to allow the title to be modified.
+      var $newTask = $(
+        '<div class="calendar-task" style="top:' + dropTop + 'px; height:' + defaultHeight + 'px; left:5%;">' +
+          '<button class="remove-btn" title="حذف">&#10006;</button>' +
+          // Make the title editable by using contenteditable on the container (or an input if you prefer)
+          '<div class="task-title" contenteditable="true">' + title + '</div>' +
+          '<div class="time-label"></div>' +
+        '</div>'
+      );
+      // Mark the new task as an event (or exam) box
+      $newTask.attr("data-box-type", "ایونت");
+      
+      
+      const patterns = ['exam-pattern-1','exam-pattern-2','exam-pattern-3'];
+// انتخاب رندوم
+const rndPattern = patterns[Math.floor(Math.random() * patterns.length)];
+// اضافه کردن کلاس پترن
+$newTask.addClass(rndPattern);
+      // Append the new exam task to the day column
+      $(this).append($newTask);
+      // Initialize dragging and resizing for the new task and update its time label.
+      
+      initCalendarTask($newTask);
+      updateTimeLabel($newTask);
+      setupEditableSelects($newTask,0);
+        // Remove the original exam task from the events container
+  $dropped.remove();
+      // Note: Do not re-append the original exam task back to its parent container,
+      // so it is effectively removed from the events box.
+      return;
+    }
+    
+     // Branch جدید برای باکس شناور
+if ($dropped.hasClass("floating-box")) {
+  var containerOffset = $(this).offset();
+  var dropTop = ui.offset.top - containerOffset.top;
+  dropTop = Math.round(dropTop / 8.75) * 8.75;
+
+  // ساخت المان تقویمی
+  var $newTask = $(
+    '<div class="calendar-task floating" ' +
+         'style="top:' + dropTop + 'px; height:52.5px; left:5%;">' +
+      '<button class="remove-btn" title="حذف">&#10006;</button>' +
+      '<div class="task-title">باکس شناور</div>' +
+      '<div class="time-label"></div>' +
+    '</div>'
+  );
+  $newTask.attr("data-box-type", "شناور");
+
+  // قرار دادن در تقویم و فعال‌سازی درگ/ریزایز
+  $(this).append($newTask);
+  initCalendarTask($newTask);
+  updateTimeLabel($newTask);
+setupEditableSelects($newTask,0);
+  // المان اصلی در لیست ایونت بمونه (برای دراپ‌های بعدی)
+  return;
+}
+
+    if ($dropped.hasClass("calendar-task")) {
+      $dropped.appendTo($(this));
+      $dropped.css({ top: dropTop, left: "5%" });
+      updateTimeLabel($dropped);
+    } else if($dropped.closest('.events-box').length > 0 && $dropped.closest('.exam-task').length <= 0){
+            // Check if the dragged element came from the events box:
+      // Create an event task which has only an editable title and a tick button.
+      var $newTask = $(
+        '<div class="calendar-task event-task" style="top:' + dropTop + 'px; height:52.5px; left:5%;">' +
+                  '<button class="remove-btn" title="حذف">&#10006;</button>' +
+
+          // Tick button to generate new draggable task later
+          '<button class="tick-btn" title="ایجاد تکلیف جدید">افزودن تکلیف</button>' +
+          // Editable title (using an input so the user can change it)
+          '<input type="text"   class="task-title task-inp editable" placeholder="عنوان" />' +
+          '<div class="time-label"></div>' +
+        '</div>'
+      );
+      // Set the box type to "ایونت" for event tasks
+      $newTask.attr("data-box-type", "ایونت");
+      // Append the new task to the day column
+      $(this).append($newTask);
+      // Initialize dragging/resizing for the new task
+      initCalendarTask($newTask);
+      updateTimeLabel($newTask);
+setupEditableSelects($newTask,0);
+
+
+    } else if($dropped.closest('.assignments-box').length > 0 || $dropped.closest('.exam-task').length > 0 ){
+            // Check if the dragged element came from the events box:
+      var title = $dropped.text().trim();
+      // Create an event task which has only an editable title and a tick button.
+      var $newTask = $(
+        '<div class="calendar-task" style="top:' + dropTop + 'px; height:52.5px; left:5%;">' +
+                  '<button class="remove-btn" title="حذف">&#10006;</button>' +
+
+          '<div class="task-title">' + title + '</div>' +
+          '<div class="time-label"></div>' +
+        '</div>'
+      );
+      // Set the box type to "ایونت" for event tasks
+      $newTask.attr("data-box-type", "تکلیف");
+      
+  var cleanTitle = title.replace(/^آمادگی و تکلیف\s+/, '');
+  // استخراج نام درس (اولین کلمه یا هر منطق دیگه‌ای که لازم دارید)
+  var subj = cleanTitle.split(" ")[0];
+  if (subjectColors[subj]) {
+    $newTask.css("background-color", subjectColors[subj]);
+  }
+
+      // Append the new task to the day column
+      $(this).append($newTask);
+      // Initialize dragging/resizing for the new task
+      initCalendarTask($newTask);
+      updateTimeLabel($newTask);
+      setupEditableSelects($newTask,0);
+       $dropped.remove();
+    }
+    else{
+      var title = $dropped.text().trim();
+      var $newTask = $( 
+        '<div class="calendar-task extended-task" style="top:' + dropTop + 'px; height:52.5px; left:5%;">' +
+          '<button class="remove-btn" title="حذف">&#10006;</button>' +
+          '<button class="repeat-btn" title="تکرار شونده" style="font-size:10px; margin-left:4px;">تکرار</button>' +
+          '<div class="task-title">' + title + '</div><div class="task-info" style="display: flex; flex-direction: row; align-items: center; max-width: 80%;">' +
+          '<select class="task-chapter p-1 text-sm leading-tight" style="width: 100%; margin-top: 4px;"></select>' +  // Searchable dropdown
+          ' <select class="task-extra p-1 text-sm leading-tight" style=" margin-top: 4px;"><option value="" selected disabled>-</option><option value="5">5</option><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option><option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option><option value="60">60</option><option value="65">65</option><option value="70">70</option><option value="75">75</option><option value="80">80</option><option value="85">85</option><option value="90">90</option><option value="95">95</option><option value="100">100</option></select>' +
+          '<div class="hidden extra-info">تعداد تست: 0</div><div class="time-label"></div>' +
+        '</div>'
+      );
+      // Extract subject name from the dragged element’s data attribute:
+var subjectName = $dropped.data("lesson-name");
+
+// OPTIONAL: If data attribute is missing, try to extract from the title text (you may adjust this logic)
+if (!subjectName) {
+  subjectName = title.split(" ")[0];
+}
+
+// Set background color if the subject exists in your subjectColors object:
+if (subjectColors.hasOwnProperty(subjectName)) {
+  $newTask.css("background-color", subjectColors[subjectName]);
+}
+      var defaultBoxType = "مطالعه";  
+       $newTask.attr("data-box-type", defaultBoxType);
+       $newTask.attr("data-lesson-id", lessonId);
+$newTask.attr("data-grade", grade);
+// When a task is dropped from the subjects box:
+if ($(this).closest('#specialized-task-list').length > 0) {
+  $newTask.attr("data-lesson-type", "تخصصی");
+} else {
+  $newTask.attr("data-lesson-type", "عمومی");
+}
+
+      $(this).append($newTask);
+
+            var $chapterSelect = $newTask.find('.task-chapter');
+            if ($chapterSelect.hasClass('select2-hidden-accessible')) {
+  $chapterSelect.select2('destroy');
+  $chapterSelect.next('.select2-container').remove();
+}
+// ۲) پاک کردن همه <option> قبلی (در صورت نیاز)
+$chapterSelect.empty();
+
+$chapterSelect.select2({
+    placeholder: "شماره فصل",
+    dropdownParent: $newTask,
+    width: '100%',
+    theme: 'bootstrap-5',
+    minimumInputLength: 0,  // Allow search on zero-length input if desired
+    ajax: {
+        // Custom transport function for caching
+        transport: function (params, success, failure) {
+            // Construct a unique cache key based on lessonId and grade
+            var key = lessonId + "_" + grade;
+            
+            // If data is already cached, filter it (if a search term is provided) and return it.
+            if (chapterCache[key]) {
+                var data = chapterCache[key];
+                if (params.data.term) {
+                    // Filter cached data client-side.
+                    data = data.filter(function(item) {
+                        return item.text.toLowerCase().indexOf(params.data.term.toLowerCase()) > -1;
+                    });
+                }
+                // Select2 expects an object with a 'results' property
+                success({ results: data });
+                // Return null to avoid creating a new request.
+                return null;
+            }
+            console.log(currentMajorCode);
+            // If not in cache, make the AJAX call.
+            var request = $.ajax({
+                url: "/get-chapters/",
+                dataType: "json",
+                delay: 250,  // optional: debounce delay
+                data: {
+                    lesson_id: lessonId,
+                    grade: grade,
+                    major_code: currentMajorCode,
+                    q: params.data.term  // pass the search term if your endpoint uses it
+                }
+            });
+            
+            // When the AJAX call succeeds, cache the result and then return the (optionally filtered) data.
+            request.then(function(data){
+                // Cache the full result for this combination
+                chapterCache[key] = data;
+                var resultData = data;
+                if (params.data.term) {
+                    resultData = data.filter(function(item) {
+                        return item.text.toLowerCase().indexOf(params.data.term.toLowerCase()) > -1;
+                    });
+                }
+                success({ results: resultData });
+            }, failure);
+            
+            return request;
+        },
+        // processResults simply wraps the data; adjust if needed
+        processResults: function (data) {
+            // In our transport function we already wrap in { results: ... }
+            return data;
+        }
+    }
+}); 
+
+            $('.select2-selection--single').removeClass('select2-selection--single').removeClass('select2-selection').addClass('task-extra');
+      initCalendarTask($newTask);
+      updateTimeLabel($newTask);
+setupEditableSelects($newTask,0);
+  // Option 3: Retrieve the original element from the data.
+  var $original = $dropped.data('originalElement');
+  console.log("Original element:", $original); // Debug log
+  if ($original && $original.parent().hasClass('task-list')) {
+     // Append it to the end of its parent container.
+     $original.parent().append($original);
+  }
+  
+  return; // Exit after processing subjects task drop.
+}      var $original = $dropped.data('originalElement');
+      if ($original) {
+         $original.parent().append($original);
+      }
+      
+      return; // Exit after processing subjects task drop.
+    
+
+    }
+            });
+
+            // 5. Update the day column headers with the sorted headers.
+            // Assumes there are exactly 7 .day-column elements in the DOM.
+           // $(".day-column").each(function(index){
+           //     if (index < headers.length) {
+           //         var headerData = headers[index];
+            //        var formattedDate = headerData.date.format("jD jMMMM");
+            //        $(this).find("h4").text(headerData.weekday + " - " + formattedDate);
+                    // Optionally, set a data-date attribute
+            //        $(this).attr("data-date", headerData.date.format("YYYY-MM-DD"));
+           //     }
+         //   });
+          //  
+            // 6. Load tasks for the plan period.
+            var weekStartIso = planStart.toISOString().replace("Z", "+00:00");
+            $.ajax({
+                url: "/get-weekly-report-details/",
+                data: { week_start: weekStartIso, student_id: student_id },
+                dataType: "json",
+                success: function(response) {
+                    $(".task-container").empty();
+                    if (response.tasks && response.tasks.length > 0) {
+                    readOnlyMode = false;
+                    $(".save-btn").prop("disabled", false).text("ذخیره");
+                    $("#important-events").val(response.important_events);
+                    response.tasks.forEach(function(task) {
+                        var top = calculateTop(task.start_time);
+                        var height = calculateHeight(task.start_time, task.end_time);
+                        // Find the target container by matching the day's name.
+                        var $targetContainer = $('.day-column[data-day="'+ task.day_of_week +'"] .task-container');
+                        
+                        var $taskBox;
+                        if (task.box_type === "ایونت" || task.box_type === "تکلیف") {
+                          // For event or assignment boxes that do not require select2
+                          $taskBox = $( 
+                            '<div class="calendar-task" style="top:' + top + 'px; height:' + height + 'px; left:5%;">' +
+                              '<button class="remove-btn" title="حذف">&#10006;</button>' +
+                                 '<button class="tick-btn" title="ایجاد تکلیف جدید">افزودن تکلیف</button>' +
+
+                              '<div class="task-title" contenteditable="true">' + task.title + '</div>' +
+                              '<div class="time-label">' +
+                                 moment.utc(task.start_time).format("HH:mm") + " - " +
+                                 moment.utc(task.end_time).format("HH:mm") +
+                              '</div>' +
+                            '</div>'
+                          );
+                        } else {
+                          // For extended tasks coming from the subjects box – include select boxes etc.
+                          $taskBox = $( 
+                            '<div class="calendar-task extended-task" style="top:' + top + 'px; height:' + height + 'px; left:5%;">' +
+                              '<button class="remove-btn" title="حذف">&#10006;</button>' +
+                              '<div class="task-title" contenteditable="true">' + task.title + '</div>' +
+                              '<div class="task-info" style="display: flex; flex-direction: row; align-items: center; max-width: 80%;">' +
+                                '<select class="task-chapter p-1 text-sm leading-tight" style="width: 100%; margin-top: 4px;"></select>' +
+                                '<select class="task-extra p-1 text-sm leading-tight" style="margin-top: 4px;"><option value="" selected disabled>-</option>' +
+                                  '<option value="5">5</option>' +
+                                  '<option value="10">10</option>' +
+                                  '<option value="15">15</option>' +
+                                  '<option value="20">20</option>' +
+                                  '<option value="25">25</option>' +
+                                  '<option value="30">30</option>' +
+                                  '<option value="35">35</option>' +
+                                  '<option value="40">40</option>' +
+                                  '<option value="45">45</option>' +
+                                  '<option value="50">50</option>' +
+                                  '<option value="55">55</option>' +
+                                  '<option value="60">60</option>' +
+                                  '<option value="65">65</option>' +
+                                  '<option value="70">70</option>' +
+                                  '<option value="75">75</option>' +
+                                  '<option value="80">80</option>' +
+                                  '<option value="85">85</option>' +
+                                  '<option value="90">90</option>' +
+                                  '<option value="95">95</option>' +
+                                  
+                                  '<option value="100">100</option>' +
+                                '</select>' +
+                                '<div class="hidden extra-info">تعداد تست: ' + (task.optional_tests_count || 0) + '</div>' +
+                                '<div class="time-label">' +
+                                  moment.utc(task.start_time).format("HH:mm") + " - " +
+                                  moment.utc(task.end_time).format("HH:mm") +
+                                '</div>' +
+                              '</div>' +
+                            '</div>'
+                          );
+                          // Store additional data attributes for later use
+
+                        }
+                        // If your task JSON has a lesson_name field:
+if (task.lesson_name && subjectColors.hasOwnProperty(task.lesson_name)) {
+  $taskBox.css("background-color", subjectColors[task.lesson_name]);
+}
+                          $taskBox.attr("data-box-type", task.box_type);
+                          $taskBox.attr("data-lesson-type", task.lesson_type || "عمومی");
+                          $taskBox.attr("data-lesson-id", task.lesson_id);
+                          $taskBox.attr("data-grade", task.grade);
+                          $taskBox.attr("data-optional-tests", task.optional_tests_count || 0);
+                        $targetContainer.append($taskBox);
+                        if ($taskBox.hasClass("extended-task")) {
+                          var $chapterSelect = $taskBox.find('.task-chapter');
+
+
+
+                          
+  // If the saved plan has chapter info, prepopulate the select.
+  if ( task.chapter_id && task.chapter_text ) {
+    // Create the default option using the saved chapter data.
+    var option = new Option(task.chapter_text, task.chapter_id, true, true);
+    $chapterSelect.append(option);
+    $chapterSelect.val(task.chapter_id).trigger("change");
+  }
+    if ($chapterSelect.hasClass('select2-hidden-accessible')) {
+    $chapterSelect.select2('destroy');
+    $chapterSelect.next('.select2-container').remove();
+  }
+  // Initialize select2 on the chapter select with an ajax data source.
+$chapterSelect.select2({
+    placeholder: "شماره فصل",
+    dropdownParent: $taskBox,
+    width: '100%',
+    theme: 'bootstrap-5',
+    minimumInputLength: 0,  // Allow search on zero-length input if desired
+    ajax: {
+        // Custom transport function for caching
+        transport: function (params, success, failure) {
+            // Construct a unique cache key based on lessonId and grade
+            var key = task.lesson_id + "_" + task.grade;
+            
+            // If data is already cached, filter it (if a search term is provided) and return it.
+            if (chapterCache[key]) {
+                var data = chapterCache[key];
+                if (params.data.term) {
+                    // Filter cached data client-side.
+                    data = data.filter(function(item) {
+                        return item.text.toLowerCase().indexOf(params.data.term.toLowerCase()) > -1;
+                    });
+                }
+                // Select2 expects an object with a 'results' property
+                success({ results: data });
+                // Return null to avoid creating a new request.
+                return null;
+            }
+            
+            // If not in cache, make the AJAX call.
+            var request = $.ajax({
+                url: "/get-chapters/",
+                dataType: "json",
+                delay: 250,  // optional: debounce delay
+                data: {
+                    lesson_id: task.lesson_id,
+                    grade: task.grade,
+                    major_code: currentMajorCode,
+                    q: params.data.term  // pass the search term if your endpoint uses it
+                }
+            });
+            
+            // When the AJAX call succeeds, cache the result and then return the (optionally filtered) data.
+            request.then(function(data){
+                // Cache the full result for this combination
+                chapterCache[key] = data;
+                var resultData = data;
+                if (params.data.term) {
+                    resultData = data.filter(function(item) {
+                        return item.text.toLowerCase().indexOf(params.data.term.toLowerCase()) > -1;
+                    });
+                }
+                success({ results: resultData });
+            }, failure);
+            
+            return request;
+        },
+        // processResults simply wraps the data; adjust if needed
+        processResults: function (data) {
+            // In our transport function we already wrap in { results: ... }
+            return data;
+        }
+    }
+});
+
+
+  // --- Initialize the extra select with select2.
+  var $extraSelect = $taskBox.find('.task-extra');
+  // If there is a saved extra value, set it as the selected value.
+  if (task.extra) {
+    $extraSelect.val(task.extra).trigger("change");
+  }
+  $extraSelect.select2({
+    placeholder: "انتخاب تعداد تست",
+    dropdownParent: $taskBox,
+    width: '100%', 
+    theme: 'bootstrap-5'
+    // No ajax required here if the options are static.
+  });
+                          // Adjust classes if needed, as in your drop handler:
+                          $('.select2-selection--single')
+                            .removeClass('select2-selection--single')
+                            .removeClass('select2-selection')
+                            .addClass('task-extra');
+                        }
+
+                        initCalendarTask($taskBox);
+                        setupEditableSelects($taskBox,1);
+                        
+                    });
+                }else{
+                    
+                            $.ajax({
+        url: "/get_default_events/",
+        type: "GET",
+        data: { student_id: student_id },
+        dataType: "json",
+        success: function(defaultEvents) {
+            defaultEvents.forEach(function(event) {
+                var $newTask = $(
+                    '<div class="calendar-task" style="top:' + calculateTop(event.start_time) +
+                    'px; height:' + calculateHeight(event.start_time, event.end_time) +
+                    'px; left:5%;">' +
+                    '<button class="remove-btn" title="حذف">&#10006;</button>' +
+                    '<button class="tick-btn" title="ایجاد تکلیف جدید">افزودن تکلیف</button>' +
+                    '<div class="task-title" contenteditable="true">' + event.name + '</div>' +
+                    '<div class="time-label">' + event.start_time + " - " + event.end_time + '</div>' +
+                    '</div>'
+                );
+                // قرار دادن باکس در ستونی که برابر با event.day_of_week است.
+                $('.day-column[data-day="'+ event.day_of_week +'"] .task-container').append($newTask);
+                
+           
+            });
+        },
+        error: function(err) {
+            console.error("Error fetching default events", err);
+        }
+    });
+                }},
+                error: function(xhr, status, error) {
+                    // Handle error if needed.
+                }
+            });
+        },
+        error: function(xhr, status, error){
+            // Handle error from /check-weekly-report/ if needed.
+        }
+    });
+
+});
+
+
+
+
+
+$('.subjects-box .task, .events-box .task').draggable({
+  helper: function() {
+    // کلونِ المان اصلی می‌سازیم
+    var $clone = $(this).clone();
+    // عرض دلخواه (مثلاً 100px) روش ست می‌کنیم
+    $clone.css({ width: '100px' });
+    return $clone;
+  },
+  revert: "invalid",
+  zIndex: 100,
+   cursorAt: { top: 0, left: 50 },
+  start: function(event, ui) {
+    // مطمئن می‌شویم در شروع درگ هم عرض ثابت باشه
+    ui.helper.css('width', '100px');
+       $(this).data('originalElement', $(this));
+  }
+});
+
+
+  // حتماً پس از بارگذاری Moment-Jalaali اجرا شود
+  moment.loadPersian({ dialect: 'persian-modern' });
+
+  document.getElementById("download-week-output").addEventListener("click", function(){
+    // 1. جمع‌آوری اطلاعات
+    const studentName    = $("#student-select option:selected").text();
+    const consultantName = $(".consultant-name").text();
+    // تاریخ انتخاب شده در هفته
+    const rawJalaliStart = $("#weekSelector").val();                // YYYY-MM-DD شمسی
+    const jalaliStart    = moment(rawJalaliStart, "YYYY-MM-DD").format("jD jMMMM YYYY");
+    const jalaliEnd      = moment(rawJalaliStart, "YYYY-MM-DD").add(6, "days").format("jD jMMMM YYYY");
+    
+    /////**//////
+        const studentNameRaw = $("#student-select option:selected").text().trim();
+    const studentNameForFile = studentNameRaw.replace(/\s+/g, '');
+
+    const fileName = `${studentNameForFile}${$("#weekSelector").val()}-برنامه.pdf`;
+    
+    
+    
+    // رویدادهای مهم (هر خط یک بولت)
+    const importantEvents = $("#important-events").val()
+      .split("\n")
+      .filter(l => l.trim())
+      .map(l => `<li>• ${l.trim()}</li>`)
+      .join("");
+
+    // 2. آماده‌سازی HTML تقویم (همان calendarHTML قبلی)
+    let calendarClone = $(".calendar-wrapper").clone();
+    calendarClone.find("select").remove();     // حذف سلکت‌ها
+    calendarClone.find(".remove-btn, .tick-btn, .edit-btn , .repeat-btn, .open-copy-day").remove(); // حذف دکمه‌ها
+    const calendarHTML = calendarClone.prop("outerHTML");
+
+    // 3. باز کردن پنجره‌ی جدید و نوشتن HTML
+    const w = window.open("", "_blank");
+    w.document.write(`
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>خروجی هفته</title>
+          <link href="https://fonts.googleapis.com/css2?family=Homemade+Apple&display=swap" rel="stylesheet">
+          <style>
+  .watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.08;        /* میزان شفافیت */
+    width: 60%;           /* یا هر اندازه‌ای که مناسب دونستید */
+    pointer-events: none; /* کلیک‌ها رو از زیر رد کنه */
+    z-index: 0;           /* زیر همه عناصر */
+  }
+/* پترن خال‌خال */
+/* پترن خال‌خال */
+.calendar-task.exam-pattern-1 {
+  background-color: #f0f0f0 !important;
+  background-image: radial-gradient(circle, #ccc 20%, transparent 20%) !important;
+  background-size: 10px 10px !important;
+}
+
+/* پترن خط‌کشی مورب */
+.calendar-task.exam-pattern-2 {
+  background-color: #f8f9fa !important;
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(0,0,0,0.05) 0,
+    rgba(0,0,0,0.05) 1px,
+    transparent 1px,
+    transparent 5px
+  ) !important;
+}
+
+/* پترن شطرنجی ریز */
+.calendar-task.exam-pattern-3 {
+  background-color: #eef2f5 !important;
+  background-image:
+    linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(0,0,0,0.05) 1px, transparent 1px) !important;
+  background-size: 10px 10px !important;
+}
+
+/* کوچک کردن فاصله و ظاهر clean برای لیست تسک‌ها */
+#otherStudentTasks .task {
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+/* اختصاصی برای حالت دوم */
+.other-plan-task {
+  background: #ffe082;
+  border: 1px solid #ffca28;
+  color: #333;
+}
+
+/* نمایش متنی فصل و تعداد تست */
+.chapter-display,
+.tests-display {
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+/* دکمه‌ی مداد */
+.edit-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.edit-btn svg {
+  width: 14px;
+  height: 14px;
+  color: #0d6efd;
+}
+.edit-btn:hover svg {
+  color: #0a58ca;
+}
+
+
+.tick-btn{
+    position: absolute;
+    top: 5px;
+    font-size:10px;
+    right: 5px;
+}
+.select2-results__option{
+    font-size:11px !important;
+}
+  .download-btn {
+    display: inline-block;
+padding: 0px 12px;
+    margin: 10px;
+    font-size: 10px;
+    color: #ffffff;
+    background: linear-gradient(45deg, #4CAF50, #2E7D32);
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: background 0.3s, transform 0.2s;
+    cursor: pointer;
+  }
+  .download-btn:hover {
+    background: linear-gradient(45deg, #66BB6A, #388E3C);
+    transform: translateY(-2px);
+  }
+  .download-btn:active {
+    transform: translateY(0);
+  }
+  /* لیست ایونت: خودِ دکمه باکس شناور */
+.floating-box {
+  background: #ffeb3b;
+  border: 1px solid #fbc02d;
+  color: #333;
+}
+
+/* وقتی به تقویم سقوط کنه */
+.calendar-task.floating {
+  background: #fff176 !important;      /* زرد روشن */
+  border-bottom: 3px solid #f9a825 !important;
+}
+
+
+            html, body {
+              margin:0; padding:0;
+              direction: rtl;
+              font-family: 'Vazir', sans-serif;
+            }
+            body {
+              display: flex; flex-direction: column;
+              background: #fdfdfd;
+            }
+            .report-header {
+              background: linear-gradient(135deg, #ffe7c0, #ffd1a0);
+              padding: 20px;
+              text-align: center;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            .report-header h1 {
+              margin:0;
+              font-family: 'Homemade Apple', cursive;
+              font-size: 32px;
+              color: #333;
+            }
+            .report-header p {
+              margin:5px 0 0;
+              font-size: 16px;
+              color: #555;
+            }
+            .calendar-wrapper {
+              flex:1;
+              overflow: hidden;
+              padding: 10px 20px;
+            }
+            .calendar-container {
+              
+              border: 2px dashed #bbb;
+              border-radius: 8px;
+            }
+            .day-column {
+              border-left: 1px dashed #bbb !important;
+            }
+            .time-label {
+              font-size:6px !important;
+            }
+            .calendar-task .task-title {
+              font-size: 14px !important;
+            }
+            .important-events {
+              background: #fff8dc;
+              margin: 20px;
+              padding: 15px;
+              border: 1px dotted #e6b800;
+              border-radius: 6px;
+              font-size: 14px;
+            }
+            .important-events ul {
+              margin:0; padding-inline-start:20px;
+            }
+            .important-events li {
+              margin: 6px 0;
+            }
+            .report-footer {
+              text-align: center;
+              padding: 12px;
+              background: #fafafa;
+              font-size: 12px;
+              color: #888;
+              border-top: 1px solid #ddd;
+            }
+            .chapter-display,
+.tests-display {
+  font-size: 10px;
+  margin-right: 4px;
+}
+#pdfPage {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 210mm;
+  
+}
+ .report-footer {
+  flex: 0 0 auto; /* هدر و فوتر اندازه‌ی محتواشون رو می‌گیرن */
+}
+.calendar-wrapper {
+  flex: 1 1 auto;  /* وسط رو پر می‌کنه */
+  display: flex;
+    overflow:visible;
+}
+.timeline {
+  flex: 0 0 60px;  /* عرض ثابت تایم‌لاین */
+}
+.calendar-container {
+  flex: 1 1 auto;  /* ستون‌های روز عرض باقیمانده رو می‌گیرن */
+  display: flex;
+  gap: 5px;
+}
+.day-column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-wrapper {
+  padding: 0;
+  margin: 0;
+}
+.day-column {
+  flex: 1; /* هر ستون فضای مساوی بگیره */
+
+    button#download-pdf {
+      position: fixed; top: 10px; left: 10px;
+      z-index: 999;
+      padding: 8px 12px;
+      background: #2E7D32; color: #fff;
+      border: none; border-radius: 4px;
+      font-size: 14px; cursor: pointer;
+    }
+  @page { size: A4 landscape; margin: 0; }
+
+  :root { --header-h: 100px; --footer-h: 60px; }
+  .report-header { height: var(--header-h); /* بقیۀ استایل هدر */ }
+  .report-footer { height: var(--footer-h); /* بقیۀ استایل فوتر */ }
+
+  .calendar-wrapper {
+    height: calc(100vh - var(--header-h) - var(--footer-h));
+    overflow: hidden;
+    padding: 0 20px;
+    box-sizing: border-box;
+  }
+
+  .task-container {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 14px,
+      #eee 14px,
+      #eee 15px
+    );
+  }
+  .timeline {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 30px,
+      #ddd 30px,
+      #ddd 31px
+    );
+  }
+  /* فضای تقویم */
+    .calendar-wrapper {
+      box-sizing: border-box !important;
+      height: calc(100vh - 80px - 40px) !important;
+      padding: 0 20px !important;
+      overflow: hidden !important;
+    }
+
+    /* ستون‌ها */
+    .calendar-container {
+      display: flex !important;
+      width: 100% !important;
+      gap: 10px !important;
+    }
+    .day-column {
+      flex: 1 !important;
+      background: #fff !important;
+      border: 1px solid #ddd !important;
+      border-radius: 10px !important;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1) !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    /* پس‌زمینه خطوط ساعتی */
+    .task-container {
+      flex: 1 !important;
+      position: relative !important;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent, transparent 14px,
+        #eee 14px, #eee 15px
+      ) !important;
+    }
+    .timeline {
+      width: 60px !important;
+      height: calc(100vh - 80px - 40px) !important;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent, transparent 30px,
+        #ddd 30px, #ddd 31px
+      ) !important;
+    }
+     /* اضافه کن این استایل‌ها */
+        .report-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: linear-gradient(135deg, #ffe7c0, #ffd1a0);
+          padding: 20px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+  </style>
+  <!-- بارگذاری html2canvas و jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+        </head>
+        <body style="margin:0; padding:0; direction:rtl; font-family:'Vazir', sans-serif">
+  <div id="pdfPage" style="
+        width:100%;   /* عرض در حالت Landscape */
+  min-height:210mm;   /* حداقل اندازه A4 در حالت Landscape */
+  height:auto;        /* ارتفاع = اندازه‌ی محتوا */
+      display:flex;
+      flex-direction:column;
+      box-sizing:border-box;
+      padding:10mm;       /* حاشیه اطراف */
+  ">
+    <!-- ۱. دکمه دانلود (بعدا مخفی می‌شود) -->
+    <button id="download-pdf" style="align-self:flex-start; margin-bottom:5px">
+      دانلود PDF
+    </button>
+  <img class="watermark" src="https://panelkimia.ir/2.png" alt="Watermark Logo" />
+    <!-- ۲. هِدِر -->
+    <div class="report-header" style="justify-content: space-between;
+    align-items: center;
+    display: flex;">
+    <img src="https://panelkimia.ir/2.png" alt="لوگو چپ" />
+      <h1 style="margin:0; font-family:'Homemade Apple',cursive; font-size:32px">
+        برنامه هفته‌ای ${studentName}
+      </h1>
+      <p style="margin:5px 0 0; font-size:16px; color:#555">
+        ${consultantName}
+      </p>
+             <img style="    mix-blend-mode: darken;" src="https://panelkimia.ir/1.png" alt="لوگو راست" />
+    </div>
+
+    <!-- ۳. بدنه تقویم -->
+    <div class="calendar-wrapper" style="
+        flex:1 1 auto;
+        display:flex;
+        overflow:hidden;
+        margin:10px 0;
+    ">
+
+      <!-- ستون‌های روز -->
+      <div class="calendar-container" style="
+          flex:1 1 auto;
+          display:flex;
+          gap:5px;
+          background:#fff; /* اختیاری */
+          padding:5px;
+      ">
+        ${calendarHTML}
+      </div>
+    </div>
+
+    <!-- ۴. رویدادهای مهم -->
+    <div class="important-events" style="
+        flex:0 0 auto;
+        background:#fff8dc;
+        padding:10px;
+        border:1px dotted #e6b800;
+        border-radius:6px;
+        margin-bottom:10px;
+    ">
+      <strong>رویدادهای مهم این هفته:</strong>
+      <ul style="margin:5px 0 0; padding-inline-start:20px">
+        ${importantEvents}
+      </ul>
+    </div>
+
+    <!-- ۵. فوتر -->
+    <div class="report-footer" style="
+        flex:0 0 auto;
+        text-align:center;
+        padding:8px;
+        background:#fafafa;
+        font-size:12px;
+        color:#888;
+        border-top:1px solid #ddd;
+    ">
+      Generated by Kimiagarkhune © ${new Date().getFullYear()}
+    </div>
+  </div>
+
+  <!-- html2canvas و jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+
+  <script>
+    document.getElementById("download-pdf").addEventListener("click", async () => {
+      // مخفی کردن دکمه
+      document.getElementById("download-pdf").style.display = "none";
+
+      // فقط از #pdfPage عکس بگیر
+      const wrapper = document.getElementById("pdfPage");
+      // اندازه‌ی واقعیِ محتوا
+const fullW = wrapper.scrollWidth;
+const fullH = wrapper.scrollHeight;
+
+const canvas = await html2canvas(wrapper, {
+  scale: 2,
+  useCORS: true,
+  width: fullW,
+  height: fullH,
+  windowWidth: fullW,
+  windowHeight: fullH
+});
+      const imgData = canvas.toDataURL('image/jpeg', 0.7);
+      const { jsPDF } = window.jspdf;
+      // landscape یا portrait بسته به نیاز
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+      // فیت کردن تصویر به صفحات A4
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = pdf.internal.pageSize.getHeight();
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgH = (imgProps.height * pdfW) / imgProps.width;
+
+      pdf.addImage(imgData, "JPEG", 0, 0, pdfW, imgH);
+      pdf.save('${fileName}');
+
+      // نمایش دوباره دکمه
+      document.getElementById("download-pdf").style.display = "";
+    });
+  <\/script>
+</body>
+
+      </html>
+    `);
+    w.document.close();
+    w.focus();
+  });
+
+
+
+document.getElementById("download-week-summary").addEventListener("click", function(){
+    const studentName    = $("#student-select option:selected").text();
+const consultantName = $(".consultant-name").text();
+  // ---------------------
+  // 1. Data Collection
+  // ---------------------
+  var summaryData = {};
+  var daysOrder = ["شنبه", "یک‌شنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"];
+  
+  // Loop over each day column and group tasks by lesson name (ignoring grade)
+  var dayColumns = document.querySelectorAll(".calendar-wrapper .day-column");
+  dayColumns.forEach(function(dayCol) {
+    var dayName = dayCol.getAttribute("data-day");
+    if (!dayName) {
+      var header = dayCol.querySelector("h4");
+      dayName = header ? header.innerText.split("-")[0].trim() : "نا مشخص";
+    }
+    
+    // Using tasks with extended-task class (change the selector if needed)
+    var tasks = dayCol.querySelectorAll(".calendar-task.extended-task");
+    tasks.forEach(function(task) {
+      // Get the raw lesson name from the task title.
+      var rawLessonName = task.querySelector(".task-title")
+          ? task.querySelector(".task-title").innerText.trim()
+          : "نام نامشخص";
+          
+      // Remove grade designations from the lesson name.
+      var lessonName = rawLessonName.replace(/(دهم|یازدهم|دوازدهم)/g, '').trim();
+          var lessonType = task.getAttribute("data-lesson-type") || "تخصصی";
+      // Group tasks using the cleaned lesson name.
+      if (!summaryData[lessonName]) {
+        summaryData[lessonName] = {
+          lessonName: lessonName,
+          lessonType: lessonType,
+          days: {},
+          totalTests: 0,
+          totalDuration: 0
+        };
+      }
+      
+      // Extract test count from the extra-info element (if available).
+      var testCount = 0;
+      var extraInfoElem = task.querySelector('.extra-info');
+      if (extraInfoElem) {
+        var matches = extraInfoElem.textContent.match(/\d+/);
+        if (matches && matches.length > 0) {
+          testCount = parseInt(matches[0], 10) || 0;
+        }
+      }
+      
+      // Get the duration based on task height (assuming height equals minutes).
+      var duration = parseInt(task.style.height, 10)*2 || 0;
+      
+      // Determine the day for the current task.
+      // Here, the day can be extracted from the closest day column.
+      var dayColumn = task.closest(".day-column");
+      var dayName = dayColumn ? dayColumn.getAttribute("data-day") : "نا مشخص";
+      
+      if (!summaryData[lessonName].days[dayName]) {
+        summaryData[lessonName].days[dayName] = { testCount: 0, duration: 0 };
+      }
+      summaryData[lessonName].days[dayName].testCount += testCount;
+      summaryData[lessonName].days[dayName].duration += duration;
+      summaryData[lessonName].totalTests += testCount;
+      summaryData[lessonName].totalDuration += duration;
+    });
+  });
+  
+  // Compute daily totals (for the line chart)
+  var dailyTotals = {};
+  daysOrder.forEach(function(day) {
+    dailyTotals[day] = { totalTests: 0, totalDuration: 0 };
+  });
+  for (var lesson in summaryData) {
+    var lessonData = summaryData[lesson];
+    daysOrder.forEach(function(day) {
+      var dayData = lessonData.days[day] || { testCount: 0, duration: 0 };
+      dailyTotals[day].totalTests += dayData.testCount;
+      dailyTotals[day].totalDuration += dayData.duration;
+    });
+  }
+
+  // ---------------------
+  // 2. Prepare Data for Charts
+  // ---------------------
+  // Pie charts: By lesson for total duration and total tests
+  var chartLabelsDuration = [];
+  var chartDataDuration = [];
+  var chartLabelsTests = [];
+  var chartDataTests = [];
+  for (var lessonName in summaryData) {
+    chartLabelsDuration.push(lessonName);
+    chartDataDuration.push(summaryData[lessonName].totalDuration);
+    chartLabelsTests.push(lessonName);
+    chartDataTests.push(summaryData[lessonName].totalTests);
+  }
+  
+  // Grouped Bar Chart: Ratio of different lessons (both test and duration)
+  // We'll use the same labels as above and prepare two datasets.
+  var barChartLabels = chartLabelsDuration.slice(); // same lesson names
+  var barChartDataTests = chartDataTests.slice();
+  var barChartDataDuration = chartDataDuration.slice();
+  
+  // Line Chart: Daily totals. X-axis: daysOrder; two series for tests and durations.
+  var lineLabels = daysOrder.slice();
+  var lineDataTests = [];
+  var lineDataDurations = [];
+  daysOrder.forEach(function(day){
+    lineDataTests.push(dailyTotals[day].totalTests);
+    lineDataDurations.push(dailyTotals[day].totalDuration);
+  });
+  
+  // ---------------------
+  // 3. Build the Summary Table HTML
+  // ---------------------
+  // Table header: Two leftmost columns: 'درس' and 'نوع'
+
+  var summaryTableHTML = '<div class="report-header" style="justify-content:space-between;   align-items: center;    display: flex;">        <img src="https://panelkimia.ir/2.png" alt="لوگو چپ" /> <h2 class="page-title">خلاصه هفته ' + studentName + '</h2>' + '<p class="consultant-label" style="text-align:center;"> ' + consultantName + '</p>      <img style="    mix-blend-mode: darken;" src="https://panelkimia.ir/1.png" alt="لوگو راست" /></div>';
+  summaryTableHTML += '<table class="summary-table">';
+  summaryTableHTML += '<thead>';
+  summaryTableHTML += '<tr>';
+  summaryTableHTML += '<th>درس</th>';
+  summaryTableHTML += '<th>نوع</th>';
+  daysOrder.forEach(function(day){
+    summaryTableHTML += '<th>' + day + '</th>';
+  });
+  summaryTableHTML += '<th>جمع کل</th>';
+  summaryTableHTML += '</tr>';
+  summaryTableHTML += '</thead>';
+  summaryTableHTML += '<tbody>';
+  
+  // For each lesson, create two rows:
+  // - First row: tests data (with "تست" label)
+  // - Second row: duration data (with "مدت" label)
+  for (var lessonName in summaryData) {
+    var data = summaryData[lessonName];
+      var testLabel = (data.lessonType === "عمومی") ? "تمرین تشریحی" : "تست";
+
+    // First row for tests; lesson name cell spans two rows.
+    summaryTableHTML += '<tr>';
+    summaryTableHTML += '<td class="lesson-name" style="color:#81C784" rowspan="2">' + data.lessonName + '</td>';
+summaryTableHTML += '<td>' + testLabel + '</td>';
+daysOrder.forEach(function(day){
+      var dayData = data.days[day] || { testCount: 0, duration: 0 };
+///////////////////////////////////////////////
+var testText = dayData.testCount > 0 ? dayData.testCount + ' عدد' : dayData.testCount;
+summaryTableHTML += '<td >' + testText + '</td>';
+
+
+    });
+    ///////////////////////////////////////////////
+var totalTestText = data.totalTests > 0 ? data.totalTests + ' عدد' : data.totalTests;
+summaryTableHTML += '<td class="total">' + totalTestText + '</td>';
+
+    summaryTableHTML += '</tr>';
+    
+    // Second row for durations.
+    summaryTableHTML += '<tr>';
+    summaryTableHTML += '<td>مدت</td>';
+    daysOrder.forEach(function(day){
+      var dayData = data.days[day] || { testCount: 0, duration: 0 };
+
+    ///////////////////////////////////////////////
+var durationText = dayData.duration > 0 ? dayData.duration + ' دقیقه' : dayData.duration;
+summaryTableHTML += '<td>' + durationText + '</td>';
+
+    });
+
+    ///////////////////////////////////////////////
+var totalDurationText = data.totalDuration > 0 ? data.totalDuration + ' دقیقه' : data.totalDuration;
+summaryTableHTML += '<td>' + totalDurationText + '</td>';
+
+    summaryTableHTML += '</tr>';
+  }
+  summaryTableHTML += '</tbody></table>';
+  
+  // ---------------------
+  // 4. Build the Full HTML with Charts
+  // ---------------------
+  var summaryWindow = window.open('', '_blank');
+  var summaryContent = `
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>خلاصه هفته</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
+        
+  <!-- بارگذاری html2canvas و jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+        <style>
+          .watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.08;        /* میزان شفافیت */
+    width: 60%;           /* یا هر اندازه‌ای که مناسب دونستید */
+    pointer-events: none; /* کلیک‌ها رو از زیر رد کنه */
+    z-index: 0;           /* زیر همه عناصر */
+  }
+  body {
+    direction: rtl;
+    font-family: 'Vazir', sans-serif;
+    padding: 20px;
+    margin: 0;
+    background-color: #f8f9fa;
+    line-height: 1.6;
+  }
+  .page-title {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #333;
+    font-size: 2rem;
+  }
+
+  /* ==== جدول خلاصه (با بولت‌ژورنال) ==== */
+  table.summary-table {
+    width: 100%;
+    border-collapse: collapse;      /* برای فضای بین ردیف و سلول */
+    border-spacing: 0;
+    margin-bottom: 40px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+  table.summary-table th,
+  table.summary-table td {
+    padding: 5px 16px;
+    text-align: center;
+    position: relative;            /* برای بولت‌های قبل از محتوا */
+  }
+  table.summary-table thead th {
+    background-color: #fde8c0;     /* کرم روشن */
+    color: #8f6346;
+    font-size: 1.1rem;
+    border: none;
+  }
+  table.summary-table tbody tr {
+    border-bottom: 1px dashed #e6c17a;
+  }
+  table.summary-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  table.summary-table .lesson-name {
+    color: #5b4636;
+    font-weight: bold;
+  }
+  /* بولت‌ژورنالی */
+  table.summary-table td::before {
+    content: "•";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #d17d11;
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  /* ==== چارت‌ها ==== */
+  .charts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    gap: 20px;
+  }
+  .chart-box {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 15px;
+    width: 23%;
+  }
+  .chart-box h4 {
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1rem;
+    color: #333;
+  }
+  .chart-box canvas {
+    max-width: 100%;
+    height: auto;
+  }
+     
+      /* اضافه کن این استایل‌ها */
+        .report-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: linear-gradient(135deg, #ffe7c0, #ffd1a0);
+          padding: 20px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        </style>
+        ${'<scr' + 'ipt src="https://cdn.jsdelivr.net/npm/chart.js"></scr' + 'ipt>'}
+      </head>
+      <body>
+        <img class="watermark" src="https://panelkimia.ir/2.png" alt="Watermark Logo" />
+      <button id="download-summary-pdf" class="download-btn">دانلود PDF - خلاصه هفته</button>
+      <div id="summary-wrapper">
+        ${summaryTableHTML}
+        <div class="charts">
+          <!-- Pie Chart: Total Duration per Lesson -->
+          <div class="chart-box">
+            <h4>مدت زمان درس‌ها (جمع)</h4>
+            <canvas id="chartDuration" width="200" height="200"></canvas>
+          </div>
+          <!-- Pie Chart: Total Tests per Lesson -->
+          <div class="chart-box">
+            <h4>تعداد تست درس‌ها (جمع)</h4>
+            <canvas id="chartTests" width="200" height="200"></canvas>
+          </div>
+          <!-- Grouped Bar Chart: Ratio of Lessons (Tests vs. Duration) -->
+          <div class="chart-box">
+            <h4>نسبت درس‌ها (تست و مدت)</h4>
+            <canvas id="chartGrouped" width="300" height="200"></canvas>
+          </div>
+          <!-- Line Chart: Daily Totals (Tests and Duration) -->
+          <div class="chart-box">
+            <h4>تعداد تست و مدت در روزهای هفته</h4>
+            <canvas id="chartLine" width="300" height="200"></canvas>
+          </div>
+        </div>
+        ${'<scr' + 'ipt>'}
+          // Initialize Pie Chart for Total Duration per Lesson
+          new Chart(document.getElementById("chartDuration"), {
+            type: "pie",
+            data: {
+              labels: ${JSON.stringify(chartLabelsDuration)},
+              datasets: [{
+                data: ${JSON.stringify(chartDataDuration)},
+                backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40"]
+              }]
+            },
+            options: { title: { display: true, text: "مدت زمان درس‌ها" } }
+          });
+          
+          // Initialize Pie Chart for Total Tests per Lesson
+          new Chart(document.getElementById("chartTests"), {
+            type: "pie",
+            data: {
+              labels: ${JSON.stringify(chartLabelsTests)},
+              datasets: [{
+                data: ${JSON.stringify(chartDataTests)},
+                backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40"]
+              }]
+            },
+            options: { title: { display: true, text: "تعداد تست درس‌ها" } }
+          });
+          
+          // Initialize Grouped Bar Chart for Lesson Ratios (Tests and Duration)
+          new Chart(document.getElementById("chartGrouped"), {
+            type: "bar",
+            data: {
+              labels: ${JSON.stringify(barChartLabels)},
+              datasets: [
+                {
+                  label: "تعداد تست",
+                  data: ${JSON.stringify(barChartDataTests)},
+                  backgroundColor: "rgba(54, 162, 235, 0.6)"
+                },
+                {
+                  label: "مدت زمان",
+                  data: ${JSON.stringify(barChartDataDuration)},
+                  backgroundColor: "rgba(255, 206, 86, 0.6)"
+                }
+              ]
+            },
+            options: {
+              title: { display: true, text: "نسبت درس‌ها (تست و مدت)" },
+              responsive: true,
+              scales: {
+                x: { stacked: false },
+                y: { beginAtZero: true }
+              }
+            }
+          });
+          
+          // Initialize Line Chart for Daily Totals (Tests and Duration)
+          new Chart(document.getElementById("chartLine"), {
+            type: "line",
+            data: {
+              labels: ${JSON.stringify(lineLabels)},
+              datasets: [
+                {
+                  label: "تعداد تست",
+                  data: ${JSON.stringify(lineDataTests)},
+                  fill: false,
+                  borderColor: "#36A2EB",
+                  tension: 0.1
+                },
+                {
+                  label: "مدت زمان",
+                  data: ${JSON.stringify(lineDataDurations)},
+                  fill: false,
+                  borderColor: "#FFCE56",
+                  tension: 0.1
+                }
+              ]
+            },
+            options: {
+              title: { display: true, text: "تعداد تست و مدت در روزهای هفته" },
+              responsive: true,
+              scales: {
+                y: { beginAtZero: true }
+              }
+            }
+          });
+          document.getElementById("download-summary-pdf").addEventListener("click", async function(){
+  // مخفی‌سازی دکمه برای اینکه در اسکرین‌شات نباشه
+  const btn = this;
+  btn.style.display = "none";
+
+  // المان حاوی خلاصه
+  const wrapper = document.getElementById("summary-wrapper");
+  // اندازه واقعی محتوا
+  const fullW = wrapper.scrollWidth;
+  const fullH = wrapper.scrollHeight;
+
+  // اسکرین‌شات با کیفیت
+  const canvas = await html2canvas(wrapper, {
+    scale: 2,
+    useCORS: true,
+    width: fullW,
+    height: fullH,
+    windowWidth: fullW,
+    windowHeight: fullH
+  });
+
+  const imgData = canvas.toDataURL('image/jpeg', 0.7);
+  const { jsPDF } = window.jspdf;
+  // ساخت PDF افقی A4
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+  // فیت کردن تصویر داخل صفحه
+  const pdfW = pdf.internal.pageSize.getWidth();
+  const imgProps = pdf.getImageProperties(imgData);
+  const pdfH = (imgProps.height * pdfW) / imgProps.width;
+
+  pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
+  pdf.save("week-summary.pdf");
+
+  // نمایش مجدد دکمه
+  btn.style.display = "";
+});
+
+        ${'</scr' + 'ipt>'}
+        </div>
+      </body>
+    </html>
+  `;
+  
+  summaryWindow.document.open();
+  summaryWindow.document.write(summaryContent);
+  summaryWindow.document.close();
+  summaryWindow.focus();
+});
+
+document.getElementById("download-empty-matrix").addEventListener("click", function(){
+    const studentName    = $("#student-select option:selected").text();
+const consultantName = $(".consultant-name").text();
+  // 1. Extract unique lessons and build plan data by lesson & day
+  var lessonsMap = {};
+  var planData = {}; // Structure: planData[lessonName][dayName] = { duration, tests, percentage }
+  
+  // Use the tasks that represent planned entries.
+  var tasks = document.querySelectorAll(".calendar-task.extended-task");
+  // بالای همه:
+var lessonTypes = {};
+
+
+  tasks.forEach(function(task) {
+    // Get the lesson name from the task title (or use a fallback if missing)
+    var lessonName = task.querySelector(".task-title") ? task.querySelector(".task-title").innerText.trim() : "نام نامشخص";
+    lessonsMap[lessonName] = lessonName;
+    var lessonType = task.getAttribute("data-lesson-type") || "تخصصی";
+lessonTypes[lessonName] = lessonType;
+    // Determine the day based on the closest day column having a data-day attribute
+    var dayColumn = task.closest(".day-column");
+    var dayName = dayColumn ? dayColumn.getAttribute("data-day") : "نا مشخص";
+    
+    // Extract the planned duration.
+    // (Here we assume that the element’s height, in pixels, corresponds to the duration in minutes.)
+    var duration = parseInt(task.style.height, 10) || 0;
+    
+    // Extract the test count from an element with class "extra-info" (if any)
+    var testCount = 0;
+    var extraInfoElem = task.querySelector(".extra-info");
+    if (extraInfoElem) {
+      var matches = extraInfoElem.textContent.match(/\d+/);
+      if (matches && matches.length > 0) {
+        testCount = parseInt(matches[0], 10) || 0;
+      }
+    }
+    
+    // For percentage, leave it as an empty string or add your formula if needed.
+    var percentage = "";
+    
+    // Initialize the nested object if needed
+    if (!planData[lessonName]) {
+      planData[lessonName] = {};
+    }
+    if (!planData[lessonName][dayName]) {
+      planData[lessonName][dayName] = { duration: 0, tests: 0, percentage: "" };
+    }
+    
+    // Sum up the values if multiple tasks exist for the same lesson on the same day
+    planData[lessonName][dayName].duration += duration;
+    planData[lessonName][dayName].tests += testCount;
+  });
+  
+  var lessons = Object.values(lessonsMap);
+  var daysOrder = ["شنبه", "یک‌شنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"];
+  
+  // 2. Build the matrix HTML
+  var emptyHTML =  '<div class="report-header" style="justify-content:space-between;   align-items: center;    display: flex;">        <img src="https://panelkimia.ir/2.png" alt="لوگو چپ" /> <h2 class="page-title"> ماتریس برنامه ' + studentName + '</h2>' + '<p class="consultant-label" style="text-align:center;"> ' + consultantName + '</p>      <img style="    mix-blend-mode: darken;" src="https://panelkimia.ir/1.png" alt="لوگو راست" /></div>';
+  emptyHTML += '<table class="matrix-table"  border="1">';
+  
+  // Update header to include two columns for the first "part": one for lesson name and one for the metric type
+  emptyHTML += '<thead>';
+  emptyHTML += '<tr>';
+  emptyHTML += '<th rowspan="2">درس</th>';
+  emptyHTML += '<th rowspan="2">نوع</th>';
+  daysOrder.forEach(function(day) {
+    emptyHTML += '<th colspan="2">' + day + '</th>';
+  });
+  emptyHTML += '</tr><tr>';
+  daysOrder.forEach(function(day) {
+    emptyHTML += '<th>برنامه‌ریزی</th><th>اجرا</th>';
+  });
+  emptyHTML += '</tr></thead>';
+  emptyHTML += '<tbody>';
+  
+  // For each lesson, create three rows but the lesson name is displayed only once with rowspan=3.
+  lessons.forEach(function(lesson){
+    // Row 1: حجم ساعتی
+    emptyHTML += '<tr>';
+    emptyHTML += '<td rowspan="3">' + lesson + '</td>';  // Lesson name cell spanning 3 rows
+    emptyHTML += '<td>حجم ساعتی</td>';                     // Metric type cell
+    daysOrder.forEach(function(day){
+      var cellValue = "";
+      if (planData[lesson] && planData[lesson][day]) {
+    ///////////////////////////////////////////////
+
+var duration = planData[lesson][day].duration*2;
+cellValue = duration > 0 ? duration + ' دقیقه' : duration;
+
+
+      }
+      emptyHTML += '<td>' + cellValue + '</td>';
+      emptyHTML += '<td></td>'; // اجرا cell stays empty
+    });
+    emptyHTML += '</tr>';
+    // Row 2: تست یا تمرین تشریحی
+emptyHTML += '<tr>';
+// شرطی‌سازی برچسب بر اساس lessonTypes
+var lbl = lessonTypes[lesson] === 'عمومی' 
+          ? 'تمرین تشریحی' 
+          : 'تعداد تست';
+emptyHTML += '<td>' + lbl + '</td>';
+
+
+    daysOrder.forEach(function(day){
+      var cellValue = "";
+      if (planData[lesson] && planData[lesson][day]) {
+              ///////////////////////////////////////////////
+
+var tests = planData[lesson][day].tests;
+cellValue = tests > 0 ? tests + ' عدد' : tests;
+      }
+      emptyHTML += '<td>' + cellValue + '</td>';
+      emptyHTML += '<td></td>';
+    });
+    emptyHTML += '</tr>';
+    
+    // Row 3: درصد
+    emptyHTML += '<tr>';
+    emptyHTML += '<td>درصد</td>';
+    daysOrder.forEach(function(day){
+      var cellValue = "";
+      if (planData[lesson] && planData[lesson][day]) {
+         cellValue = planData[lesson][day].percentage;
+      }
+      emptyHTML += '<td>' + cellValue + '</td>';
+      emptyHTML += '<td></td>';
+    });
+    emptyHTML += '</tr>';
+  });
+  
+  // 3. Add an extra row with 7 icons (empty glass) under each day.
+  // Adjust for the two initial columns: lesson name and metric type.
+  emptyHTML += '<tr>';
+  emptyHTML += '<td></td>'; // empty for the lesson name column
+  emptyHTML += '<td></td>'; // empty for the metric type column
+  daysOrder.forEach(function(day){
+      var singleIcon =
+        '<img src="http://panelkimia.ir/glass.webp" ' +
+             'alt="glass icon" ' +
+             'style="width:20px;height:20px;margin:0 2px;vertical-align:middle;">';
+      // حالا ۷ بار تکرارش می‌کنیم
+      var iconHTML = singleIcon.repeat(7);
+            emptyHTML += '<td>' + iconHTML + '</td>';
+      emptyHTML += '<td></td>';
+  });
+  emptyHTML += '</tr>';
+  
+  emptyHTML += '</tbody></table>';
+  
+  // 4. Open a new window and display the matrix
+  var emptyWindow = window.open('', '_blank');
+  emptyWindow.document.write(
+    `<html>
+      <head>
+        <title>ماتریس خالی</title>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" />
+        <style>
+          .watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.08;        /* میزان شفافیت */
+    width: 60%;           /* یا هر اندازه‌ای که مناسب دونستید */
+    pointer-events: none; /* کلیک‌ها رو از زیر رد کنه */
+    z-index: 0;           /* زیر همه عناصر */
+  }
+   body {
+    direction: rtl;
+    font-family: 'Vazir', sans-serif;
+    padding: 20px;
+    margin: 0;
+    background-color: #f8f9fa;
+    line-height: 1.6;
+  }
+
+  /* ==== ماتریس خالی (با بولت‌ژورنال) ==== */
+  table.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    margin-bottom: 40px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+  table.matrix-table th,
+  table.matrix-table td {
+    padding: 10px 16px;
+    text-align: center;
+    position: relative;
+  }
+  table.matrix-table thead th {
+    background-color: #fde8c0;
+    color: #8f6346;
+    font-size: 1rem;
+    border: none;
+  }
+  table.matrix-table tbody tr {
+    border-bottom: 1px dashed #e6c17a;
+  }
+  table.matrix-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  /* بولت‌ژورنال کردن هر سلول */
+  table.matrix-table td::before {
+    content: "•";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #d17d11;
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  /* ستون‌های درس و نوع (برای جلوهٔ بولت) */
+  table.matrix-table th:first-child,
+  table.matrix-table th:nth-child(2),
+  table.matrix-table td:first-child,
+  table.matrix-table td:nth-child(2) {
+    padding-left: 24px; /* جا برای بولت */
+  }
+        /* حذف خطوط بین هر سطر */
+    table.matrix-table tbody tr td {
+      padding: 8px 12px;
+      border-bottom: none !important;
+    }
+    /* اضافه کردن خط پس از هر ۳ ردیف */
+    table.matrix-table tbody tr:nth-of-type(3n) td {
+      border-bottom: 2px solid #999;
+    }
+    /* استایل ستون‌های اول و دوم */
+    table.matrix-table td:first-child,
+    table.matrix-table td:nth-child(2) {
+      padding-left: 24px;
+    }
+     /* اضافه کن این استایل‌ها */
+        .report-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: linear-gradient(135deg, #ffe7c0, #ffd1a0);
+          padding: 20px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        </style>
+        
+  <!-- بارگذاری html2canvas و jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+      </head>
+      <button id="download-matrix-pdf" class="download-btn">دانلود PDF - ماتریس خالی</button>
+<div id="matrix-wrapper">
+
+      <body>
+        <img class="watermark" src="https://panelkimia.ir/2.png" alt="Watermark Logo" />
+        ${emptyHTML}
+      </body>
+      <script>
+      document.getElementById("download-matrix-pdf").addEventListener("click", async function(){
+  const btn = this;
+  btn.style.display = "none";
+
+  const wrapper = document.getElementById("matrix-wrapper");
+  const fullW = wrapper.scrollWidth;
+  const fullH = wrapper.scrollHeight;
+
+  // ۱. عکس گرفتن از محتوا
+  const origCanvas = await html2canvas(wrapper, {
+    scale: 2,
+    useCORS: true,
+    width: fullW,
+    height: fullH,
+    windowWidth: fullW,
+    windowHeight: fullH
+  });
+
+  // ۲. ساخت canvas کمکی و چرخش ۹۰ درجه (CW)
+  const rotCanvas = document.createElement('canvas');
+  rotCanvas.width  = origCanvas.height;
+  rotCanvas.height = origCanvas.width;
+  const ctx = rotCanvas.getContext('2d');
+  // انتقال مبدا به گوشهٔ پایین-چپ و چرخش CW
+  ctx.translate(rotCanvas.width, 0);
+  ctx.rotate(Math.PI / 2);
+  // رسم عکس اصلی
+  ctx.drawImage(origCanvas, 0, 0);
+
+  // ۳. تولید تصویر چرخیده
+  const imgData = rotCanvas.toDataURL('image/jpeg', 0.7);
+
+  // ۴. ساخت PDF عمودی A4
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  // ۵. فیت کردن تصویر داخل صفحه
+  const pdfW = pdf.internal.pageSize.getWidth();   // ~210mm
+  const pdfH = pdf.internal.pageSize.getHeight();  // ~297mm
+  pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+
+  pdf.save('matrix.pdf');
+
+  btn.style.display = '';
+});
+
+      <\/script>
+      </div>
+    </html>`
+  );
+  emptyWindow.document.close();
+});
+
+
+function updateDayHeaders(weekStart) {
+  // Define the offset for each day according to its name.
+  // These offsets assume that the week starts on "شنبه" (Saturday).
+  var weekdayOffset = {
+    "شنبه": 0,
+    "یک‌شنبه": 1,
+    "دوشنبه": 2,
+    "سه‌شنبه": 3,
+    "چهارشنبه": 4,
+    "پنج‌شنبه": 5,
+    "جمعه": 6,
+  };
+
+  $(".day-column").each(function() {
+    var dayName = $(this).data("day"); // For example: "شنبه", "یکشنبه", etc.
+    var offset = weekdayOffset[dayName] || 0;
+    // Calculate the date for that day based on the selected weekStart.
+    var dayDate = moment(weekStart).add(offset, "days");
+    // Format the date in Jalali as desired (e.g., "jD jMMMM")
+    var dayJalali = dayDate.format("jD jMMMM");
+    // Update the header text. You can either replace the h4 content completely or append the date.
+    $(this).find("h4").text(dayName + " - " + dayJalali);
+  });
+}
+$(document).on('change', '.task-extra', function(){
+  var newVal = $(this).val();
+  $(this).siblings('.extra-info').text("تعداد تست: " + newVal);
+});
+// Ensure that you have included jQuery and Bootstrap JS already on your page.
+
+
+// A helper function to convert Persian digits to English.
+function convertPersianDigitsToEnglish(str) {
+  var persianDigits = ['۰','۱','۲','۳','۴','۵','۶','۷','۸','۹'];
+  for (var i = 0; i < persianDigits.length; i++) {
+    str = str.replace(new RegExp(persianDigits[i], 'g'), i);
+  }
+  return str;
+}
+
+// When opening the copy modal, set the target student id from the #student-select dropdown.
+$(document).on('click', '.open-copy-day', function(){
+    var targetStudentId = $('#student-select').val();
+    $('#targetStudentId').val(targetStudentId);
+    $('#sourceDate').val('');  // Clear the source date input.
+    $('#copyDayModal').modal('show');
+});
+
+// Handle the copy day plan form submission (front-end only).
+$(document).on('submit', '#copyDayForm', function(e) {
+    e.preventDefault();
+
+    // Get values from the form.
+    var sourceStudentId = $('#sourceStudentSelect').val();
+    var rawSourceDate = $('#sourceDate').val(); // In Jalali (Persian) format.
+    var targetDay = $('#targetDaySelect').val();
+    
+    // Convert the raw Persian date to English digits.
+    var sourceDateEng = convertPersianDigitsToEnglish(rawSourceDate);
+    
+    // Parse the date using moment-jalaali.
+    var mSource = moment(sourceDateEng, 'jYYYY-jMM-jDD');
+    if (!mSource.isValid()){
+      alert("تاریخ وارد شده معتبر نمی‌باشد.");
+      return;
+    }
+    
+    // Format the date as a standard string (YYYY-MM-DD) to check for the plan.
+    var sourceDateStr = mSource.format('YYYY-MM-DD');
+    // Compute the Persian day name from the source date (e.g., "دوشنبه").
+    var sourceDayName = mSource.format('jdddd').replace(/^j/, '');
+    console.log(sourceDayName);
+    // First, check if the source student has a report for that date.
+    $.ajax({
+         url: '/check-weekly-report/',
+         type: 'GET',
+         data: {
+             selected_date: sourceDateStr,
+             student_id: sourceStudentId
+         },
+         dataType: "json",
+         success: function(checkResponse) {
+              if(checkResponse.exists !== "current") {
+                  alert("برای تاریخ " + sourceDateStr + " در برنامه دانش‌آموز منبع برنامه‌ای یافت نشد.");
+                  return;
+              }
+              // Use the returned week_start value to fetch the full report details.
+              var weekStartIso = checkResponse.week_start;
+              
+              $.ajax({
+                  url: '/get-weekly-report-details/',
+                  type: 'GET',
+                  data: {
+                      week_start: weekStartIso,
+                      student_id: sourceStudentId
+                  },
+                  dataType: "json",
+                  success: function(response) {
+                      var tasks = response.tasks || [];
+                      // Filter tasks that correspond to the source day computed from the entered date.
+                      var filteredTasks = tasks.filter(function(task) {
+                          console.log(task.day_of_week);
+                          return task.day_of_week === sourceDayName;
+                          
+                      });
+                      if(filteredTasks.length === 0) {
+                          alert("در برنامه دانش‌آموز منبع برای تاریخ " + sourceDateStr + "، هیچ برنامه‌ای یافت نشد.");
+                          return;
+                      }
+                      // For each task, create a clone and insert it into the target day column.
+                      filteredTasks.forEach(function(task) {
+                          var top = calculateTop(task.start_time);
+                          var height = calculateHeight(task.start_time, task.end_time);
+                          var $newTask = $(
+                            '<div class="calendar-task" style="top:' + top + 'px; height:' + height + 'px; left:5%;">' +
+                              '<button class="remove-btn" title="حذف">&#10006;</button>' +
+                              '<div class="task-title" contenteditable="true">' + task.title + '</div>' +
+                              '<div class="time-label">' +
+                                moment.utc(task.start_time).format("HH:mm") + " - " +
+                                moment.utc(task.end_time).format("HH:mm") +
+                              '</div>' +
+                            '</div>'
+                          );
+                          $newTask.attr("data-box-type", task.box_type);
+                          // Append the new task to the target day column's container.
+                          $('.day-column[data-day="' + targetDay + '"] .task-container').append($newTask);
+                          // Reinitialize draggable/resizable functionality.
+                          initCalendarTask($newTask);
+                          updateTimeLabel($newTask);
+                          setupEditableSelects($newTask,0);
+                      });
+                  },
+                  error: function(xhr, status, error) {
+                      alert("خطا در دریافت جزئیات برنامه دانش‌آموز منبع.");
+                  }
+              });
+         },
+         error: function(xhr, status, error){
+              alert("خطا در بررسی برنامه دانش‌آموز منبع.");
+         }
+   });
+    
+    // Close the modal.
+    $('#copyDayModal').modal('hide');
+});
+
+
+
+
+
+</script>
+
+<!-- Modal for copying a day plan (front-end only; tasks are inserted into the calendar) -->
+<div class="modal fade" id="copyDayModal" tabindex="-1" aria-labelledby="copyDayModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="copyDayForm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="copyDayModalLabel">کپی برنامه یک روز از دانش‌آموز دیگر</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="sourceStudentSelect" class="form-label">دانش‌آموز منبع</label>
+            <select class="form-select" id="sourceStudentSelect" name="source_student_id" required>
+              {% for student in students %}
+                <option value="{{ student.id }}">{{ student.profile.first_name }} {{ student.profile.last_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="sourceDate" class="form-label">تاریخ در برنامه منبع (به فرمت شمسی)</label>
+            <input type="text" class="form-control" id="sourceDate" name="source_date" placeholder="مثلاً ۱۴۰۲-۰۱-۰۱" required>
+          </div>
+          <div class="mb-3">
+            <label for="targetDaySelect" class="form-label">روز مقصد در برنامه فعلی</label>
+            <select class="form-select" id="targetDaySelect" name="target_day_of_week" required>
+              <option value="شنبه">شنبه</option>
+              <option value="یک‌شنبه">یک‌شنبه</option>
+              <option value="دوشنبه">دوشنبه</option>
+              <option value="سه‌شنبه">سه‌شنبه</option>
+              <option value="چهارشنبه">چهارشنبه</option>
+              <option value="پنج‌شنبه">پنج‌شنبه</option>
+              <option value="جمعه">جمعه</option>
+            </select>
+          </div>
+          <!-- Hidden field: target_student_id will be set from the student-select dropdown -->
+          <input type="hidden" name="target_student_id" id="targetStudentId">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="submit" class="btn btn-primary">کپی برنامه</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+$(document).ready(function(){
+    // Select all subject tasks in both specialized and general subject lists
+    $("#specialized-task-list .task, #general-task-list .task").each(function(){
+       // Retrieve the subject name from the data attribute
+       var subjectName = $(this).data("lesson-name");
+       // If a color exists in subjectColors mapping for this subject name, apply it
+       if(subjectColors.hasOwnProperty(subjectName)) {
+           $(this).css("background-color", subjectColors[subjectName]);
+       }
+    });
+});
+
+    $('#student-select').on('change', function() { 
+    var studentId = $(this).val();
+    $.ajax({
+        url: '/get-lessons-for-student/',  // your custom endpoint URL
+        type: 'GET',
+        data: { student_id: studentId },
+        dataType: 'json',
+        success: function(data) {
+            currentMajorCode = data.major_code;
+             $('.grade-filter').prop('checked', false);
+
+            // 1. بازنویسی HTML
+            $('#specialized-task-list').html(
+              data.specialized_lessons.map(l =>
+                `<div class="task" data-lesson-id="${l.id}"
+                                 data-lesson-name="${l.name}"
+                                 data-grade="${l.grade_id}">
+                   ${l.name} ${l.grade}
+                 </div>`
+              ).join('')
+            );
+            $('#general-task-list').html(
+              data.general_lessons.map(l =>
+                `<div class="task" data-lesson-id="${l.id}"
+                                 data-lesson-name="${l.name}"
+                                 data-grade="${l.grade_id}">
+                   ${l.name} ${l.grade}
+                 </div>`
+              ).join('')
+            );
+        
+            // 2. اعمال رنگ‌ها
+            $('#specialized-task-list .task, #general-task-list .task').each(function(){
+              var name = $(this).data('lesson-name');
+              if(subjectColors[name]){
+                $(this).css('background-color', subjectColors[name]);
+              }
+            });
+        
+            // 3. دوباره فعال‌سازی درگ
+            $('.subjects-box .task').draggable({
+                helper: "clone",
+                revert: "invalid",
+                zIndex: 100,
+                start: function(e, ui) {
+                  ui.helper.css('width', $(this).outerWidth());
+                  $(this).data('originalElement', $(this));
+                }
+            });
+                           // ۲) ببین چه پایه‌هایی در داده هست: از data.specialized_lessons و data.general_lessons
+  const grades = new Set();
+  data.specialized_lessons.concat(data.general_lessons)
+      .forEach(l=> grades.add(String(l.grade_id)));
+
+  // ۳) تیک پایه‌های موجود رو بزن
+  grades.forEach(g=> $(`.grade-filter[value="${g}"]`).prop('checked', true));
+
+  // ۴) در نهایت فیلتر رو اعمال کن
+  applyGradeFilter();
+  
+        },
+
+        error: function(err) {
+            console.error("Error fetching lessons:", err);
+        }
+    });
+});
+function setupEditableSelects($taskBox,$docollapse) {
+  // المان‌های اصلی
+  var $chapSelect = $taskBox.find('select.task-chapter');
+  var $testsSelect = $taskBox.find('select.task-extra');
+  var $select2Containers = $taskBox.find('.select2-container');
+
+  // spanهای نمایش متن
+  var $chapDisp  = $('<span class="chapter-display"></span>').insertAfter($chapSelect).hide();
+  var $testsDisp = $('<span class="tests-display"></span>').insertAfter($testsSelect).hide();
+
+  // دکمه‌ی مداد
+  var $editBtn = $(`
+    <button class="edit-btn" title="ویرایش">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="bi bi-pencil" viewBox="0 0 16 16">
+        <path d="M12.146.146a.5.5 0 0 1 .708.708L3.207 10.5H2.5v.707l9.647-9.647a.5.5 0 0 1 .708 0z"/>
+        <path fill-rule="evenodd" d="M11.207 2.5L13.5 4.793l-9.647 9.646H1.56V12.146L11.207 2.5z"/>
+      </svg>
+    </button>
+  `).insertAfter($testsDisp).hide();
+
+  // تابعی که وقتی هر دو مقدار گرفتند اجرا می‌شود
+  function tryCollapse() {
+    var chapText = $chapSelect.find('option:selected').text();
+    var testsVal = $testsSelect.val();
+    if (chapText && testsVal) {
+      // پر کردن spanها
+      $chapDisp.text(chapText).show();
+      $testsDisp.text( testsVal + " تست " ).show();
+      // مخفی کردن سلکت‌ها و کانتینرهای select2
+      $chapSelect.hide();
+      $testsSelect.hide();
+      $select2Containers.hide();
+      // نمایش دکمه
+      $editBtn.show();
+    }
+  }
+
+  // لیسنر تغییرات
+  $chapSelect.on('change', tryCollapse);
+  $testsSelect.on('change', tryCollapse);
+
+  // کلیک روی مداد → بازگردانی سلکت‌ها
+  $editBtn.on('click', function() {
+    $chapSelect.show();
+    $testsSelect.show();
+    $select2Containers.show();
+    $chapDisp.hide();
+    $testsDisp.hide();
+    $editBtn.hide();
+  });
+  if($docollapse){
+      tryCollapse();
+  }
+}
+// ===============================
+// تب "برنامه دانش‌آموز دیگر"
+// ===============================
+// ===============================
+// تب "برنامه دانش‌آموز دیگر"
+// ===============================
+$(document).ready(function(){
+  $('#otherStudentSelect').select2({
+    placeholder: 'دانش‌آموز را انتخاب کنید',
+    width: '100%',
+    theme: 'bootstrap-5'
+  });
+
+  function initOtherPlanDraggable() {
+    $('#otherStudentTasks .other-plan-task').draggable({
+      helper: 'clone',
+      revert: 'invalid',
+      zIndex: 100,
+      start: function(e, ui) {
+        ui.helper.css('width', $(this).outerWidth());
+      }
+    });
+  }
+
+  $('#otherStudentSelect').on('change', function() {
+    var studentId = $(this).val();
+    var $list = $('#otherStudentTasks').empty();
+    if (!studentId) return;
+
+    $.ajax({
+      url: '/get-last-weekly-report/',
+      data: { student_id: studentId },
+      dataType: 'json',
+      success: function(resp) {
+        if (!resp.tasks || !resp.tasks.length) {
+          return $list.append('<div class="task">بدون برنامهٔ ثبت‌شده</div>');
+        }
+        resp.tasks.forEach(function(t) {
+          // ساخت عنوان برای توضیحات:
+          var title = t.lesson_name +
+                      ' — فصل ' + t.chapter_text +
+                      ' — ' + t.optional_tests_count + ' تست' +
+                      ' — ' + t.duration_minutes  +' دقیقه' +
+                       ' — ' + t.day_of_week;
+          // ایجاد باکس:
+          var $task = $('<div class="task other-plan-task"></div>')
+            .text(title)
+            .data(t);
+
+          // **اعمال رنگِ پس‌زمینه**:
+          if (subjectColors[t.lesson_name]) {
+            $task.css('background-color', subjectColors[t.lesson_name]);
+          }
+
+          $list.append($task);
+        });
+        initOtherPlanDraggable();
+      },
+      error: function() {
+        alert('خطا در دریافت برنامهٔ دانش‌آموز');
+      }
+    });
+  });
+
+  // هندلر دراپِ .other-plan-task
+  $(document).on('drop', '.task-container', function(event, ui) {
+    var $d = ui.draggable;
+    if ($d.hasClass('other-plan-task')) {
+      var t = $d.data();
+      var containerOffset = $(this).offset();
+      var dropTop = ui.offset.top - containerOffset.top;
+      dropTop = Math.round(dropTop / 8.75) * 8.75;
+
+    var $new = $(
+      '<div class="calendar-task extended-task" ' +
+           'style="top:' + dropTop + 'px; height:' + (t.duration_minutes * 0.5833) + 'px; left:5%;">' +
+        '<button class="remove-btn" title="حذف">✖</button>' +
+        '<div class="task-title" contenteditable="true">' + t.lesson_name + '</div>' +
+        '<div class="task-info" style="display:flex; align-items:center; max-width:80%;">' +
+          '<select class="task-chapter p-1 text-sm" style="width:50%; margin-right:4px;">' +
+            '<option value="' + t.chapter_id + '" selected>فصل ' + t.chapter_text + '</option>' +
+          '</select>' +
+          '<select class="task-extra p-1 text-sm" style="width:30%; margin-right:4px;">' +
+            '<option value="" disabled>تعداد تست</option>' +
+          '<option value="5">5</option>' +
+          '<option value="10">10</option>' +
+          '<option value="15">15</option>' +
+          '<option value="20">20</option>' +
+          '<option value="25">25</option>' +
+          '<option value="30">30</option>' +
+          '<option value="35">35</option>' +
+          '<option value="40">40</option>' +
+          '<option value="45">45</option>' +
+          '<option value="50">50</option>' +
+          '<option value="55">55</option>' +
+          '<option value="60">60</option>' +
+          '<option value="65">65</option>' +
+          '<option value="70">70</option>' +
+          '<option value="75">75</option>' +
+          '<option value="80">80</option>' +
+          '<option value="85">85</option>' +
+          '<option value="90">90</option>' +
+          '<option value="95">95</option>' +
+          
+          '<option value="100">100</option>' +
+          '</select>' +
+                                                  '<div class="hidden extra-info"></div>' +
+          '<div class="time-label"></div>' +
+        '</div>' +
+      '</div>'
+    );
+      // اعمال رنگِ پس‌زمینه:
+      if (subjectColors[t.lesson_name]) {
+        $new.css('background-color', subjectColors[t.lesson_name]);
+      }
+      $new
+        .attr('data-box-type', 'مطالعه')
+        .attr('data-lesson-id', t.lesson_id)
+        .attr('data-lesson-type', t.lesson_type)
+        .attr('data-grade', t.grade);
+
+      $(this).append($new);
+      
+      
+      
+                               var $extraSelect = $new.find('select.task-extra');
+                                  $extraSelect.val(t.optional_tests_count);
+                                  $new.find('.extra-info').text("تعداد تست: " + t.optional_tests_count);
+      var $extra = $new.find('select.task-extra');
+$extra.val(t.optional_tests_count);
+
+// اگر از select2 استفاده می‌کنی (مثلاً برای collapseOnInit یا theme)، این را هم بزن:
+$extra.trigger('change');
+
+          // ← اینجا اضافه کنید:
+    var $chap = $new.find('select.task-chapter');
+    // اول اگر از قبل select2 بود، destroy کن
+    if ($chap.hasClass('select2-hidden-accessible')) {
+      $chap.select2('destroy').next('.select2-container').remove();
+    }
+    $chap.select2({
+      placeholder: "شماره فصل",
+      dropdownParent: $new,
+      width: '100%',
+      theme: 'bootstrap-5',
+      minimumInputLength: 0,
+      ajax: {
+        transport: function (params, success, failure) {
+          var key = t.lesson_id + "_" + t.grade;
+          if (chapterCache[key]) {
+            var data = chapterCache[key];
+            if (params.data.term) {
+              data = data.filter(function(item){
+                return item.text.toLowerCase()
+                           .includes(params.data.term.toLowerCase());
+              });
+            }
+            success({ results: data });
+            return null;
+          }
+          console.log(t.grade);
+          var req = $.ajax({
+            url: "/get-chapters/",
+            dataType: "json",
+            delay: 250,
+            data: {
+              lesson_id: t.lesson_id,
+              grade: t.grade,
+              major_code: currentMajorCode,
+              q: params.data.term
+            }
+          });
+          req.then(function(data){
+            chapterCache[key] = data;
+            var out = params.data.term
+              ? data.filter(function(item){
+                  return item.text.toLowerCase()
+                             .includes(params.data.term.toLowerCase());
+                })
+              : data;
+            success({ results: out });
+          }, failure);
+          return req;
+        },
+        processResults: function(data){
+          return data;
+        }
+      }
+    });
+      initCalendarTask($new);
+      updateTimeLabel($new);
+      setupEditableSelects($new, /* collapseOnInit: */ true);
+      $d.remove();
+      return;
+    }
+  });
+});
+
+
+
+function applyGradeFilter() {
+  // پایه‌های انتخاب‌شده
+  const activeGrades = $('.grade-filter:checked').map((_,el)=>el.value).get();
+  // برای هر درس در حالت عادی (نه تب دانش‌آموز دیگر)
+  $('#specialized-task-list .task, #general-task-list .task').each(function(){
+    const grade = String($(this).data('grade'));
+    $(this).toggle(activeGrades.includes(grade));
+  });
+}
+$(document).on('change', '.grade-filter', applyGradeFilter);
+
+</script>
+
+<style>
+.select2-dropdown.select2-dropdown{
+        width: 130px !important;
+}
+
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+
+<!-- این کانتینرها توی صفحه نمایش داده نمی‌شند ولی CSS صفحه رو ارث می‌برند -->
+<div id="hidden-week-output"    style="position:absolute;
+       left:-9999px;
+       top:0; 
+       visibility:hidden;
+       pointer-events:none;
+       "></div>
+<div id="hidden-week-summary"   style="position:absolute;
+       left:-9999px;
+       top:0;
+       visibility:hidden;
+       pointer-events:none;"></div>
+<div id="hidden-empty-matrix"   style="position:absolute;
+       left:-9999px;
+       top:0;
+       visibility:hidden;
+       pointer-events:none;"></div>
+<script>
+  // دقت کن jspdf.html افزونه‌ی html2canvas دارد
+  const { jsPDF } = window.jspdf;
+
+// اول این فانکشن کمکی را در ابتدای اسکریپت تعریف کنید:
+async function captureDivAsDataURL(divId) {
+  // کلون می‌کنیم تا div اصلی دست‌نخورده بماند
+  const original = document.getElementById(divId);
+  const clone = original.cloneNode(true);
+  // استایل‌های مخفی که روی اصلی هست رو پاک کنید
+  clone.style.position = 'fixed';
+  clone.style.left     = '0';
+  clone.style.top      = '0';
+  clone.style.opacity  = '0';
+  clone.style.zIndex   = '-1';
+  clone.style.display  = 'block';
+  // به بادی الصاقش کن
+  document.body.appendChild(clone);
+
+  // صبر بسیار کوتاه بدیم که رندر بشه
+  await new Promise(r => setTimeout(r, 100));
+
+  // حالا html2canvas بگیر
+  const canvas = await html2canvas(clone, {
+    scale: 2,
+    useCORS: true,
+    width:  clone.scrollWidth,
+    height: clone.scrollHeight
+  });
+  // کلون رو بردار
+  document.body.removeChild(clone);
+  // خروجی base64
+  return canvas.toDataURL('image/jpeg', 0.7);
+}
+
+document.getElementById("download-all-pdf").addEventListener("click", /**/async/**/ function(){
+    const studentName    = $("#student-select option:selected").text();
+const consultantName = $(".consultant-name").text();
+  // 1. Extract unique lessons and build plan data by lesson & day
+  var lessonsMap = {};
+  var planData = {}; // Structure: planData[lessonName][dayName] = { duration, tests, percentage }
+  
+  // Use the tasks that represent planned entries.
+  var tasks = document.querySelectorAll(".calendar-task.extended-task");
+  // بالای همه:
+var lessonTypes = {};
+
+
+  tasks.forEach(function(task) {
+    // Get the lesson name from the task title (or use a fallback if missing)
+    var lessonName = task.querySelector(".task-title") ? task.querySelector(".task-title").innerText.trim() : "نام نامشخص";
+    lessonsMap[lessonName] = lessonName;
+    var lessonType = task.getAttribute("data-lesson-type") || "تخصصی";
+lessonTypes[lessonName] = lessonType;
+    // Determine the day based on the closest day column having a data-day attribute
+    var dayColumn = task.closest(".day-column");
+    var dayName = dayColumn ? dayColumn.getAttribute("data-day") : "نا مشخص";
+    
+    // Extract the planned duration.
+    // (Here we assume that the element’s height, in pixels, corresponds to the duration in minutes.)
+    var duration = parseInt(task.style.height, 10) || 0;
+    
+    // Extract the test count from an element with class "extra-info" (if any)
+    var testCount = 0;
+    var extraInfoElem = task.querySelector(".extra-info");
+    if (extraInfoElem) {
+      var matches = extraInfoElem.textContent.match(/\d+/);
+      if (matches && matches.length > 0) {
+        testCount = parseInt(matches[0], 10) || 0;
+      }
+    }
+    
+    // For percentage, leave it as an empty string or add your formula if needed.
+    var percentage = "";
+    
+    // Initialize the nested object if needed
+    if (!planData[lessonName]) {
+      planData[lessonName] = {};
+    }
+    if (!planData[lessonName][dayName]) {
+      planData[lessonName][dayName] = { duration: 0, tests: 0, percentage: "" };
+    }
+    
+    // Sum up the values if multiple tasks exist for the same lesson on the same day
+    planData[lessonName][dayName].duration += duration;
+    planData[lessonName][dayName].tests += testCount;
+  });
+  
+  var lessons = Object.values(lessonsMap);
+  var daysOrder = ["شنبه", "یک‌شنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"];
+  
+  // 2. Build the matrix HTML
+  var emptyHTML =  '<div class="report-header" style="justify-content:space-between;   align-items: center;    display: flex;">        <img src="https://panelkimia.ir/2.png" alt="لوگو چپ" /> <h2 class="page-title"> ماتریس برنامه ' + studentName + '</h2>' + '<p class="consultant-label" style="text-align:center;"> ' + consultantName + '</p>      <img style="    mix-blend-mode: darken;" src="https://panelkimia.ir/1.png" alt="لوگو راست" /></div>';
+  emptyHTML += '<table class="matrix-table"  border="1">';
+  
+  // Update header to include two columns for the first "part": one for lesson name and one for the metric type
+  emptyHTML += '<thead>';
+  emptyHTML += '<tr>';
+  emptyHTML += '<th rowspan="2">درس</th>';
+  emptyHTML += '<th rowspan="2">نوع</th>';
+  daysOrder.forEach(function(day) {
+    emptyHTML += '<th colspan="2">' + day + '</th>';
+  });
+  emptyHTML += '</tr><tr>';
+  daysOrder.forEach(function(day) {
+    emptyHTML += '<th>برنامه‌ریزی</th><th>اجرا</th>';
+  });
+  emptyHTML += '</tr></thead>';
+  emptyHTML += '<tbody>';
+  
+  // For each lesson, create three rows but the lesson name is displayed only once with rowspan=3.
+  lessons.forEach(function(lesson){
+    // Row 1: حجم ساعتی
+    emptyHTML += '<tr>';
+    emptyHTML += '<td rowspan="3">' + lesson + '</td>';  // Lesson name cell spanning 3 rows
+    emptyHTML += '<td>حجم ساعتی</td>';                     // Metric type cell
+    daysOrder.forEach(function(day){
+      var cellValue = "";
+      if (planData[lesson] && planData[lesson][day]) {
+    ///////////////////////////////////////////////
+var duration = planData[lesson][day].duration*2;
+cellValue = duration > 0 ? duration + ' دقیقه' : duration;
+
+      }
+      emptyHTML += '<td>' + cellValue + '</td>';
+      emptyHTML += '<td></td>'; // اجرا cell stays empty
+    });
+    emptyHTML += '</tr>';
+    // Row 2: تست یا تمرین تشریحی
+emptyHTML += '<tr>';
+// شرطی‌سازی برچسب بر اساس lessonTypes
+var lbl = lessonTypes[lesson] === 'عمومی' 
+          ? 'تمرین تشریحی' 
+          : 'تعداد تست';
+emptyHTML += '<td>' + lbl + '</td>';
+
+
+    daysOrder.forEach(function(day){
+      var cellValue = "";
+      if (planData[lesson] && planData[lesson][day]) {
+    ///////////////////////////////////////////////
+
+var tests = planData[lesson][day].tests;
+cellValue = tests > 0 ? tests + ' عدد' : tests;
+      }
+      emptyHTML += '<td>' + cellValue + '</td>';
+      emptyHTML += '<td></td>';
+    });
+    emptyHTML += '</tr>';
+    
+    // Row 3: درصد
+    emptyHTML += '<tr>';
+    emptyHTML += '<td>درصد</td>';
+    daysOrder.forEach(function(day){
+      var cellValue = "";
+      if (planData[lesson] && planData[lesson][day]) {
+         cellValue = planData[lesson][day].percentage;
+      }
+      emptyHTML += '<td>' + cellValue + '</td>';
+      emptyHTML += '<td></td>';
+    });
+    emptyHTML += '</tr>';
+  });
+  
+  // 3. Add an extra row with 7 icons (empty glass) under each day.
+  // Adjust for the two initial columns: lesson name and metric type.
+  emptyHTML += '<tr>';
+  emptyHTML += '<td></td>'; // empty for the lesson name column
+  emptyHTML += '<td></td>'; // empty for the metric type column
+  daysOrder.forEach(function(day){
+      var singleIcon =
+        '<img src="http://panelkimia.ir/glass.webp" ' +
+             'alt="glass icon" ' +
+             'style="width:20px;height:20px;margin:0 2px;vertical-align:middle;">';
+      // حالا ۷ بار تکرارش می‌کنیم
+      var iconHTML = singleIcon.repeat(7);
+            emptyHTML += '<td>' + iconHTML + '</td>';
+      emptyHTML += '<td></td>';
+  });
+  emptyHTML += '</tr>';
+  
+  emptyHTML += '</tbody></table>';
+  
+  // 4. Open a new window and display the matrix
+    document.getElementById("hidden-empty-matrix").innerHTML =
+    `
+        <link class="temp-report-css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" />
+        <style class="temp-report-css">
+.watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.08;    /* نیمه‌شفاف */
+  width: 60%;       /* قابل تنظیم */
+  pointer-events: none;
+  z-index: 0;       /* زیر محتوا */
+}
+#section-output,
+#section-summary,
+#section-matrix {
+  position: relative;
+}
+
+   body {
+    direction: rtl;
+    font-family: 'Vazir', sans-serif;
+    padding: 20px;
+    margin: 0;
+    background-color: #f8f9fa;
+    line-height: 1.6;
+  }
+
+  /* ==== ماتریس خالی (با بولت‌ژورنال) ==== */
+  table.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    margin-bottom: 40px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+  table.matrix-table th,
+  table.matrix-table td {
+    padding: 10px 16px;
+    text-align: center;
+    position: relative;
+  }
+  table.matrix-table thead th {
+    background-color: #fde8c0;
+    color: #8f6346;
+    font-size: 1rem;
+    border: none;
+  }
+  table.matrix-table tbody tr {
+    border-bottom: 1px dashed #e6c17a;
+  }
+  table.matrix-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  /* بولت‌ژورنال کردن هر سلول */
+  table.matrix-table td::before {
+    content: "•";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #d17d11;
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  /* ستون‌های درس و نوع (برای جلوهٔ بولت) */
+  table.matrix-table th:first-child,
+  table.matrix-table th:nth-child(2),
+  table.matrix-table td:first-child,
+  table.matrix-table td:nth-child(2) {
+    padding-left: 24px; /* جا برای بولت */
+  }
+    /* حذف خطوط بین هر سطر */
+    table.matrix-table tbody tr td {
+      padding: 8px 12px;
+      border-bottom: none !important;
+    }
+    /* اضافه کردن خط پس از هر ۳ ردیف */
+    table.matrix-table tbody tr:nth-of-type(3n) td {
+      border-bottom: 2px solid #999;
+    }
+    /* استایل ستون‌های اول و دوم */
+    table.matrix-table td:first-child,
+    table.matrix-table td:nth-child(2) {
+      padding-left: 24px;
+    }
+        </style>
+        
+  <!-- بارگذاری html2canvas و jsPDF -->
+  <script class="temp-report-css" src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script class="temp-report-css" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+    
+      <button id="download-matrix-pdf" class="download-btn">دانلود PDF - ماتریس خالی</button>
+<div id="matrix-wrapper">
+
+   
+        ${emptyHTML}
+     
+      <script>
+      document.getElementById("download-matrix-pdf").addEventListener("click", async function(){
+  const btn = this;
+  btn.style.display = "none";
+
+  const wrapper = document.getElementById("matrix-wrapper");
+  const fullW = wrapper.scrollWidth;
+  const fullH = wrapper.scrollHeight;
+
+  // ۱. عکس گرفتن از محتوا
+  const origCanvas = await html2canvas(wrapper, {
+    scale: 2,
+    useCORS: true,
+    width: fullW,
+    height: fullH,
+    windowWidth: fullW,
+    windowHeight: fullH
+  });
+
+  // ۲. ساخت canvas کمکی و چرخش ۹۰ درجه (CW)
+  const rotCanvas = document.createElement('canvas');
+  rotCanvas.width  = origCanvas.height;
+  rotCanvas.height = origCanvas.width;
+  const ctx = rotCanvas.getContext('2d');
+  // انتقال مبدا به گوشهٔ پایین-چپ و چرخش CW
+  ctx.translate(rotCanvas.width, 0);
+  ctx.rotate(Math.PI / 2);
+  // رسم عکس اصلی
+  ctx.drawImage(origCanvas, 0, 0);
+
+  // ۳. تولید تصویر چرخیده
+  const imgData = rotCanvas.toDataURL('image/jpeg', 0.7);
+
+  // ۴. ساخت PDF عمودی A4
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+  // ۵. فیت کردن تصویر داخل صفحه
+  const pdfW = pdf.internal.pageSize.getWidth();   // ~210mm
+  const pdfH = pdf.internal.pageSize.getHeight();  // ~297mm
+  pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+
+  pdf.save('matrix.pdf');
+
+  btn.style.display = '';
+});
+
+      <\/script>
+
+      </div>
+    `;
+    
+     var summaryData = {};
+  var daysOrder = ["شنبه", "یک‌شنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنج‌شنبه", "جمعه"];
+  
+  // Loop over each day column and group tasks by lesson name (ignoring grade)
+  var dayColumns = document.querySelectorAll(".calendar-wrapper .day-column");
+  dayColumns.forEach(function(dayCol) {
+    var dayName = dayCol.getAttribute("data-day");
+    if (!dayName) {
+      var header = dayCol.querySelector("h4");
+      dayName = header ? header.innerText.split("-")[0].trim() : "نا مشخص";
+    }
+    
+    // Using tasks with extended-task class (change the selector if needed)
+    var tasks = dayCol.querySelectorAll(".calendar-task.extended-task");
+    tasks.forEach(function(task) {
+      // Get the raw lesson name from the task title.
+      var rawLessonName = task.querySelector(".task-title")
+          ? task.querySelector(".task-title").innerText.trim()
+          : "نام نامشخص";
+          
+      // Remove grade designations from the lesson name.
+      var lessonName = rawLessonName.replace(/(دهم|یازدهم|دوازدهم)/g, '').trim();
+          var lessonType = task.getAttribute("data-lesson-type") || "تخصصی";
+      // Group tasks using the cleaned lesson name.
+      if (!summaryData[lessonName]) {
+        summaryData[lessonName] = {
+          lessonName: lessonName,
+          lessonType: lessonType,
+          days: {},
+          totalTests: 0,
+          totalDuration: 0
+        };
+      }
+      
+      // Extract test count from the extra-info element (if available).
+      var testCount = 0;
+      var extraInfoElem = task.querySelector('.extra-info');
+      if (extraInfoElem) {
+        var matches = extraInfoElem.textContent.match(/\d+/);
+        if (matches && matches.length > 0) {
+          testCount = parseInt(matches[0], 10) || 0;
+        }
+      }
+      
+      // Get the duration based on task height (assuming height equals minutes).
+      var duration = parseInt(task.style.height, 10)*2 || 0;
+      
+      // Determine the day for the current task.
+      // Here, the day can be extracted from the closest day column.
+      var dayColumn = task.closest(".day-column");
+      var dayName = dayColumn ? dayColumn.getAttribute("data-day") : "نا مشخص";
+      
+      if (!summaryData[lessonName].days[dayName]) {
+        summaryData[lessonName].days[dayName] = { testCount: 0, duration: 0 };
+      }
+      summaryData[lessonName].days[dayName].testCount += testCount;
+      summaryData[lessonName].days[dayName].duration += duration;
+      summaryData[lessonName].totalTests += testCount;
+      summaryData[lessonName].totalDuration += duration;
+    });
+  });
+  
+  // Compute daily totals (for the line chart)
+  var dailyTotals = {};
+  daysOrder.forEach(function(day) {
+    dailyTotals[day] = { totalTests: 0, totalDuration: 0 };
+  });
+  for (var lesson in summaryData) {
+    var lessonData = summaryData[lesson];
+    daysOrder.forEach(function(day) {
+      var dayData = lessonData.days[day] || { testCount: 0, duration: 0 };
+      dailyTotals[day].totalTests += dayData.testCount;
+      dailyTotals[day].totalDuration += dayData.duration;
+    });
+  }
+
+  // ---------------------
+  // 2. Prepare Data for Charts
+  // ---------------------
+  // Pie charts: By lesson for total duration and total tests
+  var chartLabelsDuration = [];
+  var chartDataDuration = [];
+  var chartLabelsTests = [];
+  var chartDataTests = [];
+  for (var lessonName in summaryData) {
+    chartLabelsDuration.push(lessonName);
+    chartDataDuration.push(summaryData[lessonName].totalDuration);
+    chartLabelsTests.push(lessonName);
+    chartDataTests.push(summaryData[lessonName].totalTests);
+  }
+  
+  // Grouped Bar Chart: Ratio of different lessons (both test and duration)
+  // We'll use the same labels as above and prepare two datasets.
+  var barChartLabels = chartLabelsDuration.slice(); // same lesson names
+  var barChartDataTests = chartDataTests.slice();
+  var barChartDataDuration = chartDataDuration.slice();
+  
+  // Line Chart: Daily totals. X-axis: daysOrder; two series for tests and durations.
+  var lineLabels = daysOrder.slice();
+  var lineDataTests = [];
+  var lineDataDurations = [];
+  daysOrder.forEach(function(day){
+    lineDataTests.push(dailyTotals[day].totalTests);
+    lineDataDurations.push(dailyTotals[day].totalDuration);
+  });
+  
+  // ---------------------
+  // 3. Build the Summary Table HTML
+  // ---------------------
+  // Table header: Two leftmost columns: 'درس' and 'نوع'
+
+  var summaryTableHTML = '<div class="report-header" style="justify-content:space-between;   align-items: center;    display: flex;">        <img src="https://panelkimia.ir/2.png" alt="لوگو چپ" /> <h2 class="page-title">خلاصه هفته ' + studentName + '</h2>' + '<p class="consultant-label" style="text-align:center;"> ' + consultantName + '</p>      <img style="    mix-blend-mode: darken;" src="https://panelkimia.ir/1.png" alt="لوگو راست" /></div>';
+  summaryTableHTML += '<table class="summary-table">';
+  summaryTableHTML += '<thead>';
+  summaryTableHTML += '<tr>';
+  summaryTableHTML += '<th>درس</th>';
+  summaryTableHTML += '<th>نوع</th>';
+  daysOrder.forEach(function(day){
+    summaryTableHTML += '<th>' + day + '</th>';
+  });
+  summaryTableHTML += '<th>جمع کل</th>';
+  summaryTableHTML += '</tr>';
+  summaryTableHTML += '</thead>';
+  summaryTableHTML += '<tbody>';
+  
+  // For each lesson, create two rows:
+  // - First row: tests data (with "تست" label)
+  // - Second row: duration data (with "مدت" label)
+  for (var lessonName in summaryData) {
+    var data = summaryData[lessonName];
+      var testLabel = (data.lessonType === "عمومی") ? "تمرین تشریحی" : "تست";
+
+    // First row for tests; lesson name cell spans two rows.
+    summaryTableHTML += '<tr>';
+    summaryTableHTML += '<td class="lesson-name" style="color:#81C784" rowspan="2">' + data.lessonName + '</td>';
+summaryTableHTML += '<td>' + testLabel + '</td>';
+daysOrder.forEach(function(day){
+      var dayData = data.days[day] || { testCount: 0, duration: 0 };
+    ///////////////////////////////////////////////
+var testText = dayData.testCount > 0 ? dayData.testCount + ' عدد' : dayData.testCount;
+summaryTableHTML += '<td >' + testText + '</td>';
+
+    });
+
+    ///////////////////////////////////////////////
+var totalTestText = data.totalTests > 0 ? data.totalTests + ' عدد' : data.totalTests;
+summaryTableHTML += '<td class="total">' + totalTestText + '</td>';
+
+
+    summaryTableHTML += '</tr>';
+    
+    // Second row for durations.
+    summaryTableHTML += '<tr>';
+    summaryTableHTML += '<td>مدت</td>';
+    daysOrder.forEach(function(day){
+      var dayData = data.days[day] || { testCount: 0, duration: 0 };
+
+
+    ///////////////////////////////////////////////
+var durationText = dayData.duration > 0 ? dayData.duration + ' دقیقه' : dayData.duration;
+summaryTableHTML += '<td>' + durationText + '</td>';
+
+    });
+
+    ///////////////////////////////////////////////
+var totalDurationText = data.totalDuration > 0 ? data.totalDuration + ' دقیقه' : data.totalDuration;
+summaryTableHTML += '<td>' + totalDurationText + '</td>';
+
+
+
+    summaryTableHTML += '</tr>';
+  }
+  summaryTableHTML += '</tbody></table>';
+  
+  // ---------------------
+  // 4. Build the Full HTML with Charts
+
+  document.getElementById("hidden-week-summary").innerHTML = `
+   
+        <link class="temp-report-css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+        <link class="temp-report-css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
+        
+  <!-- بارگذاری html2canvas و jsPDF -->
+  <script class="temp-report-css" src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script class="temp-report-css" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+        <style class="temp-report-css">
+        
+  body {
+    direction: rtl;
+    font-family: 'Vazir', sans-serif;
+    padding: 20px;
+    margin: 0;
+    background-color: #f8f9fa;
+    line-height: 1.6;
+  }
+  .page-title {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #333;
+    font-size: 2rem;
+  }
+
+  /* ==== جدول خلاصه (با بولت‌ژورنال) ==== */
+  table.summary-table {
+    width: 100%;
+    border-collapse: collapse;      /* برای فضای بین ردیف و سلول */
+    border-spacing: 0;
+    margin-bottom: 40px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    overflow: hidden;
+  }
+  table.summary-table th,
+  table.summary-table td {
+    padding: 5px 16px;
+    text-align: center;
+    position: relative;            /* برای بولت‌های قبل از محتوا */
+  }
+  table.summary-table thead th {
+    background-color: #fde8c0;     /* کرم روشن */
+    color: #8f6346;
+    font-size: 1.1rem;
+    border: none;
+  }
+  table.summary-table tbody tr {
+    border-bottom: 1px dashed #e6c17a;
+  }
+  table.summary-table tbody tr:last-child {
+    border-bottom: none;
+  }
+  table.summary-table .lesson-name {
+    color: #5b4636;
+    font-weight: bold;
+  }
+  /* بولت‌ژورنالی */
+  table.summary-table td::before {
+    content: "•";
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #d17d11;
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  /* ==== چارت‌ها ==== */
+  .charts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    gap: 20px;
+  }
+  .chart-box {
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 15px;
+    width: 23%;
+  }
+  .chart-box h4 {
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 1rem;
+    color: #333;
+  }
+  .chart-box canvas {
+    max-width: 100%;
+    height: auto;
+  }
+     
+        </style>
+        ${'<scr' + 'ipt class="temp-report-css" src="https://cdn.jsdelivr.net/npm/chart.js"></scr' + 'ipt>'}
+     
+    
+      <button id="download-summary-pdf" class="download-btn">دانلود PDF - خلاصه هفته</button>
+      <div id="summary-wrapper">
+        ${summaryTableHTML}
+        <div class="charts">
+          <!-- Pie Chart: Total Duration per Lesson -->
+          <div class="chart-box">
+            <h4>مدت زمان درس‌ها (جمع)</h4>
+            <canvas id="chartDuration" width="200" height="200"></canvas>
+          </div>
+          <!-- Pie Chart: Total Tests per Lesson -->
+          <div class="chart-box">
+            <h4>تعداد تست درس‌ها (جمع)</h4>
+            <canvas id="chartTests" width="200" height="200"></canvas>
+          </div>
+          <!-- Grouped Bar Chart: Ratio of Lessons (Tests vs. Duration) -->
+          <div class="chart-box">
+            <h4>نسبت درس‌ها (تست و مدت)</h4>
+            <canvas id="chartGrouped" width="300" height="200"></canvas>
+          </div>
+          <!-- Line Chart: Daily Totals (Tests and Duration) -->
+          <div class="chart-box">
+            <h4>تعداد تست و مدت در روزهای هفته</h4>
+            <canvas id="chartLine" width="300" height="200"></canvas>
+          </div>
+        </div>
+        ${'<scr' + 'ipt>'}
+          // Initialize Pie Chart for Total Duration per Lesson
+          new Chart(document.getElementById("chartDuration"), {
+            type: "pie",
+            data: {
+              labels: ${JSON.stringify(chartLabelsDuration)},
+              datasets: [{
+                data: ${JSON.stringify(chartDataDuration)},
+                backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40"]
+              }]
+            },
+            options: { title: { display: true, text: "مدت زمان درس‌ها" } }
+          });
+          
+          // Initialize Pie Chart for Total Tests per Lesson
+          new Chart(document.getElementById("chartTests"), {
+            type: "pie",
+            data: {
+              labels: ${JSON.stringify(chartLabelsTests)},
+              datasets: [{
+                data: ${JSON.stringify(chartDataTests)},
+                backgroundColor: ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", "#FF9F40"]
+              }]
+            },
+            options: { title: { display: true, text: "تعداد تست درس‌ها" } }
+          });
+          
+          // Initialize Grouped Bar Chart for Lesson Ratios (Tests and Duration)
+          new Chart(document.getElementById("chartGrouped"), {
+            type: "bar",
+            data: {
+              labels: ${JSON.stringify(barChartLabels)},
+              datasets: [
+                {
+                  label: "تعداد تست",
+                  data: ${JSON.stringify(barChartDataTests)},
+                  backgroundColor: "rgba(54, 162, 235, 0.6)"
+                },
+                {
+                  label: "مدت زمان",
+                  data: ${JSON.stringify(barChartDataDuration)},
+                  backgroundColor: "rgba(255, 206, 86, 0.6)"
+                }
+              ]
+            },
+            options: {
+              title: { display: true, text: "نسبت درس‌ها (تست و مدت)" },
+              responsive: true,
+              scales: {
+                x: { stacked: false },
+                y: { beginAtZero: true }
+              }
+            }
+          });
+          
+          // Initialize Line Chart for Daily Totals (Tests and Duration)
+          new Chart(document.getElementById("chartLine"), {
+            type: "line",
+            data: {
+              labels: ${JSON.stringify(lineLabels)},
+              datasets: [
+                {
+                  label: "تعداد تست",
+                  data: ${JSON.stringify(lineDataTests)},
+                  fill: false,
+                  borderColor: "#36A2EB",
+                  tension: 0.1
+                },
+                {
+                  label: "مدت زمان",
+                  data: ${JSON.stringify(lineDataDurations)},
+                  fill: false,
+                  borderColor: "#FFCE56",
+                  tension: 0.1
+                }
+              ]
+            },
+            options: {
+              title: { display: true, text: "تعداد تست و مدت در روزهای هفته" },
+              responsive: true,
+              scales: {
+                y: { beginAtZero: true }
+              }
+            }
+          });
+          document.getElementById("download-summary-pdf").addEventListener("click", async function(){
+  // مخفی‌سازی دکمه برای اینکه در اسکرین‌شات نباشه
+  const btn = this;
+  btn.style.display = "none";
+
+  // المان حاوی خلاصه
+  const wrapper = document.getElementById("summary-wrapper");
+  // اندازه واقعی محتوا
+  const fullW = wrapper.scrollWidth;
+  const fullH = wrapper.scrollHeight;
+
+  // اسکرین‌شات با کیفیت
+  const canvas = await html2canvas(wrapper, {
+    scale: 2,
+    useCORS: true,
+    width: fullW,
+    height: fullH,
+    windowWidth: fullW,
+    windowHeight: fullH
+  });
+
+  const imgData = canvas.toDataURL('image/jpeg', 0.7);
+  const { jsPDF } = window.jspdf;
+  // ساخت PDF افقی A4
+  const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+  // فیت کردن تصویر داخل صفحه
+  const pdfW = pdf.internal.pageSize.getWidth();
+  const imgProps = pdf.getImageProperties(imgData);
+  const pdfH = (imgProps.height * pdfW) / imgProps.width;
+
+  pdf.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
+  pdf.save("week-summary.pdf");
+
+  // نمایش مجدد دکمه
+  btn.style.display = "";
+});
+
+        ${'</scr' + 'ipt>'}
+        </div>
+  
+  `;
+  
+
+
+
+  const rawJalaliStart = $("#weekSelector").val();                // YYYY-MM-DD شمسی
+    const jalaliStart    = moment(rawJalaliStart, "YYYY-MM-DD").format("jD jMMMM YYYY");
+    const jalaliEnd      = moment(rawJalaliStart, "YYYY-MM-DD").add(6, "days").format("jD jMMMM YYYY");
+    // رویدادهای مهم (هر خط یک بولت)
+    const importantEvents = $("#important-events").val()
+      .split("\n")
+      .filter(l => l.trim())
+      .map(l => `<li>• ${l.trim()}</li>`)
+      .join("");
+
+    // 2. آماده‌سازی HTML تقویم (همان calendarHTML قبلی)
+    let calendarClone = $(".calendar-wrapper").clone();
+    calendarClone.find("select").remove();     // حذف سلکت‌ها
+    calendarClone.find(".remove-btn, .tick-btn, .edit-btn , .repeat-btn, .open-copy-day").remove(); // حذف دکمه‌ها
+    const calendarHTML = calendarClone.prop("outerHTML");
+
+    // 3. باز کردن پنجره‌ی جدید و نوشتن HTML
+    document.getElementById("hidden-week-output").innerHTML =`
+   
+          <link class="temp-report-css" href="https://fonts.googleapis.com/css2?family=Homemade+Apple&display=swap" rel="stylesheet">
+          <style class="temp-report-css">
+
+
+
+            html, body {
+              margin:0; padding:0;
+              direction: rtl;
+              font-family: 'Vazir', sans-serif;
+            }
+            body {
+              display: flex; flex-direction: column;
+              background: #fdfdfd;
+            }
+            .report-header {
+              background: linear-gradient(135deg, #ffe7c0, #ffd1a0);
+              padding: 20px;
+              text-align: center;
+              box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            .report-header h1 {
+              margin:0;
+              font-family: 'Homemade Apple', cursive;
+              font-size: 32px;
+              color: #333;
+            }
+            .report-header p {
+              margin:5px 0 0;
+              font-size: 16px;
+              color: #555;
+            }
+            .calendar-wrapper {
+              flex:1;
+              overflow: hidden;
+              padding: 10px 20px;
+            }
+            .calendar-container {
+              
+              border: 2px dashed #bbb;
+              border-radius: 8px;
+            }
+            .day-column {
+              border-left: 1px dashed #bbb !important; 
+            }
+            .time-label {
+              font-size: 6px !important;
+            }
+            .calendar-task .task-title {
+              font-size: 14px !important;
+            }
+            .important-events {
+              background: #fff8dc;
+              margin: 20px;
+              padding: 15px;
+              border: 1px dotted #e6b800;
+              border-radius: 6px;
+              font-size: 14px;
+            }
+            .important-events ul {
+              margin:0; padding-inline-start:20px;
+            }
+            .important-events li {
+              margin: 6px 0;
+            }
+            .report-footer {
+              text-align: center;
+              padding: 12px;
+              background: #fafafa;
+              font-size: 12px;
+              color: #888;
+              border-top: 1px solid #ddd;
+            }
+            .chapter-display,
+.tests-display {
+  font-size: 10px;
+  margin-right: 4px;
+}
+#pdfPage {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 210mm;
+  
+}
+ .report-footer {
+  flex: 0 0 auto; /* هدر و فوتر اندازه‌ی محتواشون رو می‌گیرن */
+}
+.calendar-wrapper {
+  flex: 1 1 auto;  /* وسط رو پر می‌کنه */
+  display: flex;
+    overflow:visible;
+}
+.timeline {
+  flex: 0 0 60px;  /* عرض ثابت تایم‌لاین */
+}
+.calendar-container {
+  flex: 1 1 auto;  /* ستون‌های روز عرض باقیمانده رو می‌گیرن */
+  display: flex;
+  gap: 5px;
+}
+.day-column {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-wrapper {
+  padding: 0;
+  margin: 0;
+}
+.day-column {
+  flex: 1; /* هر ستون فضای مساوی بگیره */
+
+    button#download-pdf {
+      position: fixed; top: 10px; left: 10px;
+      z-index: 999;
+      padding: 8px 12px;
+      background: #2E7D32; color: #fff;
+      border: none; border-radius: 4px;
+      font-size: 14px; cursor: pointer;
+    }
+  @page { size: A4 landscape; margin: 0; }
+
+  :root { --header-h: 100px; --footer-h: 60px; }
+  .report-header { height: var(--header-h); /* بقیۀ استایل هدر */ }
+  .report-footer { height: var(--footer-h); /* بقیۀ استایل فوتر */ }
+
+  .calendar-wrapper {
+    height: calc(100vh - var(--header-h) - var(--footer-h));
+    overflow: hidden;
+    padding: 0 20px;
+    box-sizing: border-box;
+  }
+
+  .task-container {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 14px,
+      #eee 14px,
+      #eee 15px
+    );
+  }
+  .timeline {
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent 30px,
+      #ddd 30px,
+      #ddd 31px
+    );
+  }
+  /* فضای تقویم */
+    .calendar-wrapper {
+      box-sizing: border-box !important;
+      height: calc(100vh - 80px - 40px) !important;
+      padding: 0 20px !important;
+      overflow: hidden !important;
+    }
+
+    /* ستون‌ها */
+    .calendar-container {
+      display: flex !important;
+      width: 100% !important;
+      gap: 10px !important;
+    }
+    .day-column {
+      flex: 1 !important;
+      background: #fff !important;
+      border: 1px solid #ddd !important;
+      border-radius: 10px !important;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1) !important;
+      display: flex !important;
+      flex-direction: column !important;
+    }
+
+    /* پس‌زمینه خطوط ساعتی */
+    .task-container {
+      flex: 1 !important;
+      position: relative !important;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent, transparent 14px,
+        #eee 14px, #eee 15px
+      ) !important;
+    }
+    .timeline {
+      width: 60px !important;
+      height: calc(100vh - 80px - 40px) !important;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent, transparent 30px,
+        #ddd 30px, #ddd 31px
+      ) !important;
+    }
+     /* اضافه کن این استایل‌ها */
+        .report-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          background: linear-gradient(135deg, #ffe7c0, #ffd1a0);
+          padding: 20px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .report-header img {
+          height: 40px;
+          object-fit: contain;
+        }
+   
+  </style>
+  <!-- بارگذاری html2canvas و jsPDF -->
+  <script class="temp-report-css" src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script class="temp-report-css" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+       
+      
+  <div id="pdfPage" style="
+  margin:0;  direction:rtl; font-family:'Vazir', sans-serif;
+        width:100%;   /* عرض در حالت Landscape */
+  min-height:210mm;   /* حداقل اندازه A4 در حالت Landscape */
+  height:auto;        /* ارتفاع = اندازه‌ی محتوا */ 
+      display:flex;
+      flex-direction:column;
+      box-sizing:border-box;
+      padding:10mm;       /* حاشیه اطراف */
+  ">
+    <!-- ۱. دکمه دانلود (بعدا مخفی می‌شود) -->
+    <button id="download-pdf" style="align-self:flex-start; margin-bottom:5px">
+      دانلود PDF
+    </button>
+
+    <!-- ۲. هِدِر -->
+    <div class="report-header" style="justify-content: space-between;
+    align-items: center;
+    display: flex
+;">
+        <img src="https://panelkimia.ir/2.png" alt="لوگو چپ" />
+
+      <h1 style="margin:0; font-family:'Homemade Apple',cursive; font-size:32px">
+        برنامه هفته‌ای ${studentName}
+      </h1>
+      <p style="margin:5px 0 0; font-size:16px; color:#555">
+        ${consultantName}
+      </p>
+                   <img style="    mix-blend-mode: darken;" src="https://panelkimia.ir/1.png" alt="لوگو راست" />
+
+    </div>
+
+    <!-- ۳. بدنه تقویم -->
+    <div class="calendar-wrapper" style="
+        flex:1 1 auto;
+        display:flex;
+        overflow:hidden;
+        margin:10px 0;
+    ">
+
+      <!-- ستون‌های روز -->
+      <div class="calendar-container" style="
+          flex:1 1 auto;
+          display:flex;
+          gap:5px;
+          background:#fff; /* اختیاری */
+          padding:5px;
+      ">
+        ${calendarHTML}
+      </div>
+    </div>
+
+    <!-- ۴. رویدادهای مهم -->
+    <div class="important-events" style="
+        flex:0 0 auto;
+        background:#fff8dc;
+        padding:10px;
+        border:1px dotted #e6b800;
+        border-radius:6px;
+        margin-bottom:10px;
+    ">
+      <strong>رویدادهای مهم این هفته:</strong>
+      <ul style="margin:5px 0 0; padding-inline-start:20px">
+        ${importantEvents}
+      </ul>
+    </div>
+
+    <!-- ۵. فوتر -->
+    <div class="report-footer" style="
+        flex:0 0 auto;
+        text-align:center;
+        padding:8px;
+        background:#fafafa;
+        font-size:12px;
+        color:#888;
+        border-top:1px solid #ddd;
+    ">
+      Generated by Kimiagarkhune © ${new Date().getFullYear()}
+    </div>
+  </div>
+
+  <!-- html2canvas و jsPDF -->
+  <script class="temp-report-css" src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+  <script class="temp-report-css" src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+
+  <script>
+    document.getElementById("download-pdf").addEventListener("click", async () => {
+      // مخفی کردن دکمه
+      document.getElementById("download-pdf").style.display = "none";
+
+      // فقط از #pdfPage عکس بگیر
+      const wrapper = document.getElementById("pdfPage");
+      // اندازه‌ی واقعیِ محتوا
+const fullW = wrapper.scrollWidth;
+const fullH = wrapper.scrollHeight;
+
+const canvas = await html2canvas(wrapper, {
+  scale: 2,
+  useCORS: true,
+  width: fullW,
+  height: fullH,
+  windowWidth: fullW,
+  windowHeight: fullH
+});
+      const imgData = canvas.toDataURL('image/jpeg', 0.7);
+      const { jsPDF } = window.jspdf;
+      // landscape یا portrait بسته به نیاز
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+      // فیت کردن تصویر به صفحات A4
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = pdf.internal.pageSize.getHeight();
+      const imgProps = pdf.getImageProperties(imgData);
+      const imgH = (imgProps.height * pdfW) / imgProps.width;
+
+      pdf.addImage(imgData, "JPEG", 0, 0, pdfW, imgH);
+      pdf.save("week-plan.pdf");
+ 
+      // نمایش دوباره دکمه
+      document.getElementById("download-pdf").style.display = "";
+    });
+  <\/script>
+
+    `;
+   // ۱) تولید HTML هر سه بخش
+  const weekOutputHTML  = document.getElementById("hidden-week-output").innerHTML;
+  const weekSummaryHTML = document.getElementById("hidden-week-summary").innerHTML;
+  const emptyMatrixHTML = document.getElementById("hidden-empty-matrix").innerHTML;
+
+  // ۲) باز کردن پنجرهٔ جدید
+  const win = window.open("", "_blank");
+  win.document.write(`
+    <!DOCTYPE html>
+    <html lang="fa" dir="rtl">
+    <head>
+      <meta charset="utf-8">
+      <title>دانلود همه گزارش‌ها</title>
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css"/> 
+      <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css"/>
+      <style>
+        body { direction: rtl; font-family: 'Vazir', sans-serif; padding:20px; }
+        #combined { display:flex; flex-direction:column; gap:40px; }
+        #combined > div { background:#fff; padding:10px; border:1px solid #ddd;}
+        #download-pdf { margin-bottom:20px; }
+        #download-summary-pdf{    display:none;}
+                #download-pdf{        display:none;  }
+                #download-matrix-pdf{  display:none;}
+      </style>
+    </head>
+    <body>
+      <button id="download-all-pdf" class="btn btn-success">دانلود PDF</button>
+      <div id="combined">
+        <div id="section-output">        <img class="watermark" src="https://panelkimia.ir/2.png" alt="Watermark Logo" />${weekOutputHTML}</div>
+        <div id="section-summary">        <img class="watermark" src="https://panelkimia.ir/2.png" alt="Watermark Logo" />${weekSummaryHTML}</div>
+        <div id="section-matrix">        <img class="watermark" src="https://panelkimia.ir/2.png" alt="Watermark Logo" />${emptyMatrixHTML}</div>
+      </div>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+      <script>
+        document.getElementById("download-all-pdf").addEventListener("click", async () => {
+        const btn = document.getElementById("download-all-pdf");
+        btn.disabled = true;
+        const sections = [
+          "section-output",
+          "section-summary",
+          "section-matrix"
+        ];
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+        const pdfW = pdf.internal.pageSize.getWidth();
+        
+  for (let i = 0; i < sections.length; i++) {
+    const el = document.getElementById(sections[i]);
+    // ۱) بگیر اسکرین‌شات
+    const orig = await html2canvas(el, { scale: 2, useCORS: true });
+
+    // ۲) فقط برای ماتریس می‌چرخانیم
+    let finalCanvas = orig;
+    if (sections[i] === "section-matrix") {
+      const rot = document.createElement("canvas");
+      rot.width  = orig.height;
+      rot.height = orig.width;
+      const ctx = rot.getContext("2d");
+      ctx.translate(rot.width, 0);
+      ctx.rotate(Math.PI/2);
+      ctx.drawImage(orig, 0, 0);
+      finalCanvas = rot;
+    }
+
+    // ۳) محاسبه مقیاس هم‌عرض و هم‌ارتفاع
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const cw = finalCanvas.width;
+    const ch = finalCanvas.height;
+    const scale = Math.min(pageW / cw, pageH / ch);
+    const imgW = cw * scale;
+    const imgH = ch * scale; 
+    const x = (pageW - imgW) / 2; 
+    const y = (pageH - imgH) / 2;
+
+    // ۴) صفحهٔ جدید (به جز اولین)
+    if (i > 0) pdf.addPage();
+
+    // ۵) درج تصویر با ابعاد حساب‌شده
+    const data = finalCanvas.toDataURL('image/jpeg', 0.7);
+    pdf.addImage(data, "JPEG", x, y, imgW, imgH);
+  }
+        
+        pdf.save("all-reports.pdf");
+        btn.disabled = false;
+    
+        });
+      <\/script>
+    </body>
+    </html>
+  `);
+  win.document.close();
+  
+  document.querySelectorAll('.temp-report-css').forEach(el => el.remove());
+  location.reload();
+});
+
+
+
+</script>
+
+</body>
+</html>
