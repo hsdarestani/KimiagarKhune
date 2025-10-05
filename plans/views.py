@@ -65,8 +65,18 @@ def get_admin_panel_data(request):
     majors = Major.objects.all()
     grades = Grade.objects.all()
 
-    students_data = [{'id': s.id, 'name': f"{s.profile.first_name} {s.profile.last_name}"} for s in students]
-    advisors_data = [{'id': a.id, 'name': f"{a.profile.first_name} {a.profile.last_name}"} for a in advisors]
+    students_data = [{
+        'id': s.id,
+        'name': f"{s.profile.first_name} {s.profile.last_name}",
+        'phone_number': s.profile.phone_number,
+        'telegram_chat_id': getattr(s.profile, 'telegram_chat_id', ''),
+    } for s in students]
+    advisors_data = [{
+        'id': a.id,
+        'name': f"{a.profile.first_name} {a.profile.last_name}",
+        'phone_number': a.profile.phone_number,
+        'telegram_chat_id': getattr(a.profile, 'telegram_chat_id', ''),
+    } for a in advisors]
     majors_data = [{'id': m.id, 'name': m.name} for m in majors]
     grades_data = [{'id': g.id, 'name': g.name} for g in grades]
 
@@ -391,6 +401,49 @@ def check_weekly_report(request):
             return JsonResponse({
                 "exists": False
             })
+
+
+@login_required
+def get_reports_summary(request):
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    try:
+        limit = int(request.GET.get('limit', 50))
+    except (TypeError, ValueError):
+        limit = 50
+
+    reports = (
+        WeeklyReport.objects.select_related(
+            'student__profile',
+            'student__advisor__profile',
+        )
+        .prefetch_related('details__box')
+        .order_by('-week_start')[:limit]
+    )
+
+    results = []
+    for report in reports:
+        details = list(report.details.select_related('box'))
+        tasks_count = len(details)
+        total_minutes = sum(
+            (detail.box.duration_minutes or 0)
+            for detail in details
+            if detail.box and detail.box.duration_minutes
+        )
+        results.append({
+            'id': report.id,
+            'student_name': report.student.profile.get_full_name(),
+            'advisor_name': report.student.advisor.profile.get_full_name() if report.student.advisor else '',
+            'week_start': report.week_start.isoformat(),
+            'week_end': report.week_end.isoformat(),
+            'tasks_count': tasks_count,
+            'total_minutes': total_minutes,
+            'logs_count': len(report.logs or []),
+            'important_events': report.important_events or '',
+        })
+
+    return JsonResponse({'reports': results})
 
 
 def get_weekly_report_details(request):

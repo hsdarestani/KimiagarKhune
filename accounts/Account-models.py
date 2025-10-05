@@ -14,6 +14,15 @@ class Profile(models.Model):
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True, verbose_name="عکس پروفایل")
+    telegram_chat_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="شناسه تلگرام")
+
+    def get_full_name(self):
+        first = self.first_name or ""
+        last = self.last_name or ""
+        full_name = f"{first} {last}".strip()
+        if full_name:
+            return full_name
+        return self.user.get_username()
 
     def get_full_name(self):
         first = self.first_name or ""

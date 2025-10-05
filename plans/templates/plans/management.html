@@ -161,11 +161,10 @@
                  <div class="chat-messages flex-1 p-3 space-y-4 overflow-y-auto"></div>
                  <div class="p-2 border-t bg-gray-50 flex items-center gap-2">
                      <div class="flex-1 relative">
-                        <input type="text" class="w-full p-2 border rounded-full pl-10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="پیام...">
-                        <button class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"><i class="fas fa-smile"></i></button>
+                        <input id="chat-input" type="text" class="w-full p-2 border rounded-full pl-10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="پیام...">
+                        <button id="chat-emoji-btn" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600" type="button"><i class="fas fa-smile"></i></button>
                      </div>
-                     <button class="text-gray-500 hover:text-indigo-600 p-2"><i class="fas fa-paperclip"></i></button>
-                     <button class="text-gray-500 hover:text-indigo-600 p-2"><i class="fas fa-microphone"></i></button>
+                     <button id="chat-send-btn" class="text-white bg-indigo-600 hover:bg-indigo-700 p-2 rounded-full w-10 h-10 flex items-center justify-center" type="button"><i class="fas fa-paper-plane"></i></button>
                  </div>
              </div>
         </div>
@@ -223,10 +222,10 @@
         <div class="bg-white rounded-lg p-6 w-11/12 max-w-lg modal-enter">
             <h2 class="text-xl font-bold mb-4">ثبت اطلاعات پرداخت</h2>
              <p class="text-sm text-gray-600 mb-4">پس از واریز مبلغ دوره، لطفا اطلاعات زیر را برای تایید توسط ادمین تکمیل و ارسال نمایید.</p>
-            <form class="space-y-4">
-                <div><label class="block text-sm font-medium text-gray-700">مبلغ واریز شده (تومان)</label><input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                <div><label class="block text-sm font-medium text-gray-700">شماره پیگیری / ارجاع</label><input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                <div><label class="block text-sm font-medium text-gray-700">تاریخ واریز</label><input type="date" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+            <form id="payment-form" class="space-y-4">
+                <div><label class="block text-sm font-medium text-gray-700">مبلغ واریز شده (تومان)</label><input name="amount" type="number" min="0" step="1000" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                <div><label class="block text-sm font-medium text-gray-700">شماره پیگیری / ارجاع</label><input name="reference_number" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                <div><label class="block text-sm font-medium text-gray-700">تاریخ واریز</label><input name="payment_date" type="date" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
                 <div class="text-left pt-4">
                     <button type="button" data-close-modal="payment-modal" class="px-4 py-2 bg-gray-200 rounded-lg">انصراف</button>
                     <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">ارسال برای تایید</button>
@@ -542,6 +541,34 @@
                     </div>
                 `;
                 openModal('course-details-modal');
+
+                const addCommentForm = modalContentContainer.querySelector('#add-comment-form');
+                if (addCommentForm) {
+                    addCommentForm.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+                        const formData = new FormData(addCommentForm);
+                        try {
+                            const response = await fetch(`/courses/${course.id}/add-comment/`, {
+                                method: 'POST',
+                                headers: { 'X-CSRFToken': csrftoken },
+                                body: formData,
+                            });
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                throw new Error(errorText || 'خطا در ثبت نظر');
+                            }
+                            await response.json();
+                            await loadCourses();
+                            renderCalendar();
+                            const refreshedCourse = state.courses.find(item => item.id === course.id);
+                            if (refreshedCourse) {
+                                renderCourseDetails(refreshedCourse);
+                            }
+                        } catch (error) {
+                            alert('ثبت نظر با خطا مواجه شد.');
+                        }
+                    });
+                }
             };
 
             const createCourseCard = (course) => {
