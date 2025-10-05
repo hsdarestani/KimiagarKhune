@@ -161,11 +161,10 @@
                  <div class="chat-messages flex-1 p-3 space-y-4 overflow-y-auto"></div>
                  <div class="p-2 border-t bg-gray-50 flex items-center gap-2">
                      <div class="flex-1 relative">
-                        <input type="text" class="w-full p-2 border rounded-full pl-10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="پیام...">
-                        <button class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600"><i class="fas fa-smile"></i></button>
+                        <input id="chat-input" type="text" class="w-full p-2 border rounded-full pl-10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent" placeholder="پیام...">
+                        <button id="chat-emoji-btn" class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-indigo-600" type="button"><i class="fas fa-smile"></i></button>
                      </div>
-                     <button class="text-gray-500 hover:text-indigo-600 p-2"><i class="fas fa-paperclip"></i></button>
-                     <button class="text-gray-500 hover:text-indigo-600 p-2"><i class="fas fa-microphone"></i></button>
+                     <button id="chat-send-btn" class="text-white bg-indigo-600 hover:bg-indigo-700 p-2 rounded-full w-10 h-10 flex items-center justify-center" type="button"><i class="fas fa-paper-plane"></i></button>
                  </div>
              </div>
         </div>
@@ -223,10 +222,10 @@
         <div class="bg-white rounded-lg p-6 w-11/12 max-w-lg modal-enter">
             <h2 class="text-xl font-bold mb-4">ثبت اطلاعات پرداخت</h2>
              <p class="text-sm text-gray-600 mb-4">پس از واریز مبلغ دوره، لطفا اطلاعات زیر را برای تایید توسط ادمین تکمیل و ارسال نمایید.</p>
-            <form class="space-y-4">
-                <div><label class="block text-sm font-medium text-gray-700">مبلغ واریز شده (تومان)</label><input type="number" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                <div><label class="block text-sm font-medium text-gray-700">شماره پیگیری / ارجاع</label><input type="text" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                <div><label class="block text-sm font-medium text-gray-700">تاریخ واریز</label><input type="date" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+            <form id="payment-form" class="space-y-4">
+                <div><label class="block text-sm font-medium text-gray-700">مبلغ واریز شده (تومان)</label><input name="amount" type="number" min="0" step="1000" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                <div><label class="block text-sm font-medium text-gray-700">شماره پیگیری / ارجاع</label><input name="reference_number" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                <div><label class="block text-sm font-medium text-gray-700">تاریخ واریز</label><input name="payment_date" type="date" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
                 <div class="text-left pt-4">
                     <button type="button" data-close-modal="payment-modal" class="px-4 py-2 bg-gray-200 rounded-lg">انصراف</button>
                     <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">ارسال برای تایید</button>
@@ -238,196 +237,36 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            
-// --- Helper Functions ---
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-const csrftoken = getCookie('csrftoken');
+            const CURRENT_USER = JSON.parse('{{ dashboard_user_context|escapejs }}');
 
-// --- Data Fetching ---
-async function getAdminData() {
-    try {
-        const response = await fetch('/api/admin-panel-data/');
-        if (!response.ok) throw new Error('Failed to fetch admin data');
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching admin data:', error);
-        alert('خطا در دریافت اطلاعات از سرور.');
-        return null;
-    }
-}
-
-// --- RENDER ADMIN VIEW (The Core Logic) ---
-// این تابع را جایگزین تابع renderAdminView قبلی خود کنید یا آن را ویرایش کنید
-const renderAdminView = async (viewName) => {
-    const adminPanelContent = document.getElementById('admin-panel-content');
-    document.querySelectorAll('#admin-menu .admin-menu-item').forEach(item => item.classList.remove('active'));
-    document.querySelector(`#admin-menu .admin-menu-item[data-view="${viewName}"]`).classList.add('active');
-    
-    adminPanelContent.innerHTML = '<div class="loader" style="border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto;"></div>'; // Show loader
-
-    const data = await getAdminData();
-    if (!data) {
-        adminPanelContent.innerHTML = '<p class="text-red-500">امکان بارگذاری اطلاعات وجود ندارد.</p>';
-        return;
-    }
-
-    let content = '';
-    switch(viewName) {
-        case 'add-student':
-            const gradeOptions = data.grades.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-            const majorOptions = data.majors.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
-            content = `
-                <h3 class="text-xl font-bold mb-4">فرم افزودن دانش‌آموز جدید</h3>
-                <form id="add-student-form" class="space-y-4">
-                    <div><label class="block text-sm font-medium text-gray-700">نام</label><input name="first_name" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                    <div><label class="block text-sm font-medium text-gray-700">نام خانوادگی</label><input name="last_name" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                    <div><label class="block text-sm font-medium text-gray-700">شماره موبایل</label><input name="phone_number" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                    <div><label class="block text-sm font-medium text-gray-700">پایه تحصیلی</label><select name="grade_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${gradeOptions}</select></div>
-                    <div><label class="block text-sm font-medium text-gray-700">رشته</label><select name="major_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${majorOptions}</select></div>
-                    <div class="text-left"><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">افزودن</button></div>
-                </form>`;
-            break;
-
-        case 'assign-student':
-            const studentOptions = data.students.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-            const advisorOptions = data.advisors.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
-            const dayOptions = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه'].map(d => `<option value="${d}">${d}</option>`).join('');
-            content = `
-                <h3 class="text-xl font-bold mb-4">تخصیص دانش‌آموز به مشاور</h3>
-                <form id="assign-student-form" class="space-y-4">
-                    <div><label class="block text-sm font-medium text-gray-700">انتخاب دانش‌آموز</label><select name="student_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${studentOptions}</select></div>
-                    <div><label class="block text-sm font-medium text-gray-700">انتخاب مشاور</label><select name="advisor_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${advisorOptions}</select></div>
-                    <div><label class="block text-sm font-medium text-gray-700">روز جلسه</label><select name="day_of_week" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${dayOptions}</select></div>
-                    <div><label class="block text-sm font-medium text-gray-700">تاریخ اولین جلسه</label><input name="start_date" type="date" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                    <div><label class="block text-sm font-medium text-gray-700">ساعت جلسه</label><input name="start_time" type="time" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                    <div class="text-left"><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">تخصیص</button></div>
-                </form>`;
-            break;
-    }
-    adminPanelContent.innerHTML = content;
-    
-    document.getElementById('add-student-form')?.addEventListener('submit', handleAddStudent);
-    document.getElementById('assign-student-form')?.addEventListener('submit', handleAssignStudent);
-};
-
-// --- Form Handlers ---
-async function handleAddStudent(event) {
-    event.preventDefault();
-    const formData = new FormData(event.target);
-    const data = Object.fromEntries(formData.entries());
-    
-    try {
-        const response = await fetch('/api/add-student/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-            body: JSON.stringify(data),
-        });
-        const result = await response.json();
-        if (response.status === 201) {
-            alert(result.message);
-            renderAdminView('assign-student'); // Refresh and switch to assign view
-        } else {
-            alert(`خطا: ${result.message || 'اطلاعات نامعتبر است.'}`);
-        }
-    } catch (error) {
-        alert('یک خطای شبکه رخ داد.');
-    }
-}
-
-async function handleAssignStudent(event) {
-    event.preventDefault();
-    const formData = new FormData(event.target);
-    const data = Object.fromEntries(formData.entries());
-
-    const dayOfWeekMapping = {
-        'شنبه': 'Saturday', 'یکشنبه': 'Sunday', 'دوشنبه': 'Monday',
-        'سه‌شنبه': 'Tuesday', 'چهارشنبه': 'Wednesday', 'پنج‌شنبه': 'Thursday', 'جمعه': 'Friday'
-    };
-    data.day_of_week = dayOfWeekMapping[data.day_of_week];
-
-    try {
-        const response = await fetch('/api/assign-student/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
-            body: JSON.stringify(data),
-        });
-        const result = await response.json();
-        if (response.status === 201) {
-            alert(result.message);
-            if (typeof renderCalendar === 'function') {
-                 renderCalendar(); // تقویم اصلی را برای نمایش دوره جدید رفرش کنید
-            }
-            document.getElementById('admin-panel-modal').classList.add('hidden'); // بستن مودال
-        } else {
-            alert(`خطا: ${result.message || 'اطلاعات نامعتبر است.'}`);
-        }
-    } catch (error) {
-        alert('یک خطای شبکه رخ داد.');
-    }
-}
-
-// --- Initial Event Listeners ---
-// این شنونده‌ها را به کدهای قبلی خود اضافه کنید یا جایگزین کنید
-document.querySelectorAll('#admin-menu .admin-menu-item').forEach(item => {
-    item.addEventListener('click', () => renderAdminView(item.dataset.view));
-});
-
-document.getElementById('open-admin-panel-btn').addEventListener('click', () => {
-    renderAdminView('add-student'); // با این ویو به صورت پیش‌فرض باز شود
-    document.getElementById('admin-panel-modal').classList.remove('hidden');
-});
-
-            // --- MOCK DATA ---
-            const MOCK_DATA = {
-                courses: [
-                    { id: 1, studentId: 101, studentName: 'علی احمدی', counselorId: 1, counselorName: 'حسین دارستانی', dayOfWeek: 'شنبه', time: '09:00',
-                    sessions: [{date: '1404/04/01', completed: true}, {date: '1404/04/08', completed: false}, {date: '1404/04/15', completed: false}, {date: '1404/04/22', completed: false}],
-                    comments: [{author: 'حسین دارستانی', text: 'هفته اول عالی بود، ادامه بده.'}],
-                    attachments: [{name: 'برنامه_هفتگی.pdf', url: '#'}, {name: 'جزوه_تکمیلی.docx', url: '#'}]
-                    },
-                    { id: 2, studentId: 102, studentName: 'زهرا محمدی', counselorId: 2, counselorName: 'مریم رضایی', dayOfWeek: 'دوشنبه', time: '16:00', 
-                    sessions: [{date: '1404/04/03', completed: true}, {date: '1404/04/10', completed: true}, {date: '1404/04/17', completed: false}, {date: '1404/04/24', completed: false}],
-                    comments: [],
-                    attachments: []
-                    },
-                    { id: 3, studentId: 103, studentName: 'رضا اکبری', counselorId: 1, counselorName: 'حسین دارستانی', dayOfWeek: 'سه‌شنبه', time: '10:00',
-                    sessions: [{date: '1404/04/04', completed: false}, {date: '1404/04/11', completed: false}, {date: '1404/04/18', completed: false}, {date: '1404/04/25', completed: false}],
-                    comments: [{author: 'حسین دارستانی', text: 'لطفا گزارش کار رو کامل کن.'}],
-                    attachments: [{name: 'فایل_صوتی_جلسه.mp3', url: '#'}]
-                    }
-                ],
-                chats: {
-                    '101': { otherPartyName: 'علی احمدی', messages: [{sender: 'me', text: 'سلام علی جان، برنامه رو دیدی؟'}, {sender: 'other', text: 'سلام استاد، بله. ممنونم'}] },
-                    '103': { otherPartyName: 'رضا اکبری', messages: [{sender: 'other', text: 'استاد من فردا نمیرسم تمرین حل کنم.'}] }
-                },
-                 payments: [
-                    { id: 1, studentName: 'علی احمدی', amount: 450000, refNumber: '123456789', date: '1404/04/01', status: 'approved' },
-                    { id: 2, studentName: 'زهرا محمدی', amount: 450000, refNumber: '987654321', date: '1404/04/03', status: 'pending' },
-                    { id: 3, studentName: 'رضا اکبری', amount: 450000, refNumber: '112233445', date: '1404/04/04', status: 'rejected' },
-                ],
-                users: {
-                    admin: { id: 99, name: 'ادمین سیستم' },
-                    counselor: { id: 1, name: 'حسین دارستانی' },
-                    student: { id: 101, name: 'علی احمدی', counselorId: 1, counselorName: 'حسین دارستانی' }
-                }
+            const EN_TO_FA_DAYS = {
+                Saturday: 'شنبه',
+                Sunday: 'یکشنبه',
+                Monday: 'دوشنبه',
+                Tuesday: 'سه‌شنبه',
+                Wednesday: 'چهارشنبه',
+                Thursday: 'پنج‌شنبه',
+                Friday: 'جمعه',
             };
-            const daysOfWeek = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه'];
-            let currentRole = 'admin';
-            
-            // --- DOM Elements ---
+            const FA_TO_EN_DAYS = Object.entries(EN_TO_FA_DAYS).reduce((acc, [en, fa]) => {
+                acc[fa] = en;
+                return acc;
+            }, {});
+            const daysOfWeek = Object.values(EN_TO_FA_DAYS);
+
+            const state = {
+                courses: [],
+                payments: [],
+                paymentsLoaded: false,
+                conversations: [],
+                conversationsLoaded: false,
+                chatMessages: {},
+                activeConversationId: null,
+                reports: [],
+                reportsLoaded: false,
+                adminData: null,
+            };
+
             const calendarGrid = document.getElementById('calendar-grid');
             const modalBackdrop = document.getElementById('modal-backdrop');
             const adminControls = document.getElementById('admin-controls');
@@ -441,8 +280,203 @@ document.getElementById('open-admin-panel-btn').addEventListener('click', () => 
             const chatTitle = document.getElementById('chat-title');
             const backToChatsBtn = document.getElementById('back-to-chats-btn');
             const chatNotificationDot = document.getElementById('chat-notification-dot');
+            const adminBtn = document.getElementById('adminBtn');
+            const counselorBtn = document.getElementById('counselorBtn');
+            const studentBtn = document.getElementById('studentBtn');
+            const profileDropdown = document.getElementById('profile-dropdown');
 
-            // --- ALL FUNCTIONS DEFINED FIRST TO AVOID REFERENCE ERRORS ---
+            let currentRole = CURRENT_USER.isStaff ? 'admin' : (CURRENT_USER.role || 'student');
+
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            const csrftoken = getCookie('csrftoken');
+
+            async function fetchJSON(url, options = {}) {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    const error = new Error(`Request failed with status ${response.status}`);
+                    error.status = response.status;
+                    throw error;
+                }
+                if (response.status === 204) {
+                    return null;
+                }
+                return await response.json();
+            }
+
+            const extractFileName = (path) => {
+                if (!path) return '';
+                const parts = path.split('/');
+                return parts[parts.length - 1] || path;
+            };
+
+            const transformCourse = (course) => {
+                const sessions = (course.sessions || []).map(session => ({
+                    id: session.id,
+                    number: session.session_number,
+                    date: session.date,
+                    completed: session.is_completed,
+                    videoUrl: session.video_url,
+                }));
+                const comments = (course.comments || []).map(comment => ({
+                    id: comment.id,
+                    authorName: comment.author?.full_name || `${comment.author?.first_name || ''} ${comment.author?.last_name || ''}`.trim(),
+                    text: comment.text,
+                    createdAt: comment.created_at,
+                    attachment: comment.attachment,
+                    voiceNote: comment.voice_note,
+                }));
+                const attachments = [];
+                comments.forEach(comment => {
+                    if (comment.attachment) {
+                        attachments.push({
+                            name: extractFileName(comment.attachment),
+                            url: comment.attachment,
+                        });
+                    }
+                    if (comment.voiceNote) {
+                        attachments.push({
+                            name: extractFileName(comment.voiceNote),
+                            url: comment.voiceNote,
+                        });
+                    }
+                });
+
+                return {
+                    id: course.id,
+                    studentId: course.student,
+                    advisorId: course.advisor,
+                    studentName: course.student_name || '---',
+                    advisorName: course.advisor_name || '---',
+                    dayOfWeek: EN_TO_FA_DAYS[course.day_of_week] || course.day_of_week,
+                    startTime: course.start_time,
+                    time: course.start_time ? course.start_time.slice(0, 5) : '',
+                    startDate: course.start_date,
+                    isActive: course.is_active,
+                    sessions,
+                    comments,
+                    attachments,
+                };
+            };
+
+            async function loadCourses() {
+                try {
+                    const courses = await fetchJSON('/courses/');
+                    state.courses = courses.map(transformCourse);
+                } catch (error) {
+                    console.error('Error loading courses:', error);
+                    state.courses = [];
+                }
+            }
+
+            function updateCounselorFilterOptions() {
+                if (!counselorFilter) return;
+                const options = ['<option value="all">همه</option>'];
+                const seen = new Map();
+                state.courses.forEach(course => {
+                    if (!course.advisorId) return;
+                    if (!seen.has(course.advisorId)) {
+                        seen.set(course.advisorId, course.advisorName);
+                        options.push(`<option value="${course.advisorId}">${course.advisorName}</option>`);
+                    }
+                });
+                counselorFilter.innerHTML = options.join('');
+                counselorFilter.value = 'all';
+                counselorFilter.disabled = !(currentRole === 'admin' && CURRENT_USER.isStaff);
+            }
+
+            async function loadPayments(force = false) {
+                if (state.paymentsLoaded && !force) {
+                    return;
+                }
+                if (!CURRENT_USER.isStaff) {
+                    state.payments = [];
+                    state.paymentsLoaded = true;
+                    return;
+                }
+                try {
+                    const payments = await fetchJSON('/api/payments/');
+                    state.payments = payments;
+                } catch (error) {
+                    if (error.status !== 403) {
+                        console.error('Error loading payments:', error);
+                    }
+                    state.payments = [];
+                } finally {
+                    state.paymentsLoaded = true;
+                }
+            }
+
+            async function loadReports(force = false) {
+                if (state.reportsLoaded && !force) {
+                    return;
+                }
+                if (!CURRENT_USER.isStaff) {
+                    state.reports = [];
+                    state.reportsLoaded = true;
+                    return;
+                }
+                try {
+                    const payload = await fetchJSON('/api/reports/summary/');
+                    state.reports = payload.reports || [];
+                } catch (error) {
+                    if (error.status !== 403) {
+                        console.error('Error loading reports:', error);
+                    }
+                    state.reports = [];
+                } finally {
+                    state.reportsLoaded = true;
+                }
+            }
+
+            async function loadConversations(force = false) {
+                if (state.conversationsLoaded && !force) {
+                    return;
+                }
+                try {
+                    const conversations = await fetchJSON('/api/chat/conversations/');
+                    state.conversations = conversations;
+                } catch (error) {
+                    if (error.status !== 403) {
+                        console.error('Error loading conversations:', error);
+                    }
+                    state.conversations = [];
+                } finally {
+                    state.conversationsLoaded = true;
+                }
+            }
+
+            async function fetchChatMessages(userId) {
+                try {
+                    return await fetchJSON(`/api/chat/messages/${userId}/`);
+                } catch (error) {
+                    console.error('Error loading chat messages:', error);
+                    return [];
+                }
+            }
+
+            async function sendChatMessage(userId, data) {
+                return await fetchJSON(`/api/chat/messages/${userId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                    },
+                    body: JSON.stringify(data),
+                });
+            }
 
             const openModal = (modalId) => {
                 const modal = document.getElementById(modalId);
@@ -454,7 +488,7 @@ document.getElementById('open-admin-panel-btn').addEventListener('click', () => 
 
             const closeModal = (modalId) => {
                 const modal = document.getElementById(modalId);
-                if(modal) {
+                if (modal) {
                     const content = modal.querySelector('.modal-enter');
                     if (content) content.classList.replace('modal-enter', 'modal-leave');
                     setTimeout(() => {
@@ -464,96 +498,156 @@ document.getElementById('open-admin-panel-btn').addEventListener('click', () => 
                     }, 300);
                 }
             };
-            
+
             const openCourseDetailsModal = (course) => {
                 const modalContentContainer = document.getElementById('course-details-content');
+                if (!modalContentContainer) return;
+
+                const sessionsHtml = course.sessions.map((session, index) => `
+                    <div class="flex items-center justify-between bg-indigo-50 rounded-lg p-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 flex items-center justify-center rounded-full bg-white shadow">
+                                <span class="font-bold text-indigo-600">${index + 1}</span>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-gray-800">جلسه ${index + 1}</p>
+                                <p class="text-xs text-gray-500">${session.date}</p>
+                            </div>
+                        </div>
+                        <span class="text-sm ${session.completed ? 'text-green-600' : 'text-gray-400'}">
+                            ${session.completed ? 'انجام شد' : 'در انتظار'}
+                        </span>
+                    </div>
+                `).join('');
+
+                const commentsHtml = course.comments.map(comment => `
+                    <div class="p-3 bg-white rounded-lg shadow-sm border">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="font-semibold text-gray-700">${comment.authorName || 'کاربر'}</p>
+                            <span class="text-xs text-gray-400">${comment.createdAt ? new Date(comment.createdAt).toLocaleString('fa-IR') : ''}</span>
+                        </div>
+                        <p class="text-sm text-gray-600">${comment.text || 'بدون متن'}</p>
+                    </div>
+                `).join('');
+
+                const attachmentsHtml = course.attachments.length
+                    ? course.attachments.map(attachment => `
+                        <a href="${attachment.url}" target="_blank" class="flex items-center gap-2 p-2 border rounded-lg hover:bg-gray-50">
+                            <i class="fas fa-paperclip text-indigo-500"></i>
+                            <span class="text-sm text-gray-700">${attachment.name}</span>
+                        </a>
+                    `).join('')
+                    : '<p class="text-xs text-gray-400">فایلی ثبت نشده است.</p>';
+
+                const commentFormHtml = (CURRENT_USER.isStaff || currentRole !== 'student') ? `
+                    <section class="pt-4 border-t">
+                        <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                            <i class="fas fa-plus-circle text-indigo-500"></i> ثبت نظر جدید
+                        </h3>
+                        <form id="add-comment-form" class="space-y-3">
+                            <textarea name="text" rows="3" required class="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500" placeholder="متن نظر..."></textarea>
+                            <div class="flex items-center gap-3">
+                                <label class="text-sm text-gray-600">فایل ضمیمه (اختیاری)</label>
+                                <input type="file" name="attachment" class="text-sm" accept=".pdf,.jpg,.jpeg,.png,.mp3,.wav,.m4a" />
+                            </div>
+                            <div class="text-left">
+                                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">ارسال نظر</button>
+                            </div>
+                        </form>
+                    </section>
+                ` : '';
+
                 const weeklyPlanButton = (currentRole !== 'student') ? `
                     <button class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2">
                         <i class="fas fa-calendar-week"></i>
-                        <span>برنامه هفتگی</span>
+                        <span>مشاهده برنامه هفتگی</span>
                     </button>
                 ` : '';
 
-                const sessionsHtml = course.sessions.map((session, index) => `
-                    <li class="flex items-center justify-between text-sm py-2 border-b border-gray-100">
-                        <label class="flex items-center gap-3 text-gray-700">
-                            <input type="checkbox" ${session.completed ? 'checked' : ''} ${currentRole === 'student' ? 'disabled' : ''} class="w-5 h-5 rounded-md text-indigo-600 focus:ring-indigo-500 border-gray-300">
-                            جلسه ${index + 1}
-                        </label>
-                        <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">${session.date}</span>
-                    </li>`).join('');
-                
-                const commentsHtml = course.comments.map(comment => `
-                    <div class="bg-gray-50 p-3 rounded-lg mt-2">
-                        <p class="font-semibold text-sm text-gray-800">${comment.author}:</p>
-                        <p class="text-gray-600 text-sm">${comment.text}</p>
-                    </div>`).join('');
-
-                const attachmentsHtml = course.attachments.length > 0 ? course.attachments.map(file => `
-                    <a href="${file.url}" target="_blank" class="flex items-center gap-2 text-sm text-indigo-600 hover:underline p-2 rounded-lg hover:bg-indigo-50">
-                        <i class="fas ${file.name.includes('skyroom') ? 'fa-video' : 'fa-link'}"></i> ${file.name}
-                    </a>`).join('') : '<p class="text-xs text-gray-400 p-2">فایلی ضمیمه نشده.</p>';
-
                 modalContentContainer.innerHTML = `
-                    <div class="p-5 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-t-xl border-b flex justify-between items-center gap-4">
+                    <div class="flex justify-between items-center p-4 border-b">
                         <div>
-                            <h2 class="text-2xl font-extrabold text-gray-800">${course.studentName}</h2>
-                            <p class="text-gray-500">دوره مشاوره - ${course.dayOfWeek} ساعت ${course.time}</p>
+                            <h2 class="text-xl font-bold text-gray-800">${course.studentName}</h2>
+                            <p class="text-sm text-gray-500">مشاور: ${course.advisorName}</p>
                         </div>
-                        <div class="flex items-center gap-2">
-                            ${weeklyPlanButton}
-                            <a href="#" class="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 flex items-center gap-2">
-                                <i class="fas fa-video"></i>
-                                <span>ورود به کلاس</span>
-                            </a>
-                        </div>
+                        ${weeklyPlanButton}
                     </div>
-                    <div class="p-5 modal-body overflow-y-auto max-h-[60vh]">
-                        <div class="mb-5">
-                            <h3 class="font-bold mb-2">جلسات دوره</h3>
-                            <ul class="space-y-1">${sessionsHtml}</ul>
-                        </div>
-                        <div class="mb-5">
-                            <h3 class="font-bold mb-2">ضمیمه‌ها</h3>
-                            <div class="space-y-1">${attachmentsHtml}</div>
-                        </div>
-                        <div>
-                            <h3 class="font-bold mb-2">نظرات</h3>
-                            <div class="space-y-2">${commentsHtml || '<p class="text-xs text-gray-400">نظری ثبت نشده.</p>'}</div>
-                            <div class="mt-4 flex items-center gap-2 p-2 border rounded-lg bg-white">
-                                <input type="text" placeholder="نظر جدید..." class="flex-1 text-sm bg-transparent focus:outline-none">
-                                <button class="text-gray-400 hover:text-indigo-600"><i class="fas fa-smile"></i></button>
-                                <button class="text-gray-400 hover:text-indigo-600"><i class="fas fa-paperclip"></i></button>
-                                <button class="text-gray-400 hover:text-indigo-600"><i class="fas fa-microphone"></i></button>
-                            </div>
-                        </div>
+                    <div class="p-4 space-y-4 overflow-y-auto">
+                        <section>
+                            <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-clock text-indigo-500"></i> زمان‌بندی جلسات
+                            </h3>
+                            <div class="space-y-2">${sessionsHtml || '<p class="text-sm text-gray-500">جلسه‌ای برای این دوره ثبت نشده است.</p>'}</div>
+                        </section>
+                        <section>
+                            <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-comment-dots text-indigo-500"></i> نظرات
+                            </h3>
+                            <div class="space-y-2">${commentsHtml || '<p class="text-xs text-gray-400">نظری ثبت نشده است.</p>'}</div>
+                        </section>
+                        <section>
+                            <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
+                                <i class="fas fa-folder-open text-indigo-500"></i> فایل‌ها
+                            </h3>
+                            <div class="space-y-2">${attachmentsHtml}</div>
+                        </section>
+                        ${commentFormHtml}
                     </div>
-                     <div class="p-3 bg-gray-50 rounded-b-xl border-t flex justify-end gap-3">
-                         <button data-close-modal="course-details-modal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">بستن</button>
-                         <button data-close-modal="course-details-modal" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">ذخیره تغییرات</button>
+                    <div class="p-3 bg-gray-50 rounded-b-xl border-t flex justify-end gap-3">
+                        <button data-close-modal="course-details-modal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">بستن</button>
+                        <button data-close-modal="course-details-modal" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">ذخیره تغییرات</button>
                     </div>
                 `;
                 openModal('course-details-modal');
+
+                const addCommentForm = modalContentContainer.querySelector('#add-comment-form');
+                if (addCommentForm) {
+                    addCommentForm.addEventListener('submit', async (event) => {
+                        event.preventDefault();
+                        const formData = new FormData(addCommentForm);
+                        try {
+                            const response = await fetch(`/courses/${course.id}/add-comment/`, {
+                                method: 'POST',
+                                headers: { 'X-CSRFToken': csrftoken },
+                                body: formData,
+                            });
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                throw new Error(errorText || 'خطا در ثبت نظر');
+                            }
+                            await response.json();
+                            await loadCourses();
+                            renderCalendar();
+                            const refreshedCourse = state.courses.find(item => item.id === course.id);
+                            if (refreshedCourse) {
+                                renderCourseDetails(refreshedCourse);
+                            }
+                        } catch (error) {
+                            alert('ثبت نظر با خطا مواجه شد.');
+                        }
+                    });
+                }
             };
-            
+
             const createCourseCard = (course) => {
                 const card = document.createElement('div');
                 card.className = 'bg-white p-3 rounded-xl shadow-sm mb-3 course-card cursor-pointer';
+                const totalSessions = course.sessions.length || 4;
                 const completedSessions = course.sessions.filter(s => s.completed).length;
-                const progressPercentage = (completedSessions / 4) * 100;
+                const progressPercentage = totalSessions ? (completedSessions / totalSessions) * 100 : 0;
 
                 card.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div>
                             <p class="font-bold text-gray-800">${course.studentName}</p>
-                            <p class="text-sm text-indigo-600 font-semibold">${course.time}</p>
+                            <p class="text-sm text-indigo-600 font-semibold">${course.time || '—'}</p>
                         </div>
                         <div class="text-gray-400 text-lg hover:text-indigo-600">
                             <i class="fa-solid fa-square-arrow-up-right"></i>
                         </div>
                     </div>
                     <div class="mt-3">
-                        <p class="text-xs text-gray-500 mb-1">پیشرفت دوره (${completedSessions} از 4)</p>
+                        <p class="text-xs text-gray-500 mb-1">پیشرفت دوره (${completedSessions} از ${totalSessions})</p>
                         <div class="w-full bg-gray-200 rounded-full h-1.5">
                             <div class="bg-green-500 h-1.5 rounded-full" style="width: ${progressPercentage}%"></div>
                         </div>
@@ -564,129 +658,673 @@ document.getElementById('open-admin-panel-btn').addEventListener('click', () => 
             };
 
             const renderCalendar = () => {
-                calendarGrid.innerHTML = "";
-                let filteredCourses = MOCK_DATA.courses;
-                if (currentRole === 'counselor') {
-                    filteredCourses = MOCK_DATA.courses.filter(c => c.counselorId === MOCK_DATA.users.counselor.id);
-                } else if (currentRole === 'student') {
-                    filteredCourses = MOCK_DATA.courses.filter(c => c.studentId === MOCK_DATA.users.student.id);
-                } else if (currentRole === 'admin' && counselorFilter.value !== 'all') {
-                    filteredCourses = MOCK_DATA.courses.filter(c => c.counselorId == counselorFilter.value);
+                if (!calendarGrid) return;
+                calendarGrid.innerHTML = '';
+                let filteredCourses = [...state.courses];
+
+                if (currentRole === 'counselor' && CURRENT_USER.advisorId) {
+                    filteredCourses = filteredCourses.filter(course => course.advisorId === CURRENT_USER.advisorId);
+                } else if (currentRole === 'student' && CURRENT_USER.studentId) {
+                    filteredCourses = filteredCourses.filter(course => course.studentId === CURRENT_USER.studentId);
+                } else if (currentRole === 'admin' && CURRENT_USER.isStaff && counselorFilter && counselorFilter.value !== 'all') {
+                    filteredCourses = filteredCourses.filter(course => String(course.advisorId) === counselorFilter.value);
                 }
-                
+
                 daysOfWeek.forEach(day => {
                     const column = document.createElement('div');
                     column.className = 'day-column p-2';
                     column.innerHTML = `<h3 class="font-extrabold text-center p-2 text-gray-700">${day}</h3>`;
-                    filteredCourses.filter(c => c.dayOfWeek === day).forEach(course => column.appendChild(createCourseCard(course)));
+                    const dayCourses = filteredCourses.filter(course => course.dayOfWeek === day);
+                    if (!dayCourses.length) {
+                        const emptyMessage = document.createElement('p');
+                        emptyMessage.className = 'text-sm text-gray-400 text-center py-4';
+                        emptyMessage.textContent = 'جلسه‌ای ثبت نشده است.';
+                        column.appendChild(emptyMessage);
+                    } else {
+                        dayCourses.forEach(course => column.appendChild(createCourseCard(course)));
+                    }
                     calendarGrid.appendChild(column);
                 });
             };
 
-          
-
             const switchRole = (role, buttonElement) => {
+                if (role === 'admin' && !CURRENT_USER.isStaff) {
+                    alert('شما دسترسی ادمین ندارید.');
+                    return;
+                }
                 currentRole = role;
-                document.querySelectorAll('.view-switcher-active').forEach(b => b.classList.remove('view-switcher-active'));
-                buttonElement.classList.add('view-switcher-active');
-                adminControls.classList.toggle('hidden', role !== 'admin');
-                adminControls.classList.toggle('flex', role === 'admin');
+                document.querySelectorAll('.view-switcher-active').forEach(btn => btn.classList.remove('view-switcher-active'));
+                if (buttonElement) {
+                    buttonElement.classList.add('view-switcher-active');
+                }
+                const showAdminControls = role === 'admin' && CURRENT_USER.isStaff;
+                adminControls.classList.toggle('hidden', !showAdminControls);
+                adminControls.classList.toggle('flex', showAdminControls);
                 studentControls.classList.toggle('hidden', role !== 'student');
                 studentControls.classList.toggle('flex', role === 'student');
+                if (counselorFilter) {
+                    counselorFilter.disabled = !showAdminControls;
+                }
                 chatWindow.classList.add('hidden');
+                chatMessagesView.classList.add('hidden');
+                chatList.classList.remove('hidden');
                 renderCalendar();
             };
 
-            const renderMessages = (chatId, otherPartyName) => {
+            const renderMessages = async (userId, otherPartyName) => {
                 chatMessagesContainer.innerHTML = '';
                 chatList.classList.add('hidden');
                 chatMessagesView.style.display = 'flex';
+                chatMessagesView.classList.remove('hidden');
                 backToChatsBtn.classList.remove('hidden');
                 chatTitle.textContent = otherPartyName;
-                const chat = (currentRole === 'student') ? { messages: MOCK_DATA.chats[MOCK_DATA.users.student.id]?.messages || [] } : MOCK_DATA.chats[chatId];
-                if (chat.messages) {
-                    chat.messages.forEach(msg => {
-                        const msgBubble = document.createElement('div');
-                        const isMe = (currentRole === 'student' && msg.sender === 'other') || (currentRole !== 'student' && msg.sender === 'me');
-                        msgBubble.className = `max-w-xs p-3 rounded-lg ${isMe ? 'bg-indigo-500 text-white self-end' : 'bg-gray-200 text-gray-800 self-start'}`;
-                        msgBubble.textContent = msg.text;
-                        chatMessagesContainer.appendChild(msgBubble);
-                    });
+                state.activeConversationId = userId;
+
+                let messages = state.chatMessages[userId];
+                if (!messages) {
+                    messages = await fetchChatMessages(userId);
+                    state.chatMessages[userId] = messages;
                 }
-                chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+
+                const appendMessage = (msg) => {
+                    const msgBubble = document.createElement('div');
+                    const isMe = msg.sender === CURRENT_USER.id;
+                    msgBubble.className = `max-w-xs p-3 rounded-lg ${isMe ? 'bg-indigo-500 text-white self-end' : 'bg-gray-200 text-gray-800 self-start'}`;
+                    msgBubble.textContent = msg.text || 'بدون متن';
+                    chatMessagesContainer.appendChild(msgBubble);
+                };
+
+                if (!messages.length) {
+                    chatMessagesContainer.innerHTML = '<p class="text-sm text-gray-500">پیامی ثبت نشده است.</p>';
+                } else {
+                    messages.forEach(appendMessage);
+                    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+                }
+
+                const chatInput = document.getElementById('chat-input');
+                const chatSendBtn = document.getElementById('chat-send-btn');
+
+                if (chatSendBtn && chatInput) {
+                    const handleSend = async () => {
+                        const text = chatInput.value.trim();
+                        if (!text) {
+                            return;
+                        }
+                        chatSendBtn.disabled = true;
+                        try {
+                            const newMessage = await sendChatMessage(userId, { text });
+                            chatInput.value = '';
+                            if (!Array.isArray(state.chatMessages[userId])) {
+                                state.chatMessages[userId] = [];
+                                chatMessagesContainer.innerHTML = '';
+                            }
+                            state.chatMessages[userId].push(newMessage);
+                            appendMessage(newMessage);
+                            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+                            await loadConversations(true);
+                        } catch (error) {
+                            alert('ارسال پیام با خطا مواجه شد.');
+                        } finally {
+                            chatSendBtn.disabled = false;
+                        }
+                    };
+
+                    chatSendBtn.onclick = handleSend;
+                    chatInput.onkeydown = (event) => {
+                        if (event.key === 'Enter' && !event.shiftKey) {
+                            event.preventDefault();
+                            handleSend();
+                        }
+                    };
+                }
             };
 
-            const renderChatList = () => {
-                chatList.innerHTML = '';
+            const renderChatList = async () => {
+                chatMessagesContainer.innerHTML = '';
                 chatMessagesView.classList.add('hidden');
                 chatList.classList.remove('hidden');
                 backToChatsBtn.classList.add('hidden');
                 chatTitle.textContent = 'چت‌ها';
-                chatNotificationDot.classList.remove('hidden');
-                let chatsToShow = {};
-                if (currentRole === 'student') {
-                    const student = MOCK_DATA.users.student;
-                    chatsToShow[student.counselorId] = { otherPartyName: student.counselorName, messages: MOCK_DATA.chats[student.id]?.messages || [] };
-                } else { 
-                    chatsToShow = MOCK_DATA.chats;
+
+                if (!state.conversationsLoaded) {
+                    await loadConversations();
                 }
-                Object.entries(chatsToShow).forEach(([id, chat]) => {
-                    const lastMessage = chat.messages[chat.messages.length - 1];
+
+                chatList.innerHTML = '';
+                if (!state.conversations.length) {
+                    chatList.innerHTML = '<p class="text-sm text-gray-500 p-3">گفتگویی یافت نشد.</p>';
+                    chatNotificationDot.classList.add('hidden');
+                    return;
+                }
+
+                let totalUnread = 0;
+                state.conversations.forEach(convo => {
+                    totalUnread += convo.unread_count || 0;
+                    const nameParts = [];
+                    if (convo.profile) {
+                        if (convo.profile.first_name) nameParts.push(convo.profile.first_name);
+                        if (convo.profile.last_name) nameParts.push(convo.profile.last_name);
+                    }
+                    const displayName = nameParts.join(' ') || convo.username || 'کاربر';
+                    const lastMessage = convo.last_message || '';
+                    const lastMessageAt = convo.last_message_at ? new Date(convo.last_message_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }) : '';
                     const listItem = document.createElement('div');
                     listItem.className = 'p-3 flex items-center gap-3 hover:bg-gray-100 cursor-pointer border-b';
-                    listItem.innerHTML = `<img src="https://placehold.co/40x40/e0e7ff/4338ca?text=${chat.otherPartyName.charAt(0)}" class="w-10 h-10 rounded-full"><div><p class="font-bold">${chat.otherPartyName}</p><p class="text-sm text-gray-500 truncate">${lastMessage ? lastMessage.text : 'بدون پیام'}</p></div>`;
-                    listItem.addEventListener('click', () => renderMessages(id, chat.otherPartyName));
+                    const avatarInitial = displayName.charAt(0) || '?';
+                    const unreadBadge = convo.unread_count ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full">${convo.unread_count}</span>` : '';
+                    listItem.innerHTML = `
+                        <img src="https://placehold.co/40x40/e0e7ff/4338ca?text=${avatarInitial}" class="w-10 h-10 rounded-full">
+                        <div class="flex-1">
+                            <p class="font-bold flex items-center justify-between gap-2">
+                                <span>${displayName}</span>
+                                <span class="text-xs text-gray-400">${lastMessageAt}</span>
+                            </p>
+                            <p class="text-sm text-gray-500 truncate">${lastMessage || 'بدون پیام'}</p>
+                        </div>
+                        ${unreadBadge}
+                    `;
+                    listItem.addEventListener('click', () => {
+                        renderMessages(convo.id, displayName).catch(error => {
+                            console.error('Error rendering messages:', error);
+                            chatMessagesContainer.innerHTML = '<p class="text-sm text-red-500">خطا در بارگذاری پیام‌ها.</p>';
+                        });
+                    });
                     chatList.appendChild(listItem);
                 });
+
+                if (totalUnread > 0) {
+                    chatNotificationDot.classList.remove('hidden');
+                } else {
+                    chatNotificationDot.classList.add('hidden');
+                }
             };
 
-            // --- SETUP LISTENERS ---
-            document.getElementById('adminBtn').addEventListener('click', e => switchRole('admin', e.target));
-            document.getElementById('counselorBtn').addEventListener('click', e => switchRole('counselor', e.target));
-            document.getElementById('studentBtn').addEventListener('click', e => switchRole('student', e.target));
-            counselorFilter.addEventListener('change', renderCalendar);
-            document.getElementById('open-admin-panel-btn').addEventListener('click', () => {
-                renderAdminView('add-student');
-                openModal('admin-panel-modal');
-            });
-            document.getElementById('open-payment-modal-btn').addEventListener('click', () => openModal('payment-modal'));
+            async function getAdminData(force = false) {
+                if (!CURRENT_USER.isStaff) {
+                    return null;
+                }
+                if (state.adminData && !force) {
+                    return state.adminData;
+                }
+                try {
+                    const data = await fetchJSON('/api/admin-panel-data/');
+                    state.adminData = data;
+                    return data;
+                } catch (error) {
+                    if (error.status !== 403) {
+                        console.error('Error fetching admin data:', error);
+                    }
+                    state.adminData = null;
+                    return null;
+                }
+            }
+
+            const renderAdminView = async (viewName) => {
+                if (!CURRENT_USER.isStaff) {
+                    adminPanelContent.innerHTML = '<p class="text-sm text-gray-600">دسترسی ادمین برای شما فعال نیست.</p>';
+                    return;
+                }
+
+                document.querySelectorAll('#admin-menu .admin-menu-item').forEach(item => item.classList.remove('active'));
+                const activeButton = document.querySelector(`#admin-menu .admin-menu-item[data-view="${viewName}"]`);
+                if (activeButton) {
+                    activeButton.classList.add('active');
+                }
+
+                adminPanelContent.innerHTML = '<div class="loader" style="border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto;"></div>';
+
+                let data = null;
+                if (['add-student', 'assign-student', 'send-notification'].includes(viewName)) {
+                    data = await getAdminData();
+                    if (!data) {
+                        adminPanelContent.innerHTML = '<p class="text-red-500">امکان بارگذاری اطلاعات وجود ندارد.</p>';
+                        return;
+                    }
+                }
+
+                let content = '';
+                switch (viewName) {
+                    case 'add-student': {
+                        const gradeOptions = data.grades.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                        const majorOptions = data.majors.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+                        content = `
+                            <h3 class="text-xl font-bold mb-4">فرم افزودن دانش‌آموز جدید</h3>
+                            <form id="add-student-form" class="space-y-4">
+                                <div><label class="block text-sm font-medium text-gray-700">نام</label><input name="first_name" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                                <div><label class="block text-sm font-medium text-gray-700">نام خانوادگی</label><input name="last_name" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                                <div><label class="block text-sm font-medium text-gray-700">شماره موبایل</label><input name="phone_number" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                                <div><label class="block text-sm font-medium text-gray-700">پایه تحصیلی</label><select name="grade_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${gradeOptions}</select></div>
+                                <div><label class="block text-sm font-medium text-gray-700">رشته</label><select name="major_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${majorOptions}</select></div>
+                                <div class="text-left"><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">افزودن</button></div>
+                            </form>`;
+                        break;
+                    }
+                    case 'assign-student': {
+                        const studentOptions = data.students.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+                        const advisorOptions = data.advisors.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+                        const dayOptions = daysOfWeek.map(d => `<option value="${d}">${d}</option>`).join('');
+                        content = `
+                            <h3 class="text-xl font-bold mb-4">تخصیص دانش‌آموز به مشاور</h3>
+                            <form id="assign-student-form" class="space-y-4">
+                                <div><label class="block text-sm font-medium text-gray-700">انتخاب دانش‌آموز</label><select name="student_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${studentOptions}</select></div>
+                                <div><label class="block text-sm font-medium text-gray-700">انتخاب مشاور</label><select name="advisor_id" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${advisorOptions}</select></div>
+                                <div><label class="block text-sm font-medium text-gray-700">روز جلسه</label><select name="day_of_week" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">${dayOptions}</select></div>
+                                <div><label class="block text-sm font-medium text-gray-700">تاریخ اولین جلسه</label><input name="start_date" type="date" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                                <div><label class="block text-sm font-medium text-gray-700">ساعت جلسه</label><input name="start_time" type="time" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                                <div class="text-left"><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">تخصیص</button></div>
+                            </form>`;
+                        break;
+                    }
+                    case 'financials': {
+                        await loadPayments(true);
+                        if (!state.payments.length) {
+                            content = '<p class="text-sm text-gray-600">پرداختی برای نمایش وجود ندارد.</p>';
+                        } else {
+                            const statusLabels = {
+                                pending: 'در انتظار تایید',
+                                approved: 'تایید شده',
+                                rejected: 'رد شده',
+                            };
+                            const rows = state.payments.map(payment => `
+                                <tr class="border-b">
+                                    <td class="px-3 py-2 text-sm text-gray-700">${payment.student_name || '---'}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-700">${Number(payment.amount).toLocaleString('fa-IR')}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-500">${payment.reference_number}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-500">${payment.payment_date}</td>
+                                    <td class="px-3 py-2 text-sm font-semibold">${statusLabels[payment.status] || payment.status}</td>
+                                </tr>
+                            `).join('');
+                            content = `
+                                <h3 class="text-xl font-bold mb-4">گزارش پرداخت‌ها</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full bg-white rounded-lg shadow-sm">
+                                        <thead class="bg-gray-100 text-gray-700 text-sm">
+                                            <tr>
+                                                <th class="px-3 py-2 text-right font-semibold">دانش‌آموز</th>
+                                                <th class="px-3 py-2 text-right font-semibold">مبلغ (تومان)</th>
+                                                <th class="px-3 py-2 text-right font-semibold">شماره پیگیری</th>
+                                                <th class="px-3 py-2 text-right font-semibold">تاریخ پرداخت</th>
+                                                <th class="px-3 py-2 text-right font-semibold">وضعیت</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${rows}</tbody>
+                                    </table>
+                                </div>`;
+                        }
+                        break;
+                    }
+                    case 'send-notification': {
+                        if (!data) {
+                            content = '<p class="text-sm text-red-500">امکان بارگذاری مخاطبین وجود ندارد.</p>';
+                            break;
+                        }
+                        const studentCheckboxes = data.students.length
+                            ? data.students.map(student => {
+                                const telegramHint = student.telegram_chat_id ? `<span class=\"text-xs text-green-600\">تلگرام: ${student.telegram_chat_id}</span>` : '';
+                                return `
+                                <label class="flex items-center justify-between gap-3 p-2 border rounded-lg">
+                                    <span><input type="checkbox" name="student_ids" value="${student.id}" class="ml-2">${student.name}</span>
+                                    <span class="flex flex-col items-end text-xs text-gray-400 gap-1">
+                                        <span>${student.phone_number || ''}</span>
+                                        ${telegramHint}
+                                    </span>
+                                </label>
+                              `;
+                            }).join('')
+                            : '<p class="text-xs text-gray-400">دانش‌آموزی ثبت نشده است.</p>';
+                        const advisorCheckboxes = data.advisors.length
+                            ? data.advisors.map(advisor => {
+                                const telegramHint = advisor.telegram_chat_id ? `<span class=\"text-xs text-green-600\">تلگرام: ${advisor.telegram_chat_id}</span>` : '';
+                                return `
+                                <label class="flex items-center justify-between gap-3 p-2 border rounded-lg">
+                                    <span><input type="checkbox" name="advisor_ids" value="${advisor.id}" class="ml-2">${advisor.name}</span>
+                                    <span class="flex flex-col items-end text-xs text-gray-400 gap-1">
+                                        <span>${advisor.phone_number || ''}</span>
+                                        ${telegramHint}
+                                    </span>
+                                </label>
+                              `;
+                            }).join('')
+                            : '<p class="text-xs text-gray-400">مشاوری ثبت نشده است.</p>';
+
+                        content = `
+                            <h3 class="text-xl font-bold mb-4">ارسال نوتیفیکیشن تلگرام</h3>
+                            <p class="text-sm text-gray-600 mb-4">برای ارسال پیام، اتصال ربات تلگرام با استفاده از توکن پیکربندی شده در سرور الزامی است. در صورتی که شناسه تلگرام برای کاربری ثبت نشده باشد، ارسال پیام انجام نخواهد شد.</p>
+                            <form id="send-notification-form" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">انتخاب دانش‌آموزان</label>
+                                    <div class="space-y-2 max-h-40 overflow-y-auto pr-2">${studentCheckboxes}</div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">انتخاب مشاوران</label>
+                                    <div class="space-y-2 max-h-40 overflow-y-auto pr-2">${advisorCheckboxes}</div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-semibold text-gray-700 mb-2">متن پیام</label>
+                                    <textarea name="message" rows="4" required class="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500" placeholder="متن پیام تلگرام..."></textarea>
+                                </div>
+                                <div class="text-left">
+                                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">ارسال پیام</button>
+                                </div>
+                            </form>`;
+                        break;
+                    }
+                    case 'reports': {
+                        await loadReports(true);
+                        if (!state.reports.length) {
+                            content = '<p class="text-sm text-gray-600">گزارشی برای نمایش وجود ندارد.</p>';
+                        } else {
+                            const rows = state.reports.map(report => `
+                                <tr class="border-b">
+                                    <td class="px-3 py-2 text-sm text-gray-700">${report.student_name}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-700">${report.advisor_name || '---'}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-500">${new Date(report.week_start).toLocaleDateString('fa-IR')} - ${new Date(report.week_end).toLocaleDateString('fa-IR')}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-700 text-center">${report.tasks_count}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-700 text-center">${report.total_minutes}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-700 text-center">${report.logs_count}</td>
+                                    <td class="px-3 py-2 text-xs text-gray-600">${report.important_events || '—'}</td>
+                                </tr>
+                            `).join('');
+                            content = `
+                                <h3 class="text-xl font-bold mb-4">آخرین گزارش‌های هفتگی</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full bg-white rounded-lg shadow-sm">
+                                        <thead class="bg-gray-100 text-gray-700 text-sm">
+                                            <tr>
+                                                <th class="px-3 py-2 text-right font-semibold">دانش‌آموز</th>
+                                                <th class="px-3 py-2 text-right font-semibold">مشاور</th>
+                                                <th class="px-3 py-2 text-right font-semibold">بازه زمانی</th>
+                                                <th class="px-3 py-2 text-right font-semibold">تعداد فعالیت‌ها</th>
+                                                <th class="px-3 py-2 text-right font-semibold">دقایق برنامه‌ریزی شده</th>
+                                                <th class="px-3 py-2 text-right font-semibold">تعداد لاگ‌ها</th>
+                                                <th class="px-3 py-2 text-right font-semibold">رویدادهای مهم</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>${rows}</tbody>
+                                    </table>
+                                </div>`;
+                        }
+                        break;
+                    }
+                    default:
+                        content = '<p class="text-sm text-gray-600">یک گزینه را از منو انتخاب کنید.</p>';
+                }
+
+                adminPanelContent.innerHTML = content;
+
+                const addStudentForm = document.getElementById('add-student-form');
+                if (addStudentForm) {
+                    addStudentForm.addEventListener('submit', handleAddStudent);
+                }
+                const assignStudentForm = document.getElementById('assign-student-form');
+                if (assignStudentForm) {
+                    assignStudentForm.addEventListener('submit', handleAssignStudent);
+                }
+                const sendNotificationForm = document.getElementById('send-notification-form');
+                if (sendNotificationForm) {
+                    sendNotificationForm.addEventListener('submit', handleSendNotification);
+                }
+            };
+
+            async function handleAddStudent(event) {
+                event.preventDefault();
+                const formData = new FormData(event.target);
+                const data = Object.fromEntries(formData.entries());
+
+                try {
+                    const response = await fetch('/api/add-student/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                        body: JSON.stringify(data),
+                    });
+                    const result = await response.json();
+                    if (response.status === 201) {
+                        alert(result.message);
+                        state.adminData = null;
+                        await renderAdminView('assign-student');
+                    } else {
+                        alert(`خطا: ${result.message || 'اطلاعات نامعتبر است.'}`);
+                    }
+                } catch (error) {
+                    alert('یک خطای شبکه رخ داد.');
+                }
+            }
+
+            async function handleAssignStudent(event) {
+                event.preventDefault();
+                const formData = new FormData(event.target);
+                const data = Object.fromEntries(formData.entries());
+                data.day_of_week = FA_TO_EN_DAYS[data.day_of_week] || data.day_of_week;
+
+                try {
+                    const response = await fetch('/api/assign-student/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                        body: JSON.stringify(data),
+                    });
+                    const result = await response.json();
+                    if (response.status === 201) {
+                        alert(result.message);
+                        state.adminData = null;
+                        await loadCourses();
+                        updateCounselorFilterOptions();
+                        renderCalendar();
+                        await renderAdminView('assign-student');
+                    } else {
+                        alert(`خطا: ${result.message || 'اطلاعات نامعتبر است.'}`);
+                    }
+                } catch (error) {
+                    alert('یک خطای شبکه رخ داد.');
+                }
+            }
+
+            async function handleSendNotification(event) {
+                event.preventDefault();
+                const form = event.target;
+                const message = (form.message?.value || '').trim();
+                const studentIds = Array.from(form.querySelectorAll('input[name="student_ids"]:checked')).map(input => Number(input.value));
+                const advisorIds = Array.from(form.querySelectorAll('input[name="advisor_ids"]:checked')).map(input => Number(input.value));
+
+                if (!message) {
+                    alert('لطفا متن پیام را وارد کنید.');
+                    return;
+                }
+                if (!studentIds.length && !advisorIds.length) {
+                    alert('حداقل یک مخاطب را انتخاب کنید.');
+                    return;
+                }
+
+                try {
+                    const result = await fetchJSON('/api/notifications/send/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken,
+                        },
+                        body: JSON.stringify({ message, student_ids: studentIds, advisor_ids: advisorIds }),
+                    });
+
+                    const sentCount = (result.sent || []).length;
+                    const failureCount = (result.failures || []).length;
+                    let feedback = `پیام برای ${sentCount} نفر ارسال شد.`;
+                    if (failureCount) {
+                        const missing = result.failures.map(item => item.name).join('، ');
+                        feedback += ` ارسال برای ${failureCount} نفر با خطا مواجه شد: ${missing}`;
+                    }
+                    alert(feedback);
+                    form.reset();
+                } catch (error) {
+                    alert('ارسال اعلان با خطا مواجه شد.');
+                }
+            }
+
+            const roleButtonMap = {
+                admin: adminBtn,
+                counselor: counselorBtn,
+                student: studentBtn,
+            };
+
+            if (adminBtn) {
+                adminBtn.addEventListener('click', (e) => {
+                    if (!CURRENT_USER.isStaff) {
+                        alert('شما دسترسی ادمین ندارید.');
+                        return;
+                    }
+                    switchRole('admin', e.currentTarget);
+                });
+            }
+            if (counselorBtn) {
+                counselorBtn.addEventListener('click', (e) => switchRole('counselor', e.currentTarget));
+            }
+            if (studentBtn) {
+                studentBtn.addEventListener('click', (e) => switchRole('student', e.currentTarget));
+            }
+
+            if (counselorFilter) {
+                counselorFilter.addEventListener('change', () => renderCalendar());
+            }
+
             document.querySelectorAll('#admin-menu .admin-menu-item').forEach(item => {
                 item.addEventListener('click', () => renderAdminView(item.dataset.view));
             });
-            document.getElementById('chat-toggle-btn').addEventListener('click', () => {
-                chatWindow.classList.toggle('hidden');
-                if(!chatWindow.classList.contains('hidden')) renderChatList();
+
+            const openAdminPanelBtn = document.getElementById('open-admin-panel-btn');
+            if (openAdminPanelBtn) {
+                openAdminPanelBtn.addEventListener('click', () => {
+                    renderAdminView('add-student');
+                    openModal('admin-panel-modal');
+                });
+            }
+
+            const openPaymentModalBtn = document.getElementById('open-payment-modal-btn');
+            if (openPaymentModalBtn) {
+                openPaymentModalBtn.addEventListener('click', () => openModal('payment-modal'));
+            }
+
+            const paymentForm = document.getElementById('payment-form');
+            if (paymentForm) {
+                paymentForm.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const formData = new FormData(paymentForm);
+                    const data = Object.fromEntries(formData.entries());
+                    try {
+                        await fetchJSON('/api/payments/submit/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrftoken,
+                            },
+                            body: JSON.stringify(data),
+                        });
+                        alert('درخواست پرداخت با موفقیت ثبت شد. پس از تایید ادمین اطلاع‌رسانی خواهد شد.');
+                        paymentForm.reset();
+                        closeModal('payment-modal');
+                        state.paymentsLoaded = false;
+                        await loadPayments(true);
+                    } catch (error) {
+                        alert('ثبت پرداخت با خطا مواجه شد. لطفا مجددا تلاش کنید.');
+                    }
+                });
+            }
+
+            const chatToggleBtn = document.getElementById('chat-toggle-btn');
+            if (chatToggleBtn) {
+                chatToggleBtn.addEventListener('click', () => {
+                    chatWindow.classList.toggle('hidden');
+                    if (!chatWindow.classList.contains('hidden')) {
+                        renderChatList().catch(error => {
+                            console.error('Error rendering chat list:', error);
+                            chatList.innerHTML = '<p class="text-sm text-red-500 p-3">خطا در بارگذاری چت.</p>';
+                        });
+                    }
+                });
+            }
+
+            backToChatsBtn.addEventListener('click', () => {
+                renderChatList().catch(error => {
+                    console.error('Error rendering chat list:', error);
+                    chatList.innerHTML = '<p class="text-sm text-red-500 p-3">خطا در بارگذاری چت.</p>';
+                });
             });
-            document.getElementById('back-to-chats-btn').addEventListener('click', () => renderChatList());
-            const profileModalEl = document.getElementById("profile-modal"), modalImg = document.getElementById("modal-profile-img"), uploadInput = document.getElementById("profile-img-upload");
-            document.getElementById('profile-menu-btn').addEventListener('click', e => { e.stopPropagation(); document.getElementById('profile-dropdown').classList.toggle('hidden'); });
-            document.body.addEventListener('click', () => document.getElementById('profile-dropdown').classList.add('hidden'));
-            document.getElementById('open-profile-modal-btn').addEventListener('click', () => openModal('profile-modal'));
-            document.getElementById("save-profile-btn").addEventListener("click", () => {
-                if(uploadInput.files && uploadInput.files[0]) {
-                    const reader = new FileReader();
-                    reader.onload = e => { document.getElementById("profile-img").src = e.target.result; modalImg.src = e.target.result; };
-                    reader.readAsDataURL(uploadInput.files[0]);
-                }
-                closeModal("profile-modal");
-            });
-            uploadInput.addEventListener("change", function() { if(this.files && this.files[0]) { const reader = new FileReader(); reader.onload = e => modalImg.src = e.target.result; reader.readAsDataURL(this.files[0]); } });
-            
+
+            const profileMenuBtn = document.getElementById('profile-menu-btn');
+            if (profileMenuBtn && profileDropdown) {
+                profileMenuBtn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    profileDropdown.classList.toggle('hidden');
+                });
+                document.body.addEventListener('click', () => profileDropdown.classList.add('hidden'));
+            }
+
+            const openProfileModalBtn = document.getElementById('open-profile-modal-btn');
+            if (openProfileModalBtn) {
+                openProfileModalBtn.addEventListener('click', () => openModal('profile-modal'));
+            }
+
+            const modalImg = document.getElementById('modal-profile-img');
+            const uploadInput = document.getElementById('profile-img-upload');
+            const profileImg = document.getElementById('profile-img');
+            const saveProfileBtn = document.getElementById('save-profile-btn');
+
+            if (saveProfileBtn) {
+                saveProfileBtn.addEventListener('click', () => {
+                    if (uploadInput.files && uploadInput.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = e => {
+                            if (profileImg) profileImg.src = e.target.result;
+                            if (modalImg) modalImg.src = e.target.result;
+                        };
+                        reader.readAsDataURL(uploadInput.files[0]);
+                    }
+                    closeModal('profile-modal');
+                });
+            }
+
+            if (uploadInput) {
+                uploadInput.addEventListener('change', function () {
+                    if (this.files && this.files[0]) {
+                        const reader = new FileReader();
+                        reader.onload = e => {
+                            if (modalImg) modalImg.src = e.target.result;
+                        };
+                        reader.readAsDataURL(this.files[0]);
+                    }
+                });
+            }
+
             modalBackdrop.addEventListener('click', (e) => {
                 if (e.target === modalBackdrop) {
-                    document.querySelectorAll('[id$="-modal"].modal-enter').forEach(modal => {
+                    document.querySelectorAll('[id$="-modal"]').forEach(modal => {
                         if (!modal.classList.contains('hidden')) {
                             closeModal(modal.id);
                         }
                     });
                 }
             });
-            
-            document.body.addEventListener('click', e => { const closeButton = e.target.closest('[data-close-modal]'); if (closeButton) { closeModal(closeButton.dataset.closeModal); } });
-            
-            // --- INITIALIZATION ---
-            if (MOCK_DATA.courses[0] && MOCK_DATA.courses[0].attachments) { MOCK_DATA.courses[0].attachments.push({name: 'لینک اسکای‌روم', url: 'https://skyroom.online/ch/example/class-101'}); }
-            switchRole('admin', document.getElementById('adminBtn'));
+
+            document.body.addEventListener('click', e => {
+                const closeButton = e.target.closest('[data-close-modal]');
+                if (closeButton) {
+                    closeModal(closeButton.dataset.closeModal);
+                }
+            });
+
+            const initializeDashboard = async () => {
+                await loadCourses();
+                updateCounselorFilterOptions();
+                renderCalendar();
+                if (CURRENT_USER.isStaff) {
+                    loadPayments();
+                }
+                const initialButton = roleButtonMap[currentRole] || roleButtonMap.admin;
+                if (initialButton) {
+                    switchRole(currentRole, initialButton);
+                } else {
+                    renderCalendar();
+                }
+            };
+
+            initializeDashboard();
         });
     </script>
 </body>

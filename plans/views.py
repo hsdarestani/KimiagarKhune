@@ -24,7 +24,31 @@ def dashboard_view(request):
     این ویو فقط صفحه اصلی داشبورد را که با جاوا اسکریپت کار می‌کند،
     به کاربر نمایش می‌دهد.
     """
-    return render(request, 'plans/management.html')
+    user_profile = getattr(request.user, 'profile', None)
+    if request.user.is_staff:
+        current_role = 'admin'
+    else:
+        current_role = getattr(user_profile, 'role', 'student')
+
+    advisor_id = None
+    student_id = None
+    if user_profile and current_role == 'advisor':
+        advisor_id = Advisor.objects.filter(profile=user_profile).values_list('id', flat=True).first()
+    if user_profile and current_role == 'student':
+        student_id = Student.objects.filter(profile=user_profile).values_list('id', flat=True).first()
+
+    dashboard_user_context = json.dumps({
+        'id': request.user.id,
+        'username': request.user.username,
+        'isStaff': request.user.is_staff,
+        'role': current_role,
+        'advisorId': advisor_id,
+        'studentId': student_id,
+    })
+
+    return render(request, 'plans/management.html', {
+        'dashboard_user_context': dashboard_user_context,
+    })
 
 
 @login_required
@@ -41,8 +65,18 @@ def get_admin_panel_data(request):
     majors = Major.objects.all()
     grades = Grade.objects.all()
 
-    students_data = [{'id': s.id, 'name': f"{s.profile.first_name} {s.profile.last_name}"} for s in students]
-    advisors_data = [{'id': a.id, 'name': f"{a.profile.first_name} {a.profile.last_name}"} for a in advisors]
+    students_data = [{
+        'id': s.id,
+        'name': f"{s.profile.first_name} {s.profile.last_name}",
+        'phone_number': s.profile.phone_number,
+        'telegram_chat_id': getattr(s.profile, 'telegram_chat_id', ''),
+    } for s in students]
+    advisors_data = [{
+        'id': a.id,
+        'name': f"{a.profile.first_name} {a.profile.last_name}",
+        'phone_number': a.profile.phone_number,
+        'telegram_chat_id': getattr(a.profile, 'telegram_chat_id', ''),
+    } for a in advisors]
     majors_data = [{'id': m.id, 'name': m.name} for m in majors]
     grades_data = [{'id': g.id, 'name': g.name} for g in grades]
 
@@ -152,6 +186,54 @@ def assign_student_view(request):
         return HttpResponseBadRequest('Invalid JSON.')
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+def append_report_log(report, action, additional_data=None, *, user=None):
+    logs = report.logs if report.logs else []
+    log_entry = {
+        "timestamp": timezone.now().isoformat(),
+        "action": action,
+        "additional_data": additional_data,
+    }
+    if user is not None:
+        log_entry["user"] = {
+            "id": user.id,
+            "username": user.username,
+        }
+    logs.append(log_entry)
+    report.logs = logs
+    report.save(update_fields=["logs"])
+
+
+@require_POST
+@login_required
+def log_weekly_report_action(request):
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest('Invalid JSON.')
+
+    report_id = payload.get('report_id')
+    action = payload.get('action')
+    additional_data = payload.get('additional_data')
+
+    if not report_id or not action:
+        return HttpResponseBadRequest('Missing required fields.')
+
+    try:
+        report = WeeklyReport.objects.select_related('student__profile', 'student__advisor__profile').get(pk=report_id)
+    except WeeklyReport.DoesNotExist:
+        return HttpResponseBadRequest('Report not found.')
+
+    if not request.user.is_staff:
+        allowed_users = {report.student.profile.user_id}
+        if report.student.advisor and report.student.advisor.profile:
+            allowed_users.add(report.student.advisor.profile.user_id)
+        if request.user.id not in allowed_users:
+            return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    append_report_log(report, action, additional_data, user=request.user)
+    return JsonResponse({'status': 'success'})
 
 
 class IsOwnerOrAdminOrAdvisor(permissions.BasePermission):
@@ -272,21 +354,6 @@ def get_last_weekly_report(request):
         })
 
     return JsonResponse({'tasks': tasks})
-
-
-
-def append_report_log(report, action, additional_data=None):
-    logs = report.logs if report.logs else []
-    logs.append({
-        "timestamp": timezone.now().isoformat(),
-        "action": action,
-        "additional_data": additional_data
-    })
-    report.logs = logs
-    report.save(update_fields=["logs"])
-
-
-
 def check_weekly_report(request):
     selected_date_str = request.GET.get("selected_date")
     student_id = request.GET.get("student_id")
@@ -336,6 +403,49 @@ def check_weekly_report(request):
             })
 
 
+@login_required
+def get_reports_summary(request):
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    try:
+        limit = int(request.GET.get('limit', 50))
+    except (TypeError, ValueError):
+        limit = 50
+
+    reports = (
+        WeeklyReport.objects.select_related(
+            'student__profile',
+            'student__advisor__profile',
+        )
+        .prefetch_related('details__box')
+        .order_by('-week_start')[:limit]
+    )
+
+    results = []
+    for report in reports:
+        details = list(report.details.select_related('box'))
+        tasks_count = len(details)
+        total_minutes = sum(
+            (detail.box.duration_minutes or 0)
+            for detail in details
+            if detail.box and detail.box.duration_minutes
+        )
+        results.append({
+            'id': report.id,
+            'student_name': report.student.profile.get_full_name(),
+            'advisor_name': report.student.advisor.profile.get_full_name() if report.student.advisor else '',
+            'week_start': report.week_start.isoformat(),
+            'week_end': report.week_end.isoformat(),
+            'tasks_count': tasks_count,
+            'total_minutes': total_minutes,
+            'logs_count': len(report.logs or []),
+            'important_events': report.important_events or '',
+        })
+
+    return JsonResponse({'reports': results})
+
+
 def get_weekly_report_details(request):
     week_start = request.GET.get("week_start")
     student_id = request.GET.get("student_id")
@@ -345,7 +455,7 @@ def get_weekly_report_details(request):
     
     try:
         report = WeeklyReport.objects.get(week_start=week_start, student_id=student_id)
-        append_report_log(report, "Load Weekly Report", {"week_start": week_start, "student_id": student_id})
+        append_report_log(report, "Load Weekly Report", {"week_start": week_start, "student_id": student_id}, user=request.user)
         
         details = WeeklyReportDetail.objects.filter(report=report)
         saved_tasks = []
@@ -432,13 +542,17 @@ def get_chapters(request):
  
 @login_required
 def plan_view(request):
-    
-    advisor = Advisor.objects.filter(profile=request.user.profile).first()  
-    students = Student.objects.filter(advisor=advisor) if advisor else []  
-    
+
+    advisor = Advisor.objects.filter(profile=request.user.profile).first()
+    students = Student.objects.filter(advisor=advisor) if advisor else Student.objects.none()
+
     firststudent = students.first()
-    lessons_dict = sort_lessons_for_student(firststudent)  
-    student_major_code = MAJOR_TO_CODE.get(firststudent.major.name, "")
+    if firststudent:
+        lessons_dict = sort_lessons_for_student(firststudent)
+        student_major_code = MAJOR_TO_CODE.get(firststudent.major.name, "")
+    else:
+        lessons_dict = {'specialized_lessons': [], 'general_lessons': []}
+        student_major_code = ""
     return render(request, 'plans/plan.html', {
         'students': students,
         'specialized_lessons': lessons_dict.get('specialized_lessons', []),
@@ -626,7 +740,7 @@ def save_weekly_report(request):
                 report.week_end = week_end
                 report.disabled_days = disabled_days
                 report.important_events = important_events
-                append_report_log(report, "Report updated", {"week_start": week_start_str, "week_end": week_end_str})
+                append_report_log(report, "Report updated", {"week_start": week_start_str, "week_end": week_end_str}, user=request.user)
                 # Optionally, remove previous details so that the new ones take full effect:
                 report.details.all().delete()
                 report.save(update_fields=["week_end", "disabled_days", "logs"])
@@ -716,9 +830,8 @@ def save_weekly_report(request):
                         day_of_week=day_name,
                         is_disabled=is_day_disabled
                     )
-
             # Append a final log entry.
-            append_report_log(report, "Report details saved", {"days_count": len(days)})
+            append_report_log(report, "Report details saved", {"days_count": len(days)}, user=request.user)
             report.save(update_fields=["logs"])
 
             return JsonResponse({"status": "success"})
@@ -726,18 +839,6 @@ def save_weekly_report(request):
             return JsonResponse({"status": "error", "message": str(e)}, status=400)
     else:
         return JsonResponse({"status": "error", "message": "Only POST method allowed."}, status=405)
-        
-        
-# A helper function already provided for logging report actions.
-def append_report_log(report, action, additional_data=None):
-    logs = report.logs if report.logs else []
-    logs.append({
-        "timestamp": timezone.now().isoformat(),
-        "action": action,
-        "additional_data": additional_data
-    })
-    report.logs = logs
-    report.save(update_fields=["logs"])
 
 @csrf_exempt
 @login_required
@@ -843,7 +944,7 @@ def copy_day_plan(request):
         )
         new_details.append(new_detail)
 
-    append_report_log(target_report, "Copied day plan", {"source_student_id": source_student.id, "target_day_of_week": target_day_of_week})
+    append_report_log(target_report, "Copied day plan", {"source_student_id": source_student.id, "target_day_of_week": target_day_of_week}, user=request.user)
     return JsonResponse({"status": "success", "copied_details_count": len(new_details)})
 
 @login_required
