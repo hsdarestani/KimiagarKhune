@@ -26,6 +26,5 @@ urlpatterns = [
     path('api/add-student/', add_student_view, name='api_add_student'),
     path('api/assign-student/', assign_student_view, name='api_assign_student'),
     path('api/log-weekly-report-action/', log_weekly_report_action, name='api_log_weekly_report_action'),
-    path('api/reports/summary/', get_reports_summary, name='api_reports_summary'),
     path('', include(router.urls)),
 ]

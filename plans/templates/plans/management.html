@@ -261,9 +261,6 @@
                 conversations: [],
                 conversationsLoaded: false,
                 chatMessages: {},
-                activeConversationId: null,
-                reports: [],
-                reportsLoaded: false,
                 adminData: null,
             };
 
@@ -397,10 +394,7 @@
                 counselorFilter.disabled = !(currentRole === 'admin' && CURRENT_USER.isStaff);
             }
 
-            async function loadPayments(force = false) {
-                if (state.paymentsLoaded && !force) {
-                    return;
-                }
+            async function loadPayments() {
                 if (!CURRENT_USER.isStaff) {
                     state.payments = [];
                     state.paymentsLoaded = true;
@@ -416,28 +410,6 @@
                     state.payments = [];
                 } finally {
                     state.paymentsLoaded = true;
-                }
-            }
-
-            async function loadReports(force = false) {
-                if (state.reportsLoaded && !force) {
-                    return;
-                }
-                if (!CURRENT_USER.isStaff) {
-                    state.reports = [];
-                    state.reportsLoaded = true;
-                    return;
-                }
-                try {
-                    const payload = await fetchJSON('/api/reports/summary/');
-                    state.reports = payload.reports || [];
-                } catch (error) {
-                    if (error.status !== 403) {
-                        console.error('Error loading reports:', error);
-                    }
-                    state.reports = [];
-                } finally {
-                    state.reportsLoaded = true;
                 }
             }
 
@@ -465,17 +437,6 @@
                     console.error('Error loading chat messages:', error);
                     return [];
                 }
-            }
-
-            async function sendChatMessage(userId, data) {
-                return await fetchJSON(`/api/chat/messages/${userId}/`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrftoken,
-                    },
-                    body: JSON.stringify(data),
-                });
             }
 
             const openModal = (modalId) => {
@@ -539,24 +500,6 @@
                     `).join('')
                     : '<p class="text-xs text-gray-400">فایلی ثبت نشده است.</p>';
 
-                const commentFormHtml = (CURRENT_USER.isStaff || currentRole !== 'student') ? `
-                    <section class="pt-4 border-t">
-                        <h3 class="font-bold text-gray-800 mb-2 flex items-center gap-2">
-                            <i class="fas fa-plus-circle text-indigo-500"></i> ثبت نظر جدید
-                        </h3>
-                        <form id="add-comment-form" class="space-y-3">
-                            <textarea name="text" rows="3" required class="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500" placeholder="متن نظر..."></textarea>
-                            <div class="flex items-center gap-3">
-                                <label class="text-sm text-gray-600">فایل ضمیمه (اختیاری)</label>
-                                <input type="file" name="attachment" class="text-sm" accept=".pdf,.jpg,.jpeg,.png,.mp3,.wav,.m4a" />
-                            </div>
-                            <div class="text-left">
-                                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">ارسال نظر</button>
-                            </div>
-                        </form>
-                    </section>
-                ` : '';
-
                 const weeklyPlanButton = (currentRole !== 'student') ? `
                     <button class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center gap-2">
                         <i class="fas fa-calendar-week"></i>
@@ -591,7 +534,6 @@
                             </h3>
                             <div class="space-y-2">${attachmentsHtml}</div>
                         </section>
-                        ${commentFormHtml}
                     </div>
                     <div class="p-3 bg-gray-50 rounded-b-xl border-t flex justify-end gap-3">
                         <button data-close-modal="course-details-modal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">بستن</button>
@@ -718,7 +660,6 @@
                 chatMessagesView.classList.remove('hidden');
                 backToChatsBtn.classList.remove('hidden');
                 chatTitle.textContent = otherPartyName;
-                state.activeConversationId = userId;
 
                 let messages = state.chatMessages[userId];
                 if (!messages) {
@@ -726,57 +667,19 @@
                     state.chatMessages[userId] = messages;
                 }
 
-                const appendMessage = (msg) => {
+                if (!messages.length) {
+                    chatMessagesContainer.innerHTML = '<p class="text-sm text-gray-500">پیامی ثبت نشده است.</p>';
+                    return;
+                }
+
+                messages.forEach(msg => {
                     const msgBubble = document.createElement('div');
                     const isMe = msg.sender === CURRENT_USER.id;
                     msgBubble.className = `max-w-xs p-3 rounded-lg ${isMe ? 'bg-indigo-500 text-white self-end' : 'bg-gray-200 text-gray-800 self-start'}`;
                     msgBubble.textContent = msg.text || 'بدون متن';
                     chatMessagesContainer.appendChild(msgBubble);
-                };
-
-                if (!messages.length) {
-                    chatMessagesContainer.innerHTML = '<p class="text-sm text-gray-500">پیامی ثبت نشده است.</p>';
-                } else {
-                    messages.forEach(appendMessage);
-                    chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-                }
-
-                const chatInput = document.getElementById('chat-input');
-                const chatSendBtn = document.getElementById('chat-send-btn');
-
-                if (chatSendBtn && chatInput) {
-                    const handleSend = async () => {
-                        const text = chatInput.value.trim();
-                        if (!text) {
-                            return;
-                        }
-                        chatSendBtn.disabled = true;
-                        try {
-                            const newMessage = await sendChatMessage(userId, { text });
-                            chatInput.value = '';
-                            if (!Array.isArray(state.chatMessages[userId])) {
-                                state.chatMessages[userId] = [];
-                                chatMessagesContainer.innerHTML = '';
-                            }
-                            state.chatMessages[userId].push(newMessage);
-                            appendMessage(newMessage);
-                            chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-                            await loadConversations(true);
-                        } catch (error) {
-                            alert('ارسال پیام با خطا مواجه شد.');
-                        } finally {
-                            chatSendBtn.disabled = false;
-                        }
-                    };
-
-                    chatSendBtn.onclick = handleSend;
-                    chatInput.onkeydown = (event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                            event.preventDefault();
-                            handleSend();
-                        }
-                    };
-                }
+                });
+                chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
             };
 
             const renderChatList = async () => {
@@ -807,22 +710,10 @@
                     }
                     const displayName = nameParts.join(' ') || convo.username || 'کاربر';
                     const lastMessage = convo.last_message || '';
-                    const lastMessageAt = convo.last_message_at ? new Date(convo.last_message_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }) : '';
                     const listItem = document.createElement('div');
                     listItem.className = 'p-3 flex items-center gap-3 hover:bg-gray-100 cursor-pointer border-b';
                     const avatarInitial = displayName.charAt(0) || '?';
-                    const unreadBadge = convo.unread_count ? `<span class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full">${convo.unread_count}</span>` : '';
-                    listItem.innerHTML = `
-                        <img src="https://placehold.co/40x40/e0e7ff/4338ca?text=${avatarInitial}" class="w-10 h-10 rounded-full">
-                        <div class="flex-1">
-                            <p class="font-bold flex items-center justify-between gap-2">
-                                <span>${displayName}</span>
-                                <span class="text-xs text-gray-400">${lastMessageAt}</span>
-                            </p>
-                            <p class="text-sm text-gray-500 truncate">${lastMessage || 'بدون پیام'}</p>
-                        </div>
-                        ${unreadBadge}
-                    `;
+                    listItem.innerHTML = `<img src="https://placehold.co/40x40/e0e7ff/4338ca?text=${avatarInitial}" class="w-10 h-10 rounded-full"><div><p class="font-bold">${displayName}</p><p class="text-sm text-gray-500 truncate">${lastMessage || 'بدون پیام'}</p></div>`;
                     listItem.addEventListener('click', () => {
                         renderMessages(convo.id, displayName).catch(error => {
                             console.error('Error rendering messages:', error);
@@ -874,7 +765,7 @@
                 adminPanelContent.innerHTML = '<div class="loader" style="border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto;"></div>';
 
                 let data = null;
-                if (['add-student', 'assign-student', 'send-notification'].includes(viewName)) {
+                if (['add-student', 'assign-student'].includes(viewName)) {
                     data = await getAdminData();
                     if (!data) {
                         adminPanelContent.innerHTML = '<p class="text-red-500">امکان بارگذاری اطلاعات وجود ندارد.</p>';
@@ -916,7 +807,7 @@
                         break;
                     }
                     case 'financials': {
-                        await loadPayments(true);
+                        await loadPayments();
                         if (!state.payments.length) {
                             content = '<p class="text-sm text-gray-600">پرداختی برای نمایش وجود ندارد.</p>';
                         } else {
@@ -953,99 +844,12 @@
                         }
                         break;
                     }
-                    case 'send-notification': {
-                        if (!data) {
-                            content = '<p class="text-sm text-red-500">امکان بارگذاری مخاطبین وجود ندارد.</p>';
-                            break;
-                        }
-                        const studentCheckboxes = data.students.length
-                            ? data.students.map(student => {
-                                const telegramHint = student.telegram_chat_id ? `<span class=\"text-xs text-green-600\">تلگرام: ${student.telegram_chat_id}</span>` : '';
-                                return `
-                                <label class="flex items-center justify-between gap-3 p-2 border rounded-lg">
-                                    <span><input type="checkbox" name="student_ids" value="${student.id}" class="ml-2">${student.name}</span>
-                                    <span class="flex flex-col items-end text-xs text-gray-400 gap-1">
-                                        <span>${student.phone_number || ''}</span>
-                                        ${telegramHint}
-                                    </span>
-                                </label>
-                              `;
-                            }).join('')
-                            : '<p class="text-xs text-gray-400">دانش‌آموزی ثبت نشده است.</p>';
-                        const advisorCheckboxes = data.advisors.length
-                            ? data.advisors.map(advisor => {
-                                const telegramHint = advisor.telegram_chat_id ? `<span class=\"text-xs text-green-600\">تلگرام: ${advisor.telegram_chat_id}</span>` : '';
-                                return `
-                                <label class="flex items-center justify-between gap-3 p-2 border rounded-lg">
-                                    <span><input type="checkbox" name="advisor_ids" value="${advisor.id}" class="ml-2">${advisor.name}</span>
-                                    <span class="flex flex-col items-end text-xs text-gray-400 gap-1">
-                                        <span>${advisor.phone_number || ''}</span>
-                                        ${telegramHint}
-                                    </span>
-                                </label>
-                              `;
-                            }).join('')
-                            : '<p class="text-xs text-gray-400">مشاوری ثبت نشده است.</p>';
-
-                        content = `
-                            <h3 class="text-xl font-bold mb-4">ارسال نوتیفیکیشن تلگرام</h3>
-                            <p class="text-sm text-gray-600 mb-4">برای ارسال پیام، اتصال ربات تلگرام با استفاده از توکن پیکربندی شده در سرور الزامی است. در صورتی که شناسه تلگرام برای کاربری ثبت نشده باشد، ارسال پیام انجام نخواهد شد.</p>
-                            <form id="send-notification-form" class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">انتخاب دانش‌آموزان</label>
-                                    <div class="space-y-2 max-h-40 overflow-y-auto pr-2">${studentCheckboxes}</div>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">انتخاب مشاوران</label>
-                                    <div class="space-y-2 max-h-40 overflow-y-auto pr-2">${advisorCheckboxes}</div>
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">متن پیام</label>
-                                    <textarea name="message" rows="4" required class="w-full border border-gray-300 rounded-lg p-3 focus:ring-indigo-500 focus:border-indigo-500" placeholder="متن پیام تلگرام..."></textarea>
-                                </div>
-                                <div class="text-left">
-                                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">ارسال پیام</button>
-                                </div>
-                            </form>`;
+                    case 'send-notification':
+                        content = '<p class="text-sm text-gray-600">این بخش به زودی فعال می‌شود.</p>';
                         break;
-                    }
-                    case 'reports': {
-                        await loadReports(true);
-                        if (!state.reports.length) {
-                            content = '<p class="text-sm text-gray-600">گزارشی برای نمایش وجود ندارد.</p>';
-                        } else {
-                            const rows = state.reports.map(report => `
-                                <tr class="border-b">
-                                    <td class="px-3 py-2 text-sm text-gray-700">${report.student_name}</td>
-                                    <td class="px-3 py-2 text-sm text-gray-700">${report.advisor_name || '---'}</td>
-                                    <td class="px-3 py-2 text-sm text-gray-500">${new Date(report.week_start).toLocaleDateString('fa-IR')} - ${new Date(report.week_end).toLocaleDateString('fa-IR')}</td>
-                                    <td class="px-3 py-2 text-sm text-gray-700 text-center">${report.tasks_count}</td>
-                                    <td class="px-3 py-2 text-sm text-gray-700 text-center">${report.total_minutes}</td>
-                                    <td class="px-3 py-2 text-sm text-gray-700 text-center">${report.logs_count}</td>
-                                    <td class="px-3 py-2 text-xs text-gray-600">${report.important_events || '—'}</td>
-                                </tr>
-                            `).join('');
-                            content = `
-                                <h3 class="text-xl font-bold mb-4">آخرین گزارش‌های هفتگی</h3>
-                                <div class="overflow-x-auto">
-                                    <table class="min-w-full bg-white rounded-lg shadow-sm">
-                                        <thead class="bg-gray-100 text-gray-700 text-sm">
-                                            <tr>
-                                                <th class="px-3 py-2 text-right font-semibold">دانش‌آموز</th>
-                                                <th class="px-3 py-2 text-right font-semibold">مشاور</th>
-                                                <th class="px-3 py-2 text-right font-semibold">بازه زمانی</th>
-                                                <th class="px-3 py-2 text-right font-semibold">تعداد فعالیت‌ها</th>
-                                                <th class="px-3 py-2 text-right font-semibold">دقایق برنامه‌ریزی شده</th>
-                                                <th class="px-3 py-2 text-right font-semibold">تعداد لاگ‌ها</th>
-                                                <th class="px-3 py-2 text-right font-semibold">رویدادهای مهم</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>${rows}</tbody>
-                                    </table>
-                                </div>`;
-                        }
+                    case 'reports':
+                        content = '<p class="text-sm text-gray-600">گزارشی برای نمایش وجود ندارد.</p>';
                         break;
-                    }
                     default:
                         content = '<p class="text-sm text-gray-600">یک گزینه را از منو انتخاب کنید.</p>';
                 }
@@ -1059,10 +863,6 @@
                 const assignStudentForm = document.getElementById('assign-student-form');
                 if (assignStudentForm) {
                     assignStudentForm.addEventListener('submit', handleAssignStudent);
-                }
-                const sendNotificationForm = document.getElementById('send-notification-form');
-                if (sendNotificationForm) {
-                    sendNotificationForm.addEventListener('submit', handleSendNotification);
                 }
             };
 
@@ -1118,46 +918,6 @@
                 }
             }
 
-            async function handleSendNotification(event) {
-                event.preventDefault();
-                const form = event.target;
-                const message = (form.message?.value || '').trim();
-                const studentIds = Array.from(form.querySelectorAll('input[name="student_ids"]:checked')).map(input => Number(input.value));
-                const advisorIds = Array.from(form.querySelectorAll('input[name="advisor_ids"]:checked')).map(input => Number(input.value));
-
-                if (!message) {
-                    alert('لطفا متن پیام را وارد کنید.');
-                    return;
-                }
-                if (!studentIds.length && !advisorIds.length) {
-                    alert('حداقل یک مخاطب را انتخاب کنید.');
-                    return;
-                }
-
-                try {
-                    const result = await fetchJSON('/api/notifications/send/', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': csrftoken,
-                        },
-                        body: JSON.stringify({ message, student_ids: studentIds, advisor_ids: advisorIds }),
-                    });
-
-                    const sentCount = (result.sent || []).length;
-                    const failureCount = (result.failures || []).length;
-                    let feedback = `پیام برای ${sentCount} نفر ارسال شد.`;
-                    if (failureCount) {
-                        const missing = result.failures.map(item => item.name).join('، ');
-                        feedback += ` ارسال برای ${failureCount} نفر با خطا مواجه شد: ${missing}`;
-                    }
-                    alert(feedback);
-                    form.reset();
-                } catch (error) {
-                    alert('ارسال اعلان با خطا مواجه شد.');
-                }
-            }
-
             const roleButtonMap = {
                 admin: adminBtn,
                 counselor: counselorBtn,
@@ -1199,32 +959,6 @@
             const openPaymentModalBtn = document.getElementById('open-payment-modal-btn');
             if (openPaymentModalBtn) {
                 openPaymentModalBtn.addEventListener('click', () => openModal('payment-modal'));
-            }
-
-            const paymentForm = document.getElementById('payment-form');
-            if (paymentForm) {
-                paymentForm.addEventListener('submit', async (event) => {
-                    event.preventDefault();
-                    const formData = new FormData(paymentForm);
-                    const data = Object.fromEntries(formData.entries());
-                    try {
-                        await fetchJSON('/api/payments/submit/', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRFToken': csrftoken,
-                            },
-                            body: JSON.stringify(data),
-                        });
-                        alert('درخواست پرداخت با موفقیت ثبت شد. پس از تایید ادمین اطلاع‌رسانی خواهد شد.');
-                        paymentForm.reset();
-                        closeModal('payment-modal');
-                        state.paymentsLoaded = false;
-                        await loadPayments(true);
-                    } catch (error) {
-                        alert('ثبت پرداخت با خطا مواجه شد. لطفا مجددا تلاش کنید.');
-                    }
-                });
             }
 
             const chatToggleBtn = document.getElementById('chat-toggle-btn');
