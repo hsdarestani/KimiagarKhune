@@ -1,8 +1,10 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (ConversationListView, MessageListView,
-                    NotificationSendView, PaymentStatusView,
-                    PaymentSubmissionView, PaymentViewSet)
+from .views import (AdminReportSummaryView, AdvisorListView,
+                    ConversationListView, CurrentUserProfileView, MessageListView,
+                    NotificationInboxView, NotificationMarkReadView,
+                    NotificationRecipientListView, NotificationSendView,
+                    PaymentStatusView, PaymentSubmissionView, PaymentViewSet)
 
 # ساخت یک روتر برای ViewSet ها
 router = DefaultRouter()
@@ -14,6 +16,12 @@ urlpatterns = [
     path('payments/submit/', PaymentSubmissionView.as_view(), name='payment-submit'),
     path('payments/mine/', PaymentStatusView.as_view(), name='payment-status'),
     path('notifications/send/', NotificationSendView.as_view(), name='notification-send'),
+    path('notifications/recipients/', NotificationRecipientListView.as_view(), name='notification-recipient-list'),
+    path('notifications/inbox/', NotificationInboxView.as_view(), name='notification-inbox'),
+    path('notifications/mark-read/', NotificationMarkReadView.as_view(), name='notification-mark-read'),
+    path('advisors/', AdvisorListView.as_view(), name='advisor-list'),
+    path('reports/summary/', AdminReportSummaryView.as_view(), name='reports-summary'),
+    path('profile/', CurrentUserProfileView.as_view(), name='current-user-profile'),
 
     # URL های مربوط به چت
     path('chat/conversations/', ConversationListView.as_view(), name='conversation-list'),
