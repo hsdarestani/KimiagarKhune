@@ -25,7 +25,7 @@ urlpatterns = [
 
     # URL های مربوط به چت
     path('chat/conversations/', ConversationListView.as_view(), name='conversation-list'),
-    path('chat/messages/<int:user_id>/', MessageListView.as_view(), name='message-list'),
+    path('chat/messages/<str:conversation_id>/', MessageListView.as_view(), name='message-list'),
 
     # URL های مربوط به روتر (مثلا /api/management/payments/)
     path('', include(router.urls)),

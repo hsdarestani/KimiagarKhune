@@ -1,9 +1,10 @@
 import json
 from collections import defaultdict
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
 from django.db.models import Count, Max, Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -19,7 +20,7 @@ from management.utils import send_sms_message, send_telegram_message
 from plans.models import Course, Session
 from .models import ChatMessage, Notification, NotificationRecipient, Payment
 from .serializers import (AdvisorOptionSerializer, ChatMessageSerializer,
-                          ConversationSerializer, NotificationRecipientSerializer,
+                          NotificationRecipientSerializer,
                           NotificationTargetSerializer, PaymentSerializer,
                           UserProfileSerializer)
 
@@ -517,6 +518,53 @@ class ConversationListView(APIView):
         user = request.user
         profile = getattr(user, 'profile', None)
 
+        def serialize_user(user_obj):
+            if not user_obj:
+                return None
+            cached = serialized_users.get(user_obj.id)
+            if cached:
+                return cached
+
+            profile_obj = getattr(user_obj, 'profile', None)
+            profile_data = None
+            full_name_parts = []
+            if profile_obj:
+                profile_data = UserProfileSerializer(
+                    profile_obj,
+                    context={'request': request},
+                ).data
+                first_name = getattr(profile_obj, 'first_name', '') or ''
+                last_name = getattr(profile_obj, 'last_name', '') or ''
+                if first_name:
+                    full_name_parts.append(first_name)
+                if last_name:
+                    full_name_parts.append(last_name)
+
+            display_name = ' '.join(part for part in full_name_parts if part).strip()
+            if not display_name:
+                display_name = user_obj.get_username() or f'کاربر {user_obj.id}'
+
+            payload = {
+                'id': user_obj.id,
+                'username': user_obj.get_username(),
+                'profile': profile_data,
+                'display_name': display_name,
+            }
+            if profile_obj:
+                payload['role'] = getattr(profile_obj, 'role', None)
+            serialized_users[user_obj.id] = payload
+            return payload
+
+        def format_preview(message):
+            if message.text:
+                return message.text
+            if message.file:
+                return '📎 فایل ضمیمه'
+            if message.voice:
+                return '🎤 پیام صوتی'
+            return ''
+
+        serialized_users = {}
         allowed_user_ids = set()
         if profile:
             if profile.role == 'student':
@@ -525,13 +573,16 @@ class ConversationListView(APIView):
                     .filter(profile=profile)
                     .first()
                 )
-                if (
-                    student
+                advisor_user_id = (
+                    student.advisor.profile.user_id
+                    if student
                     and student.advisor
                     and student.advisor.profile
                     and student.advisor.profile.user_id
-                ):
-                    allowed_user_ids.add(student.advisor.profile.user_id)
+                    else None
+                )
+                if advisor_user_id:
+                    allowed_user_ids.add(advisor_user_id)
             elif profile.role == 'advisor':
                 advisor = (
                     Advisor.objects.select_related('profile__user')
@@ -551,37 +602,35 @@ class ConversationListView(APIView):
                     User.objects.exclude(id=user.id).values_list('id', flat=True)
                 )
 
-        messages = ChatMessage.objects.filter(
+        base_messages = ChatMessage.objects.select_related(
+            'sender__profile', 'receiver__profile'
+        )
+        direct_messages = base_messages.filter(
             Q(sender=user) | Q(receiver=user)
-        ).select_related('sender__profile', 'receiver__profile')
+        )
 
         conversation_meta = {}
-        for msg in messages:
+        for msg in direct_messages:
             other_user = msg.receiver if msg.sender_id == user.id else msg.sender
-            if other_user_id := getattr(other_user, 'id', None):
-                meta = conversation_meta.setdefault(
-                    other_user_id,
-                    {
-                        'last_message': '',
-                        'last_message_at': None,
-                        'unread_count': 0,
-                    },
-                )
+            other_user_id = getattr(other_user, 'id', None)
+            if not other_user_id:
+                continue
 
-                if not meta['last_message_at'] or msg.timestamp > meta['last_message_at']:
-                    if msg.text:
-                        preview = msg.text
-                    elif msg.file:
-                        preview = '📎 فایل ضمیمه'
-                    elif msg.voice:
-                        preview = '🎤 پیام صوتی'
-                    else:
-                        preview = ''
-                    meta['last_message'] = preview
-                    meta['last_message_at'] = msg.timestamp
+            meta = conversation_meta.setdefault(
+                other_user_id,
+                {
+                    'last_message': '',
+                    'last_message_at': None,
+                    'unread_count': 0,
+                },
+            )
 
-                if not msg.is_read and msg.receiver_id == user.id:
-                    meta['unread_count'] += 1
+            if not meta['last_message_at'] or msg.timestamp > meta['last_message_at']:
+                meta['last_message'] = format_preview(msg)
+                meta['last_message_at'] = msg.timestamp
+
+            if msg.receiver_id == user.id and not msg.is_read:
+                meta['unread_count'] += 1
 
         for allowed_id in allowed_user_ids:
             conversation_meta.setdefault(
@@ -593,29 +642,101 @@ class ConversationListView(APIView):
                 },
             )
 
-        all_user_ids = set(conversation_meta.keys()) | allowed_user_ids
+        pair_meta = {}
+        pair_user_ids = set()
+        if profile and profile.role == 'admin':
+            other_messages = base_messages.exclude(
+                Q(sender=user) | Q(receiver=user)
+            )
+            for msg in other_messages:
+                sender_id = msg.sender_id
+                receiver_id = msg.receiver_id
+                if not sender_id or not receiver_id or sender_id == receiver_id:
+                    continue
+                participants = tuple(sorted((sender_id, receiver_id)))
+                if user.id in participants:
+                    continue
 
-        if not all_user_ids:
+                meta = pair_meta.setdefault(
+                    participants,
+                    {
+                        'last_message': '',
+                        'last_message_at': None,
+                    },
+                )
+
+                if not meta['last_message_at'] or msg.timestamp > meta['last_message_at']:
+                    meta['last_message'] = format_preview(msg)
+                    meta['last_message_at'] = msg.timestamp
+
+                pair_user_ids.update(participants)
+
+        user_ids_needed = set(conversation_meta.keys()) | pair_user_ids | {user.id}
+        if not user_ids_needed:
             return Response([])
 
-        ordered_ids = sorted(
-            conversation_meta.keys(),
-            key=lambda uid: conversation_meta[uid]['last_message_at'] or timezone.now(),
-            reverse=True,
-        )
+        users_map = {
+            u.id: u
+            for u in User.objects.filter(id__in=user_ids_needed).select_related('profile')
+        }
 
-        users_qs = (
-            User.objects.filter(id__in=all_user_ids).select_related('profile')
-        )
-        users_map = {u.id: u for u in users_qs}
-        ordered_users = [users_map[uid] for uid in ordered_ids if uid in users_map]
+        fallback_sort = datetime(1970, 1, 1, tzinfo=dt_timezone.utc)
+        current_user_payload = serialize_user(user)
 
-        serializer = ConversationSerializer(
-            ordered_users,
-            many=True,
-            context={'request': request, 'conversation_meta': conversation_meta},
-        )
-        return Response(serializer.data)
+        entries = []
+        for user_id, meta in conversation_meta.items():
+            other_user = users_map.get(user_id)
+            if not other_user:
+                continue
+            other_payload = serialize_user(other_user)
+            last_at = meta.get('last_message_at') or fallback_sort
+            entry = {
+                'id': f'user:{user_id}',
+                'type': 'direct',
+                'participants': [payload for payload in [current_user_payload, other_payload] if payload],
+                'display_name': (other_payload or {}).get('display_name', f'کاربر {user_id}'),
+                'last_message': meta.get('last_message', ''),
+                'last_message_at': meta['last_message_at'].isoformat() if meta.get('last_message_at') else None,
+                'unread_count': meta.get('unread_count', 0),
+                '_sort': last_at,
+            }
+            entries.append(entry)
+
+        for participants, meta in pair_meta.items():
+            first_id, second_id = participants
+            first_user = users_map.get(first_id)
+            second_user = users_map.get(second_id)
+            if not first_user or not second_user:
+                continue
+            first_payload = serialize_user(first_user)
+            second_payload = serialize_user(second_user)
+            if not first_payload or not second_payload:
+                continue
+            display_name = (
+                f"{first_payload.get('display_name', f'کاربر {first_id}')} ↔ "
+                f"{second_payload.get('display_name', f'کاربر {second_id}')}"
+            )
+            last_at = meta.get('last_message_at') or fallback_sort
+            entry = {
+                'id': f'pair:{first_id}:{second_id}',
+                'type': 'pair',
+                'participants': [first_payload, second_payload],
+                'display_name': display_name,
+                'last_message': meta.get('last_message', ''),
+                'last_message_at': meta['last_message_at'].isoformat() if meta.get('last_message_at') else None,
+                'unread_count': 0,
+                '_sort': last_at,
+            }
+            entries.append(entry)
+
+        if not entries:
+            return Response([])
+
+        entries.sort(key=lambda item: item.get('_sort') or fallback_sort, reverse=True)
+        for entry in entries:
+            entry.pop('_sort', None)
+
+        return Response(entries)
 
 
 class MessageListView(APIView):
@@ -624,21 +745,80 @@ class MessageListView(APIView):
     """
     permission_classes = [permissions.IsAuthenticated]
 
-    def get(self, request, user_id):
-        """
-        دریافت لیست پیام‌ها بین کاربر لاگین کرده و کاربری با user_id.
-        """
+    def _resolve_conversation(self, request, raw_conversation_id):
+        conversation_id = str(raw_conversation_id or '').strip()
+        if not conversation_id:
+            raise ValueError('invalid conversation id')
+
+        if conversation_id.isdigit():
+            conversation_id = f'user:{conversation_id}'
+
+        if conversation_id.startswith('user:'):
+            try:
+                target_id = int(conversation_id.split(':', 1)[1])
+            except (IndexError, ValueError):
+                raise ValueError('invalid conversation id')
+            if target_id == request.user.id:
+                raise ValueError('invalid conversation id')
+            other_user = User.objects.get(id=target_id)
+            return {
+                'type': 'direct',
+                'other_user': other_user,
+                'key': f'user:{other_user.id}',
+            }
+
+        if conversation_id.startswith('pair:'):
+            if not request.user.is_staff:
+                raise PermissionError
+            parts = conversation_id.split(':')
+            if len(parts) != 3:
+                raise ValueError('invalid conversation id')
+            try:
+                first = int(parts[1])
+                second = int(parts[2])
+            except ValueError:
+                raise ValueError('invalid conversation id')
+            if first == second:
+                raise ValueError('invalid conversation id')
+            ordered = tuple(sorted((first, second)))
+            user_a = User.objects.get(id=ordered[0])
+            user_b = User.objects.get(id=ordered[1])
+            return {
+                'type': 'pair',
+                'user_ids': ordered,
+                'users': (user_a, user_b),
+                'key': f'pair:{ordered[0]}:{ordered[1]}',
+            }
+
+        raise ValueError('invalid conversation id')
+
+    def get(self, request, conversation_id):
         try:
-            other_user = User.objects.get(id=user_id)
+            conversation = self._resolve_conversation(request, conversation_id)
         except User.DoesNotExist:
             return Response({'detail': 'کاربر یافت نشد.'}, status=status.HTTP_404_NOT_FOUND)
-        messages = ChatMessage.objects.filter(
-            (Q(sender=request.user) & Q(receiver=other_user)) |
-            (Q(sender=other_user) & Q(receiver=request.user))
-        ).order_by('timestamp')
-        
-        # Mark messages as read
-        messages.filter(receiver=request.user, is_read=False).update(is_read=True)
+        except PermissionError:
+            return Response({'detail': 'دسترسی مجاز نیست.'}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError:
+            return Response({'detail': 'شناسه گفتگو نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if conversation['type'] == 'direct':
+            other_user = conversation['other_user']
+            messages = ChatMessage.objects.filter(
+                (Q(sender=request.user) & Q(receiver=other_user))
+                | (Q(sender=other_user) & Q(receiver=request.user))
+            ).order_by('timestamp')
+            messages.filter(receiver=request.user, is_read=False).update(is_read=True)
+        else:
+            user_a_id, user_b_id = conversation['user_ids']
+            participant_ids = {user_a_id, user_b_id}
+            admin_id = request.user.id
+            messages = ChatMessage.objects.filter(
+                (Q(sender_id=user_a_id, receiver_id=user_b_id)
+                 | Q(sender_id=user_b_id, receiver_id=user_a_id)
+                 | Q(sender_id=admin_id, receiver_id__in=participant_ids)
+                 | Q(sender_id__in=participant_ids, receiver_id=admin_id))
+            ).order_by('timestamp')
 
         serializer = ChatMessageSerializer(
             messages,
@@ -647,30 +827,99 @@ class MessageListView(APIView):
         )
         return Response(serializer.data)
 
-    def post(self, request, user_id):
-        """
-        ارسال یک پیام جدید از کاربر لاگین کرده به کاربری با user_id.
-        """
+    def post(self, request, conversation_id):
         try:
-            other_user = User.objects.get(id=user_id)
+            conversation = self._resolve_conversation(request, conversation_id)
         except User.DoesNotExist:
             return Response({'detail': 'کاربر یافت نشد.'}, status=status.HTTP_404_NOT_FOUND)
+        except PermissionError:
+            return Response({'detail': 'دسترسی مجاز نیست.'}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError:
+            return Response({'detail': 'شناسه گفتگو نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = ChatMessageSerializer(
             data=request.data,
             context={'request': request},
         )
-        if serializer.is_valid():
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        if conversation['type'] == 'direct':
+            other_user = conversation['other_user']
             message = serializer.save(sender=request.user, receiver=other_user)
             response_serializer = ChatMessageSerializer(
                 message,
                 context={'request': request},
             )
-            return Response(
-                response_serializer.data,
-                status=status.HTTP_201_CREATED,
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+        if not request.user.is_staff:
+            return Response({'detail': 'دسترسی مجاز نیست.'}, status=status.HTTP_403_FORBIDDEN)
+
+        validated = serializer.validated_data
+        text = validated.get('text') or ''
+        file_obj = validated.get('file')
+        voice_obj = validated.get('voice')
+
+        file_content = file_name = None
+        if file_obj:
+            try:
+                file_obj.seek(0)
+            except Exception:  # noqa: BLE001
+                pass
+            file_content = file_obj.read()
+            file_name = getattr(file_obj, 'name', 'attachment')
+
+        voice_content = voice_name = None
+        if voice_obj:
+            try:
+                voice_obj.seek(0)
+            except Exception:  # noqa: BLE001
+                pass
+            voice_content = voice_obj.read()
+            voice_name = getattr(voice_obj, 'name', 'voice-message.webm')
+
+        target_value = request.data.get('target') or request.data.get('target_user_id')
+        participant_ids = set(conversation['user_ids'])
+
+        if target_value in (None, '', 'both', 'all'):
+            target_ids = list(participant_ids)
+        else:
+            try:
+                target_id = int(target_value)
+            except (TypeError, ValueError):
+                return Response({'detail': 'شناسه گیرنده نامعتبر است.'}, status=status.HTTP_400_BAD_REQUEST)
+            if target_id not in participant_ids:
+                return Response({'detail': 'گیرنده انتخاب‌شده در این گفتگو مجاز نیست.'}, status=status.HTTP_400_BAD_REQUEST)
+            target_ids = [target_id]
+
+        created_messages = []
+        for target_id in target_ids:
+            message_kwargs = {}
+            if text:
+                message_kwargs['text'] = text
+            if file_content is not None:
+                message_kwargs['file'] = ContentFile(file_content, name=file_name)
+            if voice_content is not None:
+                message_kwargs['voice'] = ContentFile(voice_content, name=voice_name)
+
+            message = ChatMessage.objects.create(
+                sender=request.user,
+                receiver_id=target_id,
+                **message_kwargs,
             )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            created_messages.append(message)
+
+        response_serializer = ChatMessageSerializer(
+            created_messages,
+            many=True,
+            context={'request': request},
+        )
+        payload = response_serializer.data
+        if isinstance(payload, list) and len(payload) == 1:
+            payload = payload[0]
+
+        return Response(payload, status=status.HTTP_201_CREATED)
 
 
 class PaymentSubmissionView(APIView):
@@ -831,6 +1080,14 @@ class NotificationSendView(APIView):
             User.objects.filter(id__in=unique_ids)
             .select_related('profile')
         )
+        found_user_ids = {user.id for user in users}
+        missing_ids = sorted(set(unique_ids) - found_user_ids)
+        if missing_ids:
+            return Response(
+                {'detail': 'برخی کاربران انتخاب‌شده یافت نشدند.', 'missing_ids': missing_ids},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if not users:
             return Response({'detail': 'هیچ کاربری برای ارسال اعلان یافت نشد.'}, status=status.HTTP_400_BAD_REQUEST)
 

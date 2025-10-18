@@ -102,37 +102,6 @@ class ChatMessageSerializer(serializers.ModelSerializer):
         return attrs
 
 
-class ConversationSerializer(serializers.ModelSerializer):
-    """
-    سریالایزر برای نمایش لیست گفتگوها.
-    """
-    profile = UserProfileSerializer(read_only=True)
-    last_message = serializers.SerializerMethodField()
-    unread_count = serializers.SerializerMethodField()
-    last_message_at = serializers.SerializerMethodField()
-
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'profile', 'last_message', 'last_message_at', 'unread_count']
-
-    def _get_meta(self, obj):
-        meta = self.context.get('conversation_meta', {})
-        return meta.get(obj.id, {})
-
-    def get_last_message(self, obj):
-        meta = self._get_meta(obj)
-        return meta.get('last_message', '')
-
-    def get_last_message_at(self, obj):
-        meta = self._get_meta(obj)
-        ts = meta.get('last_message_at')
-        return ts.isoformat() if ts else None
-
-    def get_unread_count(self, obj):
-        meta = self._get_meta(obj)
-        return meta.get('unread_count', 0)
-
-
 class AdvisorOptionSerializer(serializers.ModelSerializer):
     """"
     سریالایزر ساده برای بازگرداندن گزینه‌های مشاور برای فیلتر ادمین.
