@@ -132,8 +132,8 @@
                     <span>پنل مدیریت</span>
                 </button>
                 <div class="items-center gap-2 hidden sm:flex">
-                     <label for="counselor-filter" class="text-sm text-gray-600">فیلتر مشاور:</label>
-                     <select id="counselor-filter" class="rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500 min-w-[220px]" data-placeholder="انتخاب مشاور" autocomplete="off">
+                     <label for="advisor-filter" class="text-sm text-gray-600">فیلتر مشاور:</label>
+                     <select id="advisor-filter" class="rounded-md border-gray-300 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500 min-w-[220px]" data-placeholder="انتخاب مشاور" autocomplete="off">
                          <option value="all">همه</option>
                      </select>
                 </div>
@@ -332,7 +332,7 @@
             const daysOfWeek = Object.values(EN_TO_FA_DAYS);
             const ROLE_LABELS = {
                 admin: 'نمای ادمین',
-                counselor: 'نمای مشاور',
+                advisor: 'نمای مشاور',
                 student: 'نمای دانش‌آموز',
             };
 
@@ -376,7 +376,7 @@
             const modalBackdrop = document.getElementById('modal-backdrop');
             const adminControls = document.getElementById('admin-controls');
             const studentControls = document.getElementById('student-controls');
-            const counselorFilter = document.getElementById('counselor-filter');
+            const advisorFilter = document.getElementById('advisor-filter');
             const adminPanelContent = document.getElementById('admin-panel-content');
             const chatWindow = document.getElementById('chat-window');
             const chatList = document.getElementById('chat-list');
@@ -399,7 +399,7 @@
             const paymentDateDisplayInput = document.getElementById('payment-date-display');
             const paymentDateHiddenInput = document.getElementById('payment-date-hidden');
             const adminBtn = document.getElementById('adminBtn');
-            const counselorBtn = document.getElementById('counselorBtn');
+            const advisorBtn = document.getElementById('advisorBtn');
             const studentBtn = document.getElementById('studentBtn');
             const roleIndicator = document.getElementById('role-indicator');
             const profileDropdown = document.getElementById('profile-dropdown');
@@ -424,7 +424,7 @@
             const CHAT_POLL_INTERVAL = 5000;
             let studentPaymentPollingInterval = null;
             const STUDENT_PAYMENT_POLL_INTERVAL = 15000;
-            let counselorSelectInstance = null;
+            let advisorSelectInstance = null;
             let notificationRecipientSelectInstance = null;
             let notificationPollingInterval = null;
             const NOTIFICATION_POLL_INTERVAL = 15000;
@@ -455,34 +455,34 @@
             }
             const csrftoken = getCookie('csrftoken');
 
-            function setCounselorFilterDisabled(disabled) {
-                if (!counselorFilter) return;
-                counselorFilter.disabled = disabled;
-                if (counselorSelectInstance) {
+            function setAdvisorFilterDisabled(disabled) {
+                if (!advisorFilter) return;
+                advisorFilter.disabled = disabled;
+                if (advisorSelectInstance) {
                     if (disabled) {
-                        counselorSelectInstance.disable();
+                        advisorSelectInstance.disable();
                     } else {
-                        counselorSelectInstance.enable();
+                        advisorSelectInstance.enable();
                     }
                 }
             }
 
-            function initializeCounselorSelect(selectedValue = 'all') {
-                if (!counselorFilter || typeof TomSelect === 'undefined') {
+            function initializeAdvisorSelect(selectedValue = 'all') {
+                if (!advisorFilter || typeof TomSelect === 'undefined') {
                     return;
                 }
 
-                if (counselorSelectInstance) {
-                    counselorSelectInstance.destroy();
-                    counselorSelectInstance = null;
+                if (advisorSelectInstance) {
+                    advisorSelectInstance.destroy();
+                    advisorSelectInstance = null;
                 }
 
-                counselorSelectInstance = new TomSelect(counselorFilter, {
+                advisorSelectInstance = new TomSelect(advisorFilter, {
                     allowEmptyOption: true,
                     create: false,
                     maxOptions: 500,
                     persist: false,
-                    placeholder: counselorFilter.dataset.placeholder || 'انتخاب مشاور',
+                    placeholder: advisorFilter.dataset.placeholder || 'انتخاب مشاور',
                     sortField: [{ field: 'text', direction: 'asc' }],
                     searchField: ['text'],
                     render: {
@@ -492,10 +492,10 @@
                 });
 
                 const valueToSet = selectedValue || 'all';
-                counselorSelectInstance.setValue(valueToSet, true);
+                advisorSelectInstance.setValue(valueToSet, true);
 
-                if (counselorFilter.disabled) {
-                    counselorSelectInstance.disable();
+                if (advisorFilter.disabled) {
+                    advisorSelectInstance.disable();
                 }
             }
 
@@ -1536,12 +1536,6 @@
                 }
             }
 
-            const extractFileName = (path) => {
-                if (!path) return '';
-                const parts = path.split('/');
-                return parts[parts.length - 1] || path;
-            };
-
             const transformCourse = (course) => {
                 const sessions = (course.sessions || []).map(session => ({
                     id: session.id,
@@ -1825,12 +1819,12 @@
                     return;
                 }
 
-                const canToggleSessions = currentRole === 'counselor';
-                const canEditClassLink = currentRole === 'admin' || currentRole === 'counselor';
+                const canToggleSessions = currentRole === 'advisor';
+                const canEditClassLink = currentRole === 'admin' || currentRole === 'advisor';
                 const sessions = Array.isArray(course.sessions) ? course.sessions : [];
                 const comments = Array.isArray(course.comments) ? course.comments : [];
                 const attachments = Array.isArray(course.attachments) ? course.attachments : [];
-                const canSubmitComment = ['admin', 'counselor', 'student'].includes(currentRole);
+                const canSubmitComment = ['admin', 'advisor', 'student'].includes(currentRole);
 
                 const sessionItemsHtml = sessions.length
                     ? sessions.map(session => {
@@ -2024,12 +2018,12 @@
                 }
             }
 
-            function updateCounselorFilterOptions() {
-                if (!counselorFilter) return;
+            function updateAdvisorFilterOptions() {
+                if (!advisorFilter) return;
 
-                const previousRawValue = counselorSelectInstance
-                    ? counselorSelectInstance.getValue()
-                    : (counselorFilter.value || 'all');
+                const previousRawValue = advisorSelectInstance
+                    ? advisorSelectInstance.getValue()
+                    : (advisorFilter.value || 'all');
                 const previousValue = Array.isArray(previousRawValue)
                     ? (previousRawValue[0] || 'all')
                     : (previousRawValue || 'all');
@@ -2050,16 +2044,16 @@
                         options.push(`<option value="${advisor.id}">${optionLabel}</option>`);
                     });
 
-                counselorFilter.innerHTML = options.join('');
+                advisorFilter.innerHTML = options.join('');
 
                 const validIds = new Set(advisorList.map(advisor => String(advisor.id)));
                 const normalizedPrev = String(previousValue || 'all');
                 const nextValue = normalizedPrev !== 'all' && !validIds.has(normalizedPrev) ? 'all' : normalizedPrev;
-                counselorFilter.value = nextValue;
+                advisorFilter.value = nextValue;
 
                 const shouldDisable = !(currentRole === 'admin' && CURRENT_USER.isStaff);
-                setCounselorFilterDisabled(shouldDisable);
-                initializeCounselorSelect(nextValue);
+                setAdvisorFilterDisabled(shouldDisable);
+                initializeAdvisorSelect(nextValue);
             }
 
             async function loadPayments() {
@@ -3239,12 +3233,12 @@
                 calendarGrid.innerHTML = '';
                 let filteredCourses = [...state.courses];
 
-                if (currentRole === 'counselor' && CURRENT_USER.advisorId) {
+                if (currentRole === 'advisor' && CURRENT_USER.advisorId) {
                     filteredCourses = filteredCourses.filter(course => course.advisorId === CURRENT_USER.advisorId);
                 } else if (currentRole === 'student' && CURRENT_USER.studentId) {
                     filteredCourses = filteredCourses.filter(course => course.studentId === CURRENT_USER.studentId);
-                } else if (currentRole === 'admin' && CURRENT_USER.isStaff && counselorFilter) {
-                    const selectedAdvisorId = counselorFilter.value || 'all';
+                } else if (currentRole === 'admin' && CURRENT_USER.isStaff && advisorFilter) {
+                    const selectedAdvisorId = advisorFilter.value || 'all';
                     if (selectedAdvisorId !== 'all') {
                         filteredCourses = filteredCourses.filter(course => String(course.advisorId) === selectedAdvisorId);
                     }
@@ -3283,7 +3277,7 @@
                 adminControls.classList.toggle('flex', showAdminControls);
                 studentControls.classList.toggle('hidden', role !== 'student');
                 studentControls.classList.toggle('flex', role === 'student');
-                setCounselorFilterDisabled(!showAdminControls);
+                setAdvisorFilterDisabled(!showAdminControls);
                 if (role === 'student') {
                     loadStudentPayments({ notify: false }).catch(error => {
                         console.error('Error loading student payments:', error);
@@ -3737,7 +3731,7 @@
                         alert(result.message);
                         state.adminData = null;
                         await loadCourses();
-                        updateCounselorFilterOptions();
+                        updateAdvisorFilterOptions();
                         renderCalendar();
                         await renderAdminView('assign-student');
                     } else {
@@ -3750,7 +3744,7 @@
 
             const roleButtonMap = {
                 admin: adminBtn,
-                counselor: counselorBtn,
+                advisor: advisorBtn,
                 student: studentBtn,
             };
 
@@ -3775,15 +3769,15 @@
                     switchRole('admin', e.currentTarget);
                 });
             }
-            if (counselorBtn) {
-                counselorBtn.addEventListener('click', (e) => switchRole('counselor', e.currentTarget));
+            if (advisorBtn) {
+                advisorBtn.addEventListener('click', (e) => switchRole('advisor', e.currentTarget));
             }
             if (studentBtn) {
                 studentBtn.addEventListener('click', (e) => switchRole('student', e.currentTarget));
             }
 
-            if (counselorFilter) {
-                counselorFilter.addEventListener('change', () => renderCalendar());
+            if (advisorFilter) {
+                advisorFilter.addEventListener('change', () => renderCalendar());
             }
 
             document.querySelectorAll('#admin-menu .admin-menu-item').forEach(item => {
@@ -4119,7 +4113,7 @@
                 await loadCurrentUserProfile();
                 await loadCourses();
                 await loadAdvisors();
-                updateCounselorFilterOptions();
+                updateAdvisorFilterOptions();
                 renderCalendar();
                 if (CURRENT_USER.isStaff) {
                     loadPayments();

@@ -2,6 +2,7 @@ import json
 import re
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
+from urllib.error import HTTPError, URLError
 
 from django.conf import settings
 
@@ -24,18 +25,36 @@ def normalize_phone_number(value):
 
 def send_telegram_message(chat_id: str, text: str):
     token = settings.TELEGRAM_BOT_TOKEN
+    proxy_url = getattr(settings, 'TELEGRAM_WORKER_URL', '')
     if not token:
         raise ValueError('TELEGRAM_BOT_TOKEN is not configured.')
+    if not proxy_url:
+        raise ValueError('TELEGRAM_WORKER_URL is not configured.')
 
-    url = f'https://api.telegram.org/bot{token}/sendMessage'
-    payload = {'chat_id': str(chat_id), 'text': text}
-    data = urllib_parse.urlencode(payload).encode()
-    req = urllib_request.Request(url, data=data, headers={'Content-Type': 'application/x-www-form-urlencoded'})
-    with urllib_request.urlopen(req, timeout=10) as response:
-        body = json.loads(response.read().decode('utf-8'))
+    payload = json.dumps({
+        'token': token,
+        'chat_id': str(chat_id),
+        'text': text,
+    }).encode('utf-8')
+    req = urllib_request.Request(
+        proxy_url,
+        data=payload,
+        headers={'Content-Type': 'application/json'},
+    )
+
+    try:
+        with urllib_request.urlopen(req, timeout=15) as response:
+            raw_body = response.read().decode('utf-8')
+    except (HTTPError, URLError) as exc:
+        raise ValueError(f'Telegram proxy request failed: {exc}') from exc
+
+    try:
+        body = json.loads(raw_body)
+    except json.JSONDecodeError as exc:
+        raise ValueError('Invalid response from telegram proxy.') from exc
 
     if not body.get('ok'):
-        raise ValueError(body.get('description', 'Failed to send telegram notification.'))
+        raise ValueError(body.get('description', body.get('error', 'Failed to send telegram notification.')))
 
 
 def send_sms_message(phone_number: str, text: str):
