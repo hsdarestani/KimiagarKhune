@@ -3292,6 +3292,14 @@
                 } else {
                     stopStudentPaymentPolling();
                 }
+                if (role === 'student') {
+                    loadStudentPayments({ notify: false }).catch(error => {
+                        console.error('Error loading student payments:', error);
+                    });
+                    startStudentPaymentPolling();
+                } else {
+                    stopStudentPaymentPolling();
+                }
                 chatWindow.classList.add('hidden');
                 chatMessagesView.classList.add('hidden');
                 chatMessagesView.style.display = 'none';
