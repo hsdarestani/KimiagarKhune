@@ -5,7 +5,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.models import User
 from django.db.models import Count, Max, Q
-from django.db.models.functions import Coalesce, TruncDate
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import permissions, status, viewsets
@@ -294,7 +294,7 @@ class AdminReportSummaryView(APIView):
             incomplete_sessions=Count('sessions', filter=Q(sessions__is_completed=False)),
             last_session_date=Max('sessions__date'),
         ).annotate(
-            dropout_date=Coalesce('last_session_date', TruncDate('created_at')),
+            dropout_date=Coalesce('last_session_date', 'start_date'),
         ).filter(incomplete_sessions__gt=0)
 
         if range_start:
@@ -332,7 +332,7 @@ class AdminReportSummaryView(APIView):
                 return max(session_dates)
             if course_obj.start_date:
                 return course_obj.start_date
-            return course_obj.created_at.date() if course_obj.created_at else None
+            return None
 
         advisor_non_renew_map = {advisor.id: 0 for advisor in advisors}
         for course_list in student_course_map.values():
