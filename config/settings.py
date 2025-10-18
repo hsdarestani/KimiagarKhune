@@ -127,6 +127,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Ensure this is set
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -135,7 +138,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_REDIRECT_URL = '/plan/'  # Redirect to the plan page after login
 LOGIN_URL = '/login/'  # Redirect to login page if user isn't authenticated
+LOGOUT_REDIRECT_URL = '/login/'
 
 
 # Integrations
-TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_BOT_TOKEN = os.environ.get(
+    'TELEGRAM_BOT_TOKEN',
+    '8489390924:AAEx7RR147AMtZK66swBcLhEuKVowi8vfMY',
+)
+TELEGRAM_WORKER_URL = os.environ.get(
+    'TELEGRAM_WORKER_URL',
+    'https://misty-sky-f10a.hsdf7rb.workers.dev/',
+)
+KAVENEGAR_API_KEY = os.environ.get(
+    'KAVENEGAR_API_KEY',
+    '7A724E712B39625A6D4C496D375467527A554D316B31676C79757678696F674B5570684C6C52534F7063343D',
+)
+KAVENEGAR_SENDER = os.environ.get('KAVENEGAR_SENDER', '')
