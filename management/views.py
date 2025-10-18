@@ -3,6 +3,7 @@ import io
 import json
 import re
 import zipfile
+from urllib.parse import unquote
 from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone as dt_timezone
 from decimal import Decimal, InvalidOperation
@@ -1330,7 +1331,7 @@ class MessageListView(APIView):
         return getattr(profile, 'role', None) == 'admin'
 
     def _resolve_conversation(self, request, raw_conversation_id):
-        conversation_id = str(raw_conversation_id or '').strip()
+        conversation_id = unquote(str(raw_conversation_id or '')).strip()
         if not conversation_id:
             raise ValueError('invalid conversation id')
 
