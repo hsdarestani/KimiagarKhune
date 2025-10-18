@@ -22,6 +22,7 @@ class Course(models.Model):
     start_time = models.TimeField(verbose_name="ساعت شروع")
     start_date = models.DateField(verbose_name="تاریخ شروع دوره")
     is_active = models.BooleanField(default=True, verbose_name="دوره فعال است؟")
+    class_link = models.URLField(blank=True, null=True, verbose_name="لینک کلاس")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
