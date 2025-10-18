@@ -32,9 +32,14 @@ class PaymentViewSet(viewsets.ModelViewSet):
     """
     ViewSet برای مدیریت پرداخت‌ها. فقط ادمین دسترسی کامل دارد.
     """
-    queryset = Payment.objects.all().order_by('-created_at')
     serializer_class = PaymentSerializer
     permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return (
+            Payment.objects.select_related('student__profile')
+            .order_by('-created_at')
+        )
 
     @action(detail=True, methods=['post'], url_path='approve')
     def approve_payment(self, request, pk=None):
@@ -270,7 +275,47 @@ class PaymentSubmissionView(APIView):
         )
 
         serializer = PaymentSerializer(payment)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                'message': 'پرداخت شما ثبت شد و در انتظار تایید ادمین است.',
+                'payment': serializer.data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class PaymentStatusView(APIView):
+    """نمایش وضعیت پرداخت‌ها برای کاربر جاری."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.is_staff:
+            payments = (
+                Payment.objects.select_related('student__profile')
+                .order_by('-created_at')
+            )
+        else:
+            profile = getattr(request.user, 'profile', None)
+            if not profile or profile.role != 'student':
+                return Response([], status=status.HTTP_200_OK)
+
+            student = (
+                Student.objects.select_related('profile')
+                .filter(profile=profile)
+                .first()
+            )
+            if not student:
+                return Response([], status=status.HTTP_200_OK)
+
+            payments = (
+                Payment.objects.select_related('student__profile')
+                .filter(student=student)
+                .order_by('-created_at')
+            )
+
+        serializer = PaymentSerializer(payments, many=True)
+        return Response(serializer.data)
 
 
 def _send_telegram_message(chat_id: str, text: str):

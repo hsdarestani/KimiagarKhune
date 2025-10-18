@@ -84,9 +84,32 @@
             background-color: #4f46e5;
             color: white;
         }
+        .toast-message {
+            direction: rtl;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgb(15 23 42 / 0.25);
+            color: #fff;
+            animation: fadeIn 0.2s ease-out;
+            font-size: 0.875rem;
+        }
+        .toast-message.success {
+            background: linear-gradient(135deg, #16a34a, #22c55e);
+        }
+        .toast-message.error {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+        }
+        .toast-message.info {
+            background: linear-gradient(135deg, #2563eb, #4f46e5);
+        }
     </style>
 </head>
 <body class="w-full h-screen">
+
+    <div id="toast-container" class="fixed top-6 right-6 flex flex-col gap-3 z-50"></div>
 
     <!-- Header -->
     <header class="bg-white shadow-md p-3 flex justify-between items-center z-20 shrink-0">
@@ -226,11 +249,13 @@
                 <div><label class="block text-sm font-medium text-gray-700">مبلغ واریز شده (تومان)</label><input name="amount" type="number" min="0" step="1000" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
                 <div><label class="block text-sm font-medium text-gray-700">شماره پیگیری / ارجاع</label><input name="reference_number" type="text" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
                 <div><label class="block text-sm font-medium text-gray-700">تاریخ واریز</label><input name="payment_date" type="date" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
-                <div class="text-left pt-4">
+                <div class="flex items-center justify-between pt-4 gap-3">
                     <button type="button" data-close-modal="payment-modal" class="px-4 py-2 bg-gray-200 rounded-lg">انصراف</button>
-                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">ارسال برای تایید</button>
+                    <button id="payment-submit-btn" type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">ارسال برای تایید</button>
                 </div>
+                <p id="payment-feedback" class="text-sm hidden"></p>
             </form>
+            <div id="student-payment-history" class="mt-6"></div>
         </div>
     </div>
 
@@ -258,6 +283,8 @@
                 courses: [],
                 payments: [],
                 paymentsLoaded: false,
+                studentPayments: [],
+                studentPaymentsLoaded: false,
                 conversations: [],
                 conversationsLoaded: false,
                 chatMessages: {},
@@ -279,6 +306,10 @@
             const chatTitle = document.getElementById('chat-title');
             const backToChatsBtn = document.getElementById('back-to-chats-btn');
             const chatNotificationDot = document.getElementById('chat-notification-dot');
+            const paymentForm = document.getElementById('payment-form');
+            const paymentFeedback = document.getElementById('payment-feedback');
+            const paymentSubmitBtn = document.getElementById('payment-submit-btn');
+            const studentPaymentHistoryContainer = document.getElementById('student-payment-history');
             const adminBtn = document.getElementById('adminBtn');
             const counselorBtn = document.getElementById('counselorBtn');
             const studentBtn = document.getElementById('studentBtn');
@@ -290,6 +321,8 @@
             let messagePollingInterval = null;
             let conversationPollingInterval = null;
             const CHAT_POLL_INTERVAL = 5000;
+            let studentPaymentPollingInterval = null;
+            const STUDENT_PAYMENT_POLL_INTERVAL = 15000;
 
             function getCookie(name) {
                 let cookieValue = null;
@@ -307,17 +340,94 @@
             }
             const csrftoken = getCookie('csrftoken');
 
+            const toastContainer = document.getElementById('toast-container');
+            const showToast = (message, type = 'info') => {
+                if (!toastContainer || !message) return;
+                const icons = {
+                    success: 'fa-circle-check',
+                    error: 'fa-circle-exclamation',
+                    info: 'fa-circle-info',
+                };
+                const toast = document.createElement('div');
+                toast.className = `toast-message ${type}`;
+                toast.innerHTML = `<i class="fas ${icons[type] || icons.info} text-white text-lg"></i><span>${message}</span>`;
+                toastContainer.appendChild(toast);
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transition = 'opacity 0.3s ease';
+                    setTimeout(() => toast.remove(), 300);
+                }, 4000);
+            };
+
+            const toDateInstance = (value) => {
+                if (!value) return null;
+                if (value instanceof Date) {
+                    return Number.isNaN(value.getTime()) ? null : value;
+                }
+                if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+                    const parsed = new Date(`${value}T00:00:00`);
+                    return Number.isNaN(parsed.getTime()) ? null : parsed;
+                }
+                const parsed = new Date(value);
+                return Number.isNaN(parsed.getTime()) ? null : parsed;
+            };
+
+            const formatToJalali = (value, options = { year: 'numeric', month: 'long', day: 'numeric' }) => {
+                const date = toDateInstance(value);
+                if (!date) return '';
+                return new Intl.DateTimeFormat('fa-IR-u-ca-persian', options).format(date);
+            };
+
+            const formatToJalaliDateTime = (value) => {
+                const date = toDateInstance(value);
+                if (!date) return '';
+                return new Intl.DateTimeFormat('fa-IR-u-ca-persian', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                }).format(date);
+            };
+
             async function fetchJSON(url, options = {}) {
-                const response = await fetch(url, options);
+                const mergedOptions = {
+                    credentials: 'same-origin',
+                    ...options,
+                };
+                mergedOptions.headers = {
+                    Accept: 'application/json',
+                    ...(options.headers || {}),
+                };
+
+                const response = await fetch(url, mergedOptions);
+                const isNoContent = response.status === 204;
+                const rawPayload = isNoContent ? '' : await response.text();
+
                 if (!response.ok) {
-                    const error = new Error(`Request failed with status ${response.status}`);
+                    let message = `Request failed with status ${response.status}`;
+                    if (rawPayload) {
+                        try {
+                            const errorData = JSON.parse(rawPayload);
+                            message = errorData.detail || errorData.message || message;
+                        } catch (parseError) {
+                            // ignore json parse error for non-json responses
+                        }
+                    }
+                    const error = new Error(message);
                     error.status = response.status;
                     throw error;
                 }
-                if (response.status === 204) {
+
+                if (!rawPayload) {
                     return null;
                 }
-                return await response.json();
+
+                try {
+                    return JSON.parse(rawPayload);
+                } catch (parseError) {
+                    return null;
+                }
             }
 
             const extractFileName = (path) => {
@@ -330,7 +440,7 @@
                 const sessions = (course.sessions || []).map(session => ({
                     id: session.id,
                     number: session.session_number,
-                    date: session.date,
+                    date: formatToJalali(session.date),
                     completed: session.is_completed,
                     videoUrl: session.video_url,
                 }));
@@ -368,6 +478,7 @@
                     startTime: course.start_time,
                     time: course.start_time ? course.start_time.slice(0, 5) : '',
                     startDate: course.start_date,
+                    startDateJalali: formatToJalali(course.start_date),
                     isActive: course.is_active,
                     sessions,
                     comments,
@@ -417,6 +528,125 @@
                     state.payments = [];
                 } finally {
                     state.paymentsLoaded = true;
+                }
+            }
+
+            function renderStudentPaymentHistory() {
+                if (!studentPaymentHistoryContainer) return;
+
+                if (!state.studentPayments.length) {
+                    studentPaymentHistoryContainer.innerHTML = `
+                        <div class="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-4 text-sm text-gray-500 text-center">
+                            هنوز پرداختی ثبت نشده است.
+                        </div>
+                    `;
+                    return;
+                }
+
+                const statusLabels = {
+                    pending: 'در انتظار تایید',
+                    approved: 'تایید شده',
+                    rejected: 'رد شده',
+                };
+                const statusClassMap = {
+                    pending: 'text-amber-500',
+                    approved: 'text-green-600',
+                    rejected: 'text-red-500',
+                };
+
+                const items = state.studentPayments.map(payment => {
+                    const statusKey = payment.status || 'pending';
+                    const statusText = payment.status_display || statusLabels[statusKey] || statusKey;
+                    const statusClass = statusClassMap[statusKey] || 'text-gray-600';
+                    const amount = Number(payment.amount || 0).toLocaleString('fa-IR');
+                    const adminNotes = payment.admin_notes ? `<p class="text-xs text-gray-500 mt-2 leading-5">یادداشت ادمین: ${payment.admin_notes}</p>` : '';
+                    return `
+                        <div class="bg-indigo-50 rounded-lg p-3 mb-3 shadow-sm border border-indigo-100 last:mb-0">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="font-semibold text-gray-700">مبلغ: ${amount} تومان</span>
+                                <span class="text-xs text-gray-500">${formatToJalali(payment.payment_date)}</span>
+                            </div>
+                            <div class="flex justify-between items-center mt-2 text-sm">
+                                <span class="text-gray-500">شماره پیگیری: ${payment.reference_number}</span>
+                                <span class="font-semibold ${statusClass}">${statusText}</span>
+                            </div>
+                            ${adminNotes}
+                        </div>
+                    `;
+                }).join('');
+
+                studentPaymentHistoryContainer.innerHTML = `
+                    <h3 class="text-base font-bold text-gray-700 mb-3 flex items-center gap-2">
+                        <i class="fas fa-receipt text-indigo-500"></i>
+                        <span>سوابق پرداخت شما</span>
+                    </h3>
+                    ${items}
+                `;
+            }
+
+            async function loadStudentPayments({ notify = true } = {}) {
+                if (CURRENT_USER.role !== 'student') {
+                    state.studentPayments = [];
+                    state.studentPaymentsLoaded = true;
+                    if (studentPaymentHistoryContainer) {
+                        studentPaymentHistoryContainer.innerHTML = '';
+                    }
+                    return [];
+                }
+
+                try {
+                    const payments = await fetchJSON('/api/payments/mine/');
+                    const normalized = Array.isArray(payments) ? payments : [];
+                    const previousStatuses = new Map(state.studentPayments.map(payment => [payment.id, payment.status]));
+
+                    if (state.studentPaymentsLoaded && notify) {
+                        normalized.forEach(payment => {
+                            const previousStatus = previousStatuses.get(payment.id);
+                            if (previousStatus && previousStatus === payment.status) {
+                                return;
+                            }
+                            if (!previousStatus && payment.status === 'pending') {
+                                return;
+                            }
+                            if (payment.status === 'approved') {
+                                showToast('پرداخت شما تایید شد.', 'success');
+                            } else if (payment.status === 'rejected') {
+                                const reason = payment.admin_notes ? ` (${payment.admin_notes})` : '';
+                                showToast(`پرداخت شما رد شد.${reason}`, 'error');
+                            }
+                        });
+                    }
+
+                    state.studentPayments = normalized;
+                    state.studentPaymentsLoaded = true;
+                    renderStudentPaymentHistory();
+                    return normalized;
+                } catch (error) {
+                    if (error.status !== 403) {
+                        console.error('Error loading student payments:', error);
+                    }
+                    return state.studentPayments;
+                }
+            }
+
+            function startStudentPaymentPolling() {
+                if (CURRENT_USER.role !== 'student') {
+                    return;
+                }
+                if (studentPaymentPollingInterval) {
+                    return;
+                }
+                studentPaymentPollingInterval = setInterval(() => {
+                    loadStudentPayments({ notify: true }).catch(error => {
+                        console.error('Error while polling student payments:', error);
+                    });
+                }, STUDENT_PAYMENT_POLL_INTERVAL);
+            }
+
+            function stopStudentPaymentPolling() {
+                if (studentPaymentPollingInterval) {
+                    clearInterval(studentPaymentPollingInterval);
+                    studentPaymentPollingInterval = null;
                 }
             }
 
@@ -689,10 +919,10 @@
 
                 const commentsHtml = course.comments.map(comment => `
                     <div class="p-3 bg-white rounded-lg shadow-sm border">
-                        <div class="flex items-center justify-between mb-2">
-                            <p class="font-semibold text-gray-700">${comment.authorName || 'کاربر'}</p>
-                            <span class="text-xs text-gray-400">${comment.createdAt ? new Date(comment.createdAt).toLocaleString('fa-IR') : ''}</span>
-                        </div>
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="font-semibold text-gray-700">${comment.authorName || 'کاربر'}</p>
+                                <span class="text-xs text-gray-400">${formatToJalaliDateTime(comment.createdAt)}</span>
+                            </div>
                         <p class="text-sm text-gray-600">${comment.text || 'بدون متن'}</p>
                     </div>
                 `).join('');
@@ -853,6 +1083,14 @@
                 if (counselorFilter) {
                     counselorFilter.disabled = !showAdminControls;
                 }
+                if (role === 'student') {
+                    loadStudentPayments({ notify: false }).catch(error => {
+                        console.error('Error loading student payments:', error);
+                    });
+                    startStudentPaymentPolling();
+                } else {
+                    stopStudentPaymentPolling();
+                }
                 chatWindow.classList.add('hidden');
                 chatMessagesView.classList.add('hidden');
                 chatMessagesView.style.display = 'none';
@@ -992,13 +1230,18 @@
                                 approved: 'تایید شده',
                                 rejected: 'رد شده',
                             };
+                            const statusClassMap = {
+                                pending: 'text-amber-500',
+                                approved: 'text-green-600',
+                                rejected: 'text-red-500',
+                            };
                             const rows = state.payments.map(payment => `
                                 <tr class="border-b">
                                     <td class="px-3 py-2 text-sm text-gray-700">${payment.student_name || '---'}</td>
                                     <td class="px-3 py-2 text-sm text-gray-700">${Number(payment.amount).toLocaleString('fa-IR')}</td>
                                     <td class="px-3 py-2 text-sm text-gray-500">${payment.reference_number}</td>
-                                    <td class="px-3 py-2 text-sm text-gray-500">${payment.payment_date}</td>
-                                    <td class="px-3 py-2 text-sm font-semibold">${statusLabels[payment.status] || payment.status}</td>
+                                    <td class="px-3 py-2 text-sm text-gray-500">${formatToJalali(payment.payment_date)}</td>
+                                    <td class="px-3 py-2 text-sm font-semibold ${statusClassMap[payment.status] || 'text-gray-600'}">${payment.status_display || statusLabels[payment.status] || payment.status}</td>
                                 </tr>
                             `).join('');
                             content = `
@@ -1134,7 +1377,61 @@
 
             const openPaymentModalBtn = document.getElementById('open-payment-modal-btn');
             if (openPaymentModalBtn) {
-                openPaymentModalBtn.addEventListener('click', () => openModal('payment-modal'));
+                openPaymentModalBtn.addEventListener('click', () => {
+                    openModal('payment-modal');
+                    loadStudentPayments({ notify: false }).catch(error => {
+                        console.error('Error refreshing payment history:', error);
+                    });
+                });
+            }
+
+            if (paymentForm) {
+                paymentForm.addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    if (paymentSubmitBtn) {
+                        paymentSubmitBtn.disabled = true;
+                    }
+                    if (paymentFeedback) {
+                        paymentFeedback.textContent = '';
+                        paymentFeedback.classList.add('hidden');
+                        paymentFeedback.classList.remove('text-green-600', 'text-red-600');
+                    }
+
+                    const formData = new FormData(paymentForm);
+                    const payload = Object.fromEntries(formData.entries());
+
+                    try {
+                        const response = await fetchJSON('/api/payments/submit/', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': csrftoken,
+                            },
+                            body: JSON.stringify(payload),
+                        });
+                        const successMessage = (response && response.message) || 'پرداخت شما ثبت شد و در انتظار تایید ادمین است.';
+                        showToast(successMessage, 'success');
+                        if (paymentFeedback) {
+                            paymentFeedback.textContent = successMessage;
+                            paymentFeedback.classList.remove('hidden', 'text-red-600');
+                            paymentFeedback.classList.add('text-green-600');
+                        }
+                        paymentForm.reset();
+                        await loadStudentPayments({ notify: false });
+                    } catch (error) {
+                        const message = error.message || 'ثبت پرداخت با خطا مواجه شد.';
+                        showToast(message, 'error');
+                        if (paymentFeedback) {
+                            paymentFeedback.textContent = message;
+                            paymentFeedback.classList.remove('hidden', 'text-green-600');
+                            paymentFeedback.classList.add('text-red-600');
+                        }
+                    } finally {
+                        if (paymentSubmitBtn) {
+                            paymentSubmitBtn.disabled = false;
+                        }
+                    }
+                });
             }
 
             const chatToggleBtn = document.getElementById('chat-toggle-btn');

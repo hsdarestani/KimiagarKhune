@@ -18,11 +18,24 @@ class PaymentSerializer(serializers.ModelSerializer):
     """
     # نمایش نام دانش‌آموز به جای آیدی
     student_name = serializers.CharField(source='student.profile.get_full_name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
 
     class Meta:
         model = Payment
-        fields = ['id', 'student', 'student_name', 'course', 'amount', 'reference_number', 'payment_date', 'status', 'created_at', 'admin_notes']
-        read_only_fields = ['student_name', 'created_at']
+        fields = [
+            'id',
+            'student',
+            'student_name',
+            'course',
+            'amount',
+            'reference_number',
+            'payment_date',
+            'status',
+            'status_display',
+            'created_at',
+            'admin_notes',
+        ]
+        read_only_fields = ['student_name', 'status_display', 'created_at']
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
