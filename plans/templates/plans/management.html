@@ -274,6 +274,8 @@
             const chatList = document.getElementById('chat-list');
             const chatMessagesView = document.getElementById('chat-messages-view');
             const chatMessagesContainer = chatMessagesView.querySelector('.chat-messages');
+            const chatInput = document.getElementById('chat-input');
+            const chatSendBtn = document.getElementById('chat-send-btn');
             const chatTitle = document.getElementById('chat-title');
             const backToChatsBtn = document.getElementById('back-to-chats-btn');
             const chatNotificationDot = document.getElementById('chat-notification-dot');
@@ -283,6 +285,11 @@
             const profileDropdown = document.getElementById('profile-dropdown');
 
             let currentRole = CURRENT_USER.isStaff ? 'admin' : (CURRENT_USER.role || 'student');
+            let activeChatUserId = null;
+            let activeChatDisplayName = '';
+            let messagePollingInterval = null;
+            let conversationPollingInterval = null;
+            const CHAT_POLL_INTERVAL = 5000;
 
             function getCookie(name) {
                 let cookieValue = null;
@@ -415,11 +422,11 @@
 
             async function loadConversations(force = false) {
                 if (state.conversationsLoaded && !force) {
-                    return;
+                    return state.conversations;
                 }
                 try {
                     const conversations = await fetchJSON('/api/chat/conversations/');
-                    state.conversations = conversations;
+                    state.conversations = Array.isArray(conversations) ? conversations : [];
                 } catch (error) {
                     if (error.status !== 403) {
                         console.error('Error loading conversations:', error);
@@ -427,15 +434,214 @@
                     state.conversations = [];
                 } finally {
                     state.conversationsLoaded = true;
+                    updateNotificationIndicator();
+                }
+                return state.conversations;
+            }
+
+            async function fetchChatMessages(userId, force = false) {
+                if (!force && state.chatMessages[userId]) {
+                    return state.chatMessages[userId];
+                }
+                try {
+                    const messages = await fetchJSON(`/api/chat/messages/${userId}/`);
+                    const normalized = Array.isArray(messages) ? messages : [];
+                    state.chatMessages[userId] = normalized;
+                    return normalized;
+                } catch (error) {
+                    console.error('Error loading chat messages:', error);
+                    return state.chatMessages[userId] || [];
                 }
             }
 
-            async function fetchChatMessages(userId) {
+            function updateNotificationIndicator() {
+                if (!chatNotificationDot) {
+                    return;
+                }
+                const totalUnread = (state.conversations || []).reduce((sum, convo) => sum + (convo.unread_count || 0), 0);
+                if (totalUnread > 0) {
+                    chatNotificationDot.classList.remove('hidden');
+                } else {
+                    chatNotificationDot.classList.add('hidden');
+                }
+            }
+
+            function getConversationDisplayName(convo) {
+                if (!convo) {
+                    return 'کاربر';
+                }
+                const nameParts = [];
+                if (convo.profile) {
+                    if (convo.profile.first_name) nameParts.push(convo.profile.first_name);
+                    if (convo.profile.last_name) nameParts.push(convo.profile.last_name);
+                }
+                const displayName = nameParts.join(' ').trim();
+                return displayName || convo.username || 'کاربر';
+            }
+
+            function populateChatList() {
+                if (!chatList) {
+                    return;
+                }
+                chatList.innerHTML = '';
+                if (!state.conversations.length) {
+                    chatList.innerHTML = '<p class="text-sm text-gray-500 p-3">گفتگویی یافت نشد.</p>';
+                    updateNotificationIndicator();
+                    return;
+                }
+
+                state.conversations.forEach(convo => {
+                    const displayName = getConversationDisplayName(convo);
+                    const lastMessage = convo.last_message || '';
+                    const listItem = document.createElement('div');
+                    listItem.className = 'p-3 flex items-center gap-3 hover:bg-gray-100 cursor-pointer border-b';
+                    const avatarInitial = displayName.charAt(0) || '?';
+                    listItem.innerHTML = `<img src="https://placehold.co/40x40/e0e7ff/4338ca?text=${avatarInitial}" class="w-10 h-10 rounded-full"><div><p class="font-bold">${displayName}</p><p class="text-sm text-gray-500 truncate">${lastMessage || 'بدون پیام'}</p></div>`;
+                    listItem.addEventListener('click', () => {
+                        renderMessages(convo.id, displayName).catch(error => {
+                            console.error('Error rendering messages:', error);
+                            chatMessagesContainer.innerHTML = '<p class="text-sm text-red-500">خطا در بارگذاری پیام‌ها.</p>';
+                        });
+                    });
+                    chatList.appendChild(listItem);
+                });
+
+                updateNotificationIndicator();
+            }
+
+            function updateMessagesUI(userId) {
+                if (!chatMessagesContainer) {
+                    return;
+                }
+                const messages = state.chatMessages[userId] || [];
+                chatMessagesContainer.innerHTML = '';
+                if (!messages.length) {
+                    chatMessagesContainer.innerHTML = '<p class="text-sm text-gray-500">پیامی ثبت نشده است.</p>';
+                    return;
+                }
+
+                messages.forEach(msg => {
+                    const msgBubble = document.createElement('div');
+                    const isMe = msg.sender === CURRENT_USER.id;
+                    msgBubble.className = `max-w-xs p-3 rounded-lg ${isMe ? 'bg-indigo-500 text-white self-end' : 'bg-gray-200 text-gray-800 self-start'}`;
+                    msgBubble.textContent = msg.text || 'بدون متن';
+                    chatMessagesContainer.appendChild(msgBubble);
+                });
+                chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
+            }
+
+            function haveMessagesChanged(previousMessages, nextMessages) {
+                if (previousMessages.length !== nextMessages.length) {
+                    return true;
+                }
+                if (!previousMessages.length) {
+                    return false;
+                }
+                const prevLast = previousMessages[previousMessages.length - 1];
+                const nextLast = nextMessages[nextMessages.length - 1];
+                if (!prevLast && !nextLast) {
+                    return false;
+                }
+                if (!prevLast || !nextLast) {
+                    return true;
+                }
+                return prevLast.id !== nextLast.id || prevLast.timestamp !== nextLast.timestamp || prevLast.text !== nextLast.text || prevLast.is_read !== nextLast.is_read;
+            }
+
+            function startMessagePolling(userId) {
+                stopMessagePolling();
+                if (!userId) {
+                    return;
+                }
+                messagePollingInterval = setInterval(async () => {
+                    try {
+                        const previousMessages = state.chatMessages[userId] ? [...state.chatMessages[userId]] : [];
+                        const latestMessages = await fetchChatMessages(userId, true);
+                        if (haveMessagesChanged(previousMessages, latestMessages)) {
+                            updateMessagesUI(userId);
+                        }
+                    } catch (error) {
+                        console.error('Error polling messages:', error);
+                    }
+                }, CHAT_POLL_INTERVAL);
+            }
+
+            function stopMessagePolling() {
+                if (messagePollingInterval) {
+                    clearInterval(messagePollingInterval);
+                    messagePollingInterval = null;
+                }
+            }
+
+            function startConversationPolling() {
+                if (conversationPollingInterval) {
+                    return;
+                }
+                conversationPollingInterval = setInterval(async () => {
+                    if (chatWindow.classList.contains('hidden')) {
+                        stopConversationPolling();
+                        return;
+                    }
+                    try {
+                        await loadConversations(true);
+                        if (!chatList.classList.contains('hidden')) {
+                            populateChatList();
+                        }
+                    } catch (error) {
+                        console.error('Error refreshing conversations:', error);
+                    }
+                }, CHAT_POLL_INTERVAL);
+            }
+
+            function stopConversationPolling() {
+                if (conversationPollingInterval) {
+                    clearInterval(conversationPollingInterval);
+                    conversationPollingInterval = null;
+                }
+            }
+
+            async function handleSendMessage() {
+                if (!chatInput || !chatSendBtn) {
+                    return;
+                }
+                if (!activeChatUserId) {
+                    alert('لطفا ابتدا یک گفتگو را انتخاب کنید.');
+                    return;
+                }
+                const text = chatInput.value.trim();
+                if (!text) {
+                    chatInput.focus();
+                    return;
+                }
+
+                chatSendBtn.disabled = true;
                 try {
-                    return await fetchJSON(`/api/chat/messages/${userId}/`);
+                    const response = await fetch(`/api/chat/messages/${activeChatUserId}/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                        body: JSON.stringify({ text }),
+                    });
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(errorText || `خطا در ارسال پیام (کد ${response.status})`);
+                    }
+                    const newMessage = await response.json();
+                    if (!Array.isArray(state.chatMessages[activeChatUserId])) {
+                        state.chatMessages[activeChatUserId] = [];
+                    }
+                    state.chatMessages[activeChatUserId].push(newMessage);
+                    updateMessagesUI(activeChatUserId);
+                    chatInput.value = '';
+                    chatInput.focus();
+                    await loadConversations(true);
+                    if (!chatList.classList.contains('hidden')) {
+                        populateChatList();
+                    }
                 } catch (error) {
-                    console.error('Error loading chat messages:', error);
-                    return [];
+                    console.error('Error sending message:', error);
+                    alert('ارسال پیام با خطا مواجه شد.');
+                } finally {
+                    chatSendBtn.disabled = false;
                 }
             }
 
@@ -649,86 +855,56 @@
                 }
                 chatWindow.classList.add('hidden');
                 chatMessagesView.classList.add('hidden');
+                chatMessagesView.style.display = 'none';
                 chatList.classList.remove('hidden');
+                stopConversationPolling();
+                stopMessagePolling();
+                activeChatUserId = null;
+                activeChatDisplayName = '';
                 renderCalendar();
             };
 
-            const renderMessages = async (userId, otherPartyName) => {
-                chatMessagesContainer.innerHTML = '';
+            async function renderMessages(userId, otherPartyName, options = {}) {
+                const { force = false } = options;
+                activeChatUserId = userId;
+                if (typeof otherPartyName === 'string' && otherPartyName.trim()) {
+                    activeChatDisplayName = otherPartyName;
+                }
+
                 chatList.classList.add('hidden');
                 chatMessagesView.style.display = 'flex';
                 chatMessagesView.classList.remove('hidden');
                 backToChatsBtn.classList.remove('hidden');
-                chatTitle.textContent = otherPartyName;
+                chatTitle.textContent = activeChatDisplayName || 'چت';
+                chatMessagesContainer.innerHTML = '';
 
-                let messages = state.chatMessages[userId];
-                if (!messages) {
-                    messages = await fetchChatMessages(userId);
-                    state.chatMessages[userId] = messages;
-                }
+                await fetchChatMessages(userId, force);
+                updateMessagesUI(userId);
+                chatInput?.focus();
 
-                if (!messages.length) {
-                    chatMessagesContainer.innerHTML = '<p class="text-sm text-gray-500">پیامی ثبت نشده است.</p>';
-                    return;
-                }
+                await loadConversations(true);
+                startMessagePolling(userId);
+            }
 
-                messages.forEach(msg => {
-                    const msgBubble = document.createElement('div');
-                    const isMe = msg.sender === CURRENT_USER.id;
-                    msgBubble.className = `max-w-xs p-3 rounded-lg ${isMe ? 'bg-indigo-500 text-white self-end' : 'bg-gray-200 text-gray-800 self-start'}`;
-                    msgBubble.textContent = msg.text || 'بدون متن';
-                    chatMessagesContainer.appendChild(msgBubble);
-                });
-                chatMessagesContainer.scrollTop = chatMessagesContainer.scrollHeight;
-            };
-
-            const renderChatList = async () => {
+            async function renderChatList(force = false) {
                 chatMessagesContainer.innerHTML = '';
                 chatMessagesView.classList.add('hidden');
+                chatMessagesView.style.display = 'none';
                 chatList.classList.remove('hidden');
                 backToChatsBtn.classList.add('hidden');
                 chatTitle.textContent = 'چت‌ها';
+                activeChatUserId = null;
+                activeChatDisplayName = '';
+                stopMessagePolling();
 
-                if (!state.conversationsLoaded) {
+                if (force) {
+                    await loadConversations(true);
+                } else if (!state.conversationsLoaded) {
                     await loadConversations();
                 }
 
-                chatList.innerHTML = '';
-                if (!state.conversations.length) {
-                    chatList.innerHTML = '<p class="text-sm text-gray-500 p-3">گفتگویی یافت نشد.</p>';
-                    chatNotificationDot.classList.add('hidden');
-                    return;
-                }
-
-                let totalUnread = 0;
-                state.conversations.forEach(convo => {
-                    totalUnread += convo.unread_count || 0;
-                    const nameParts = [];
-                    if (convo.profile) {
-                        if (convo.profile.first_name) nameParts.push(convo.profile.first_name);
-                        if (convo.profile.last_name) nameParts.push(convo.profile.last_name);
-                    }
-                    const displayName = nameParts.join(' ') || convo.username || 'کاربر';
-                    const lastMessage = convo.last_message || '';
-                    const listItem = document.createElement('div');
-                    listItem.className = 'p-3 flex items-center gap-3 hover:bg-gray-100 cursor-pointer border-b';
-                    const avatarInitial = displayName.charAt(0) || '?';
-                    listItem.innerHTML = `<img src="https://placehold.co/40x40/e0e7ff/4338ca?text=${avatarInitial}" class="w-10 h-10 rounded-full"><div><p class="font-bold">${displayName}</p><p class="text-sm text-gray-500 truncate">${lastMessage || 'بدون پیام'}</p></div>`;
-                    listItem.addEventListener('click', () => {
-                        renderMessages(convo.id, displayName).catch(error => {
-                            console.error('Error rendering messages:', error);
-                            chatMessagesContainer.innerHTML = '<p class="text-sm text-red-500">خطا در بارگذاری پیام‌ها.</p>';
-                        });
-                    });
-                    chatList.appendChild(listItem);
-                });
-
-                if (totalUnread > 0) {
-                    chatNotificationDot.classList.remove('hidden');
-                } else {
-                    chatNotificationDot.classList.add('hidden');
-                }
-            };
+                populateChatList();
+            }
 
             async function getAdminData(force = false) {
                 if (!CURRENT_USER.isStaff) {
@@ -965,21 +1141,51 @@
             if (chatToggleBtn) {
                 chatToggleBtn.addEventListener('click', () => {
                     chatWindow.classList.toggle('hidden');
-                    if (!chatWindow.classList.contains('hidden')) {
+                    const isHidden = chatWindow.classList.contains('hidden');
+                    if (!isHidden) {
                         renderChatList().catch(error => {
                             console.error('Error rendering chat list:', error);
                             chatList.innerHTML = '<p class="text-sm text-red-500 p-3">خطا در بارگذاری چت.</p>';
                         });
+                        startConversationPolling();
+                    } else {
+                        stopConversationPolling();
+                        stopMessagePolling();
+                        activeChatUserId = null;
+                        activeChatDisplayName = '';
+                        chatMessagesView.classList.add('hidden');
+                        chatMessagesView.style.display = 'none';
+                        chatList.classList.remove('hidden');
+                        chatTitle.textContent = 'چت‌ها';
                     }
                 });
             }
 
             backToChatsBtn.addEventListener('click', () => {
-                renderChatList().catch(error => {
+                renderChatList(true).catch(error => {
                     console.error('Error rendering chat list:', error);
                     chatList.innerHTML = '<p class="text-sm text-red-500 p-3">خطا در بارگذاری چت.</p>';
                 });
             });
+
+            if (chatSendBtn) {
+                chatSendBtn.addEventListener('click', () => {
+                    handleSendMessage().catch(error => {
+                        console.error('Error sending message:', error);
+                    });
+                });
+            }
+
+            if (chatInput) {
+                chatInput.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault();
+                        handleSendMessage().catch(error => {
+                            console.error('Error sending message:', error);
+                        });
+                    }
+                });
+            }
 
             const profileMenuBtn = document.getElementById('profile-menu-btn');
             if (profileMenuBtn && profileDropdown) {
@@ -1059,6 +1265,7 @@
             };
 
             initializeDashboard();
+            updateNotificationIndicator();
         });
     </script>
 </body>
