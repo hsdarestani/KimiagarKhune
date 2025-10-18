@@ -63,6 +63,42 @@ class ConversationListView(APIView):
 
     def get(self, request):
         user = request.user
+        profile = getattr(user, 'profile', None)
+
+        allowed_user_ids = set()
+        if profile:
+            if profile.role == 'student':
+                student = (
+                    Student.objects.select_related('advisor__profile__user')
+                    .filter(profile=profile)
+                    .first()
+                )
+                if (
+                    student
+                    and student.advisor
+                    and student.advisor.profile
+                    and student.advisor.profile.user_id
+                ):
+                    allowed_user_ids.add(student.advisor.profile.user_id)
+            elif profile.role == 'advisor':
+                advisor = (
+                    Advisor.objects.select_related('profile__user')
+                    .filter(profile=profile)
+                    .first()
+                )
+                if advisor:
+                    students = (
+                        Student.objects.filter(advisor=advisor)
+                        .select_related('profile__user')
+                    )
+                    for student in students:
+                        if student.profile and student.profile.user_id:
+                            allowed_user_ids.add(student.profile.user_id)
+            elif profile.role == 'admin':
+                allowed_user_ids.update(
+                    User.objects.exclude(id=user.id).values_list('id', flat=True)
+                )
+
         messages = ChatMessage.objects.filter(
             Q(sender=user) | Q(receiver=user)
         ).select_related('sender__profile', 'receiver__profile')
@@ -95,7 +131,19 @@ class ConversationListView(APIView):
                 if not msg.is_read and msg.receiver_id == user.id:
                     meta['unread_count'] += 1
 
-        if not conversation_meta:
+        for allowed_id in allowed_user_ids:
+            conversation_meta.setdefault(
+                allowed_id,
+                {
+                    'last_message': '',
+                    'last_message_at': None,
+                    'unread_count': 0,
+                },
+            )
+
+        all_user_ids = set(conversation_meta.keys()) | allowed_user_ids
+
+        if not all_user_ids:
             return Response([])
 
         ordered_ids = sorted(
@@ -104,7 +152,9 @@ class ConversationListView(APIView):
             reverse=True,
         )
 
-        users_qs = User.objects.filter(id__in=conversation_meta.keys()).select_related('profile')
+        users_qs = (
+            User.objects.filter(id__in=all_user_ids).select_related('profile')
+        )
         users_map = {u.id: u for u in users_qs}
         ordered_users = [users_map[uid] for uid in ordered_ids if uid in users_map]
 
