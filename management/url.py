@@ -10,14 +10,16 @@ router.register(r'payments', PaymentViewSet, basename='payment')
 
 # تعریف URL های اپ
 urlpatterns = [
-    # URL های مربوط به روتر (مثلا /api/management/payments/)
-    path('', include(router.urls)),
-    
-    # URL های مربوط به چت
-    path('chat/conversations/', ConversationListView.as_view(), name='conversation-list'),
-    path('chat/messages/<int:user_id>/', MessageListView.as_view(), name='message-list'),
+    # مسیرهای اختصاصی که نباید با الگوهای روتر تداخل داشته باشند
     path('payments/submit/', PaymentSubmissionView.as_view(), name='payment-submit'),
     path('payments/mine/', PaymentStatusView.as_view(), name='payment-status'),
     path('notifications/send/', NotificationSendView.as_view(), name='notification-send'),
+
+    # URL های مربوط به چت
+    path('chat/conversations/', ConversationListView.as_view(), name='conversation-list'),
+    path('chat/messages/<int:user_id>/', MessageListView.as_view(), name='message-list'),
+
+    # URL های مربوط به روتر (مثلا /api/management/payments/)
+    path('', include(router.urls)),
 ]
 
