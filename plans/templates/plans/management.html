@@ -247,6 +247,9 @@
                     <button data-view="assign-student" class="admin-menu-item text-right flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700">
                         <i class="fas fa-calendar-check w-5"></i><span>تخصیص دانش‌آموز</span>
                     </button>
+                    <button data-view="manage-advisors" class="admin-menu-item text-right flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700">
+                        <i class="fas fa-user-tie w-5"></i><span>مدیریت مشاوران</span>
+                    </button>
                     <button data-view="send-notification" class="admin-menu-item text-right flex items-center gap-3 p-3 rounded-lg hover:bg-gray-700">
                         <i class="fas fa-paper-plane w-5"></i><span>ارسال نوتیفیکیشن</span>
                     </button>
@@ -373,6 +376,22 @@
                 notificationRecipientsLoading: false,
                 notificationRecipientsError: null,
             };
+
+            const REPORT_EXPORT_OPTIONS = [
+                { value: 'all', label: 'تمام گزارش‌ها (دانلود یکجا)' },
+                { value: 'overdue_sessions', label: 'کلاس‌های منقضی شده بدون تیک' },
+                { value: 'course_completions_by_day', label: 'اتمام دوره‌ها بر اساس روز' },
+                { value: 'sessions_without_plan', label: 'کلاس‌های بدون برنامه' },
+                { value: 'advisor_performance', label: 'عملکرد تجمیعی مشاوران' },
+                { value: 'advisor_session_counts', label: 'تعداد جلسات برگزار شده مشاوران' },
+                { value: 'advisor_dropout_counts', label: 'دانش‌آموزان انصرافی هر مشاور' },
+                { value: 'advisor_non_renewal_counts', label: 'عدم تمدید دوره هر مشاور' },
+                { value: 'advisor_chat_stats', label: 'آمار پاسخ‌گویی چت مشاوران' },
+                { value: 'chat_threads', label: 'چت‌های باز و پاسخ‌داده‌شده' },
+                { value: 'student_distribution_by_advisor', label: 'توزیع دانش‌آموزان بر اساس مشاور' },
+                { value: 'student_distribution_by_grade', label: 'توزیع دانش‌آموزان بر اساس پایه' },
+                { value: 'student_distribution_by_major', label: 'توزیع دانش‌آموزان بر اساس رشته' },
+            ];
 
             let activeCourseId = null;
 
@@ -506,7 +525,7 @@
                 if (advisorFilter.disabled) {
                     advisorSelectInstance.disable();
                 }
-            }
+            };
 
             const toastContainer = document.getElementById('toast-container');
             const showToast = (message, type = 'info') => {
@@ -1546,14 +1565,32 @@
             }
 
             const transformCourse = (course) => {
-                const sessions = (course.sessions || []).map(session => ({
-                    id: session.id,
-                    number: session.session_number,
-                    date: formatToJalali(session.date),
-                    completed: session.is_completed,
-                    rawDate: session.date,
-                    videoUrl: session.video_url,
-                }));
+                const sessions = (course.sessions || []).map(session => {
+                    const uploader = session.plan_uploaded_by || null;
+                    const uploaderName = uploader
+                        ? (uploader.full_name
+                            || `${uploader.first_name || ''} ${uploader.last_name || ''}`.trim()
+                            || uploader.username
+                            || '')
+                        : '';
+                    const uploadedAtLabel = session.plan_uploaded_at
+                        ? formatToJalaliDateTime(session.plan_uploaded_at)
+                        : '';
+
+                    return {
+                        id: session.id,
+                        number: session.session_number,
+                        date: formatToJalali(session.date),
+                        completed: session.is_completed,
+                        rawDate: session.date,
+                        videoUrl: session.video_url,
+                        planFile: session.plan_file || '',
+                        planFileName: session.plan_file ? extractFileName(session.plan_file) : '',
+                        planUploadedAt: session.plan_uploaded_at || '',
+                        planUploadedAtLabel: uploadedAtLabel,
+                        planUploaderName: uploaderName,
+                    };
+                });
                 const comments = (course.comments || []).map(comment => {
                     const attachmentUrl = comment.attachment;
                     const voiceUrl = comment.voice_note;
@@ -1590,15 +1627,32 @@
                     }
                 });
 
+                sessions.forEach(session => {
+                    if (session.planFile) {
+                        attachments.push({
+                            id: `plan-${session.id}`,
+                            name: `برنامه جلسه ${session.number}`,
+                            url: session.planFile,
+                            type: 'file',
+                        });
+                    }
+                });
+
+                const dayCode = course.day_of_week;
+                const startTimeRaw = course.start_time || '';
+                const startTimeLabel = startTimeRaw ? startTimeRaw.slice(0, 5) : '';
+
                 return {
                     id: course.id,
                     studentId: course.student,
                     advisorId: course.advisor,
                     studentName: course.student_name || '---',
                     advisorName: course.advisor_name || '---',
-                    dayOfWeek: EN_TO_FA_DAYS[course.day_of_week] || course.day_of_week,
-                    startTime: course.start_time,
-                    time: course.start_time ? course.start_time.slice(0, 5) : '',
+                    dayOfWeek: EN_TO_FA_DAYS[dayCode] || dayCode,
+                    dayCode,
+                    startTime: startTimeRaw,
+                    startTimeLabel,
+                    time: startTimeLabel,
                     startDate: course.start_date,
                     startDateJalali: formatToJalali(course.start_date),
                     isActive: course.is_active,
@@ -1608,6 +1662,266 @@
                     attachments,
                 };
             };
+
+            const getAdvisorWorkingHours = (advisorId) => {
+                if (!advisorId) {
+                    return [];
+                }
+                const adminData = state.adminData;
+                if (!adminData || !Array.isArray(adminData.advisors)) {
+                    return [];
+                }
+                const advisor = adminData.advisors.find(item => Number(item?.id) === Number(advisorId));
+                if (!advisor || !Array.isArray(advisor.working_hours)) {
+                    return [];
+                }
+                return advisor.working_hours;
+            };
+
+            function populateScheduleTimeOptions(formEl, course, selectedDayCode) {
+                if (!formEl || !course) {
+                    return;
+                }
+                const daySelect = formEl.querySelector('select[name="day_of_week"]');
+                const timeSelect = formEl.querySelector('select[name="start_time"]');
+                const messageEl = formEl.querySelector('#course-schedule-slot-message');
+
+                if (!timeSelect) {
+                    return;
+                }
+
+                const normalizedDay = selectedDayCode || (daySelect ? daySelect.value : '');
+                if (!normalizedDay) {
+                    timeSelect.innerHTML = '<option value="">ابتدا روز هفته را انتخاب کنید</option>';
+                    timeSelect.disabled = true;
+                    if (messageEl) {
+                        messageEl.textContent = 'ابتدا روز هفته را انتخاب کنید.';
+                        messageEl.classList.remove('hidden');
+                        messageEl.classList.remove('text-red-600', 'text-green-600');
+                        messageEl.classList.add('text-gray-500');
+                    }
+                    return;
+                }
+
+                const workingHours = getAdvisorWorkingHours(course.advisorId).filter(
+                    slot => slot && slot.day_of_week === normalizedDay,
+                );
+
+                if (!workingHours.length) {
+                    timeSelect.innerHTML = '<option value="">بازه‌ای برای این روز ثبت نشده است</option>';
+                    timeSelect.disabled = true;
+                    if (messageEl) {
+                        messageEl.textContent = 'برای این روز بازه‌ای ثبت نشده است. ابتدا در بخش مدیریت مشاور بازه جدید ثبت کنید.';
+                        messageEl.classList.remove('hidden');
+                        messageEl.classList.add('text-red-600');
+                        messageEl.classList.remove('text-green-600', 'text-gray-500');
+                    }
+                    return;
+                }
+
+                const currentTime = course.startTimeLabel || course.time || '';
+                const selectedTime = timeSelect.value || currentTime;
+
+                const optionParts = workingHours.map(slot => {
+                    const slotStart = slot.start_time || '';
+                    const slotEnd = slot.end_time || '';
+                    const isCurrentSlot = slot.day_of_week === (course.dayCode || '')
+                        && slot.start_time === currentTime;
+                    const rawRemaining = Number(slot.remaining_capacity ?? 0);
+                    const adjustedRemaining = Math.max(rawRemaining + (isCurrentSlot ? 1 : 0), 0);
+                    const capacityLabel = adjustedRemaining > 0
+                        ? `ظرفیت باقی‌مانده: ${formatCount(adjustedRemaining)}`
+                        : 'ظرفیت تکمیل است';
+                    const isSelected = selectedTime && selectedTime === slot.start_time;
+                    return `<option value="${slotStart}" data-remaining="${adjustedRemaining}" ${isCurrentSlot ? 'data-current-slot="true"' : ''} ${isSelected ? 'selected' : ''}>${escapeHtml(`${slotStart} تا ${slotEnd}`)} • ${escapeHtml(capacityLabel)}</option>`;
+                });
+
+                timeSelect.innerHTML = optionParts.join('');
+                timeSelect.disabled = false;
+                if (!timeSelect.value && timeSelect.options.length) {
+                    timeSelect.selectedIndex = 0;
+                }
+
+                updateScheduleSlotMessage(formEl, course);
+            }
+
+            function updateScheduleSlotMessage(formEl, course) {
+                if (!formEl) {
+                    return;
+                }
+                const messageEl = formEl.querySelector('#course-schedule-slot-message');
+                if (!messageEl) {
+                    return;
+                }
+                const daySelect = formEl.querySelector('select[name="day_of_week"]');
+                const timeSelect = formEl.querySelector('select[name="start_time"]');
+                const selectedDay = daySelect ? daySelect.value : '';
+
+                if (!selectedDay) {
+                    messageEl.textContent = 'ابتدا روز هفته را انتخاب کنید.';
+                    messageEl.classList.remove('hidden');
+                    messageEl.classList.remove('text-red-600', 'text-green-600');
+                    messageEl.classList.add('text-gray-500');
+                    return;
+                }
+
+                const selectedTime = timeSelect ? timeSelect.value : '';
+                if (!selectedTime) {
+                    messageEl.textContent = 'بازه زمانی مورد نظر را انتخاب کنید.';
+                    messageEl.classList.remove('hidden');
+                    messageEl.classList.remove('text-red-600', 'text-green-600');
+                    messageEl.classList.add('text-gray-500');
+                    return;
+                }
+
+                const workingHours = getAdvisorWorkingHours(course.advisorId);
+                const slot = workingHours.find(item => item && item.day_of_week === selectedDay && item.start_time === selectedTime);
+                if (!slot) {
+                    messageEl.textContent = 'بازه انتخاب‌شده برای این مشاور یافت نشد.';
+                    messageEl.classList.remove('hidden');
+                    messageEl.classList.add('text-red-600');
+                    messageEl.classList.remove('text-green-600', 'text-gray-500');
+                    return;
+                }
+
+                const isCurrentSlot = slot.day_of_week === (course.dayCode || '')
+                    && slot.start_time === (course.startTimeLabel || course.time || '');
+                const rawRemaining = Number(slot.remaining_capacity ?? 0);
+                const remaining = Math.max(rawRemaining + (isCurrentSlot ? 1 : 0), 0);
+                const rawAssigned = Number(slot.assigned_count ?? 0);
+                const assigned = Math.max(rawAssigned - (isCurrentSlot ? 1 : 0), 0);
+                const maxStudents = Number(slot.max_students ?? 0);
+
+                const infoParts = [
+                    `ظرفیت کل: ${formatCount(maxStudents)}`,
+                    `رزرو شده: ${formatCount(assigned)}`,
+                ];
+
+                if (remaining > 0) {
+                    infoParts.push(`ظرفیت آزاد: ${formatCount(remaining)}`);
+                    messageEl.classList.add('text-green-600');
+                    messageEl.classList.remove('text-red-600', 'text-gray-500');
+                } else {
+                    infoParts.push('ظرفیت آزاد: ۰');
+                    messageEl.classList.add('text-red-600');
+                    messageEl.classList.remove('text-green-600', 'text-gray-500');
+                }
+
+                messageEl.textContent = infoParts.join(' • ');
+                messageEl.classList.remove('hidden');
+            }
+
+            async function submitCourseSchedule(courseId, formEl) {
+                if (!courseId || !formEl) {
+                    return;
+                }
+                const daySelect = formEl.querySelector('select[name="day_of_week"]');
+                const timeSelect = formEl.querySelector('select[name="start_time"]');
+                const startHidden = formEl.querySelector('input[name="start_date"]');
+                const feedbackEl = formEl.querySelector('#course-schedule-feedback');
+                const submitBtn = formEl.querySelector('button[type="submit"]');
+
+                if (feedbackEl) {
+                    feedbackEl.textContent = '';
+                    feedbackEl.classList.add('hidden');
+                    feedbackEl.classList.remove('text-red-600', 'text-green-600');
+                }
+
+                const payload = {
+                    day_of_week: daySelect ? daySelect.value : '',
+                    start_time: timeSelect ? timeSelect.value : '',
+                    start_date: startHidden ? startHidden.value : '',
+                };
+
+                if (!payload.day_of_week || !payload.start_time || !payload.start_date) {
+                    const message = 'لطفاً روز، ساعت و تاریخ جدید را انتخاب کنید.';
+                    if (feedbackEl) {
+                        feedbackEl.textContent = message;
+                        feedbackEl.classList.remove('hidden');
+                        feedbackEl.classList.add('text-red-600');
+                    }
+                    showToast(message, 'error');
+                    return;
+                }
+
+                if (timeSelect && timeSelect.selectedOptions.length) {
+                    const selectedOption = timeSelect.selectedOptions[0];
+                    const remaining = Number(selectedOption.dataset.remaining || '0');
+                    const isCurrentSlot = selectedOption.dataset.currentSlot === 'true';
+                    if (!isCurrentSlot && remaining <= 0) {
+                        const message = 'ظرفیت این بازه برای مشاور تکمیل است. لطفاً بازه دیگری را انتخاب کنید.';
+                        if (feedbackEl) {
+                            feedbackEl.textContent = message;
+                            feedbackEl.classList.remove('hidden');
+                            feedbackEl.classList.add('text-red-600');
+                        }
+                        showToast(message, 'error');
+                        return;
+                    }
+                }
+
+                if (submitBtn) {
+                    submitBtn.disabled = true;
+                    submitBtn.dataset.originalText = submitBtn.textContent;
+                    submitBtn.textContent = 'در حال ذخیره...';
+                }
+
+                try {
+                    const response = await fetch(`/courses/${courseId}/`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken,
+                        },
+                        body: JSON.stringify(payload),
+                    });
+
+                    if (!response.ok) {
+                        let errorMessage = 'به‌روزرسانی زمان‌بندی با خطا مواجه شد.';
+                        try {
+                            const errorData = await response.json();
+                            if (errorData) {
+                                const detail = errorData.detail || errorData.message;
+                                if (detail) {
+                                    errorMessage = detail;
+                                }
+                            }
+                        } catch (parseError) {
+                            // نادیده گرفتن خطای پارس
+                        }
+                        throw new Error(errorMessage);
+                    }
+
+                    showToast('زمان‌بندی دوره با موفقیت به‌روزرسانی شد.', 'success');
+                    if (feedbackEl) {
+                        feedbackEl.textContent = 'زمان‌بندی دوره به‌روزرسانی شد.';
+                        feedbackEl.classList.remove('hidden');
+                        feedbackEl.classList.add('text-green-600');
+                    }
+
+                    if (CURRENT_USER.isStaff) {
+                        await getAdminData(true);
+                    }
+                    await refreshCourse(courseId, { reRenderModal: true });
+                } catch (error) {
+                    console.error('Error updating course schedule:', error);
+                    const message = error.message || 'به‌روزرسانی زمان‌بندی با خطا مواجه شد.';
+                    if (feedbackEl) {
+                        feedbackEl.textContent = message;
+                        feedbackEl.classList.remove('hidden');
+                        feedbackEl.classList.add('text-red-600');
+                    }
+                    showToast(message, 'error');
+                } finally {
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        if (submitBtn.dataset.originalText) {
+                            submitBtn.textContent = submitBtn.dataset.originalText;
+                            delete submitBtn.dataset.originalText;
+                        }
+                    }
+                }
+            }
 
             function updateCourseInState(course) {
                 if (!course || typeof course.id === 'undefined') {
@@ -1672,6 +1986,55 @@
                 } finally {
                     if (checkboxEl) {
                         checkboxEl.disabled = false;
+                    }
+                }
+            }
+
+            async function uploadSessionPlan(sessionId, file, courseId, inputEl) {
+                if (!sessionId || !file) {
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('plan_file', file);
+
+                try {
+                    const response = await fetch(`/sessions/${sessionId}/upload-plan/`, {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': csrftoken },
+                        body: formData,
+                    });
+
+                    if (!response.ok) {
+                        let message = 'بارگذاری برنامه با خطا مواجه شد.';
+                        try {
+                            const errorPayload = await response.json();
+                            if (errorPayload) {
+                                if (typeof errorPayload.detail === 'string') {
+                                    message = errorPayload.detail;
+                                } else {
+                                    const values = Object.values(errorPayload)
+                                        .flat()
+                                        .filter(Boolean);
+                                    if (values.length) {
+                                        message = values.join('، ');
+                                    }
+                                }
+                            }
+                        } catch (parseError) {
+                            // ignore parse error
+                        }
+                        throw new Error(message);
+                    }
+
+                    showToast('برنامه جلسه با موفقیت بارگذاری شد.', 'success');
+                    await refreshCourse(courseId, { reRenderModal: true });
+                } catch (error) {
+                    console.error('Error uploading session plan:', error);
+                    showToast(error.message || 'بارگذاری برنامه با خطا مواجه شد.', 'error');
+                } finally {
+                    if (inputEl) {
+                        inputEl.value = '';
                     }
                 }
             }
@@ -1800,6 +2163,46 @@
                     });
                 }
 
+                const scheduleForm = modalContentContainer.querySelector('#course-schedule-form');
+                if (scheduleForm) {
+                    const daySelect = scheduleForm.querySelector('select[name="day_of_week"]');
+                    const timeSelect = scheduleForm.querySelector('select[name="start_time"]');
+                    const startDisplay = scheduleForm.querySelector('#course-schedule-date-display');
+                    const startHidden = scheduleForm.querySelector('#course-schedule-date-hidden');
+
+                    if (startDisplay && startHidden) {
+                        setupJalaliDatePicker(startDisplay, startHidden);
+                        if (course.startDate) {
+                            startHidden.value = course.startDate;
+                            try {
+                                startDisplay.value = formatToJalaliShort(course.startDate);
+                            } catch (error) {
+                                startDisplay.value = course.startDateJalali || '';
+                            }
+                        }
+                    }
+
+                    const initialDay = daySelect ? daySelect.value : course.dayCode;
+                    populateScheduleTimeOptions(scheduleForm, course, initialDay);
+
+                    if (daySelect) {
+                        daySelect.addEventListener('change', () => {
+                            populateScheduleTimeOptions(scheduleForm, course, daySelect.value);
+                        });
+                    }
+
+                    if (timeSelect) {
+                        timeSelect.addEventListener('change', () => {
+                            updateScheduleSlotMessage(scheduleForm, course);
+                        });
+                    }
+
+                    scheduleForm.addEventListener('submit', (event) => {
+                        event.preventDefault();
+                        submitCourseSchedule(course.id, scheduleForm);
+                    });
+                }
+
                 const sessionToggles = modalContentContainer.querySelectorAll('[data-session-toggle]');
                 sessionToggles.forEach(toggle => {
                     toggle.addEventListener('change', (event) => {
@@ -1807,6 +2210,31 @@
                         const sessionId = Number(input.dataset.sessionId);
                         input.disabled = true;
                         handleSessionToggle(sessionId, input.checked, input, course.id);
+                    });
+                });
+
+                const planInputs = modalContentContainer.querySelectorAll('[data-session-plan-input]');
+                planInputs.forEach(input => {
+                    input.addEventListener('change', (event) => {
+                        const target = event.target;
+                        const sessionId = Number(target.dataset.sessionId);
+                        const file = target.files && target.files[0];
+                        if (file && sessionId) {
+                            uploadSessionPlan(sessionId, file, course.id, target);
+                        } else {
+                            target.value = '';
+                        }
+                    });
+                });
+
+                const planTriggers = modalContentContainer.querySelectorAll('[data-session-plan-trigger]');
+                planTriggers.forEach(button => {
+                    button.addEventListener('click', () => {
+                        const sessionId = Number(button.dataset.sessionId);
+                        const targetInput = modalContentContainer.querySelector(`[data-session-plan-input][data-session-id="${sessionId}"]`);
+                        if (targetInput) {
+                            targetInput.click();
+                        }
                     });
                 });
             }
@@ -1829,7 +2257,9 @@
                 }
 
                 const canToggleSessions = currentRole === 'advisor';
+                const canReschedule = CURRENT_USER.isStaff && currentRole === 'admin';
                 const canEditClassLink = currentRole === 'admin' || currentRole === 'advisor';
+                const canManageSessionPlans = (currentRole === 'advisor') || (CURRENT_USER.isStaff && currentRole === 'admin');
                 const sessions = Array.isArray(course.sessions) ? course.sessions : [];
                 const comments = Array.isArray(course.comments) ? course.comments : [];
                 const attachments = Array.isArray(course.attachments) ? course.attachments : [];
@@ -1849,14 +2279,61 @@
                                 </label>
                             `
                             : `<span class="text-xs ${statusClass}">${statusLabel}</span>`;
-                        return `
-                            <div class="flex items-center justify-between bg-indigo-50 rounded-lg p-3" data-session-id="${session.id}">
-                                <div>
-                                    <p class="font-semibold text-gray-800">جلسه ${sessionNumber}</p>
-                                    <p class="text-xs text-gray-500">${sessionDate}</p>
+
+                        const planPrimaryHtml = session.planFile
+                            ? `
+                                <a href="${escapeHtml(session.planFile)}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-700">
+                                    <i class="fas fa-paperclip"></i>
+                                    <span>${escapeHtml(session.planFileName || 'برنامه ثبت‌شده')}</span>
+                                </a>
+                            `
+                            : `
+                                <span class="inline-flex items-center gap-2 text-xs text-gray-400">
+                                    <i class="fas fa-paperclip"></i>
+                                    <span>برنامه‌ای بارگذاری نشده است.</span>
+                                </span>
+                            `;
+
+                        const metaParts = [];
+                        if (session.planUploaderName) {
+                            metaParts.push(`توسط ${session.planUploaderName}`);
+                        }
+                        if (session.planUploadedAtLabel) {
+                            metaParts.push(`آخرین بروزرسانی ${session.planUploadedAtLabel}`);
+                        }
+                        const planMetaHtml = metaParts.length
+                            ? `<span class="text-[11px] text-gray-400">${metaParts.map(part => escapeHtml(part)).join(' • ')}</span>`
+                            : '';
+
+                        const uploadControls = canManageSessionPlans
+                            ? `
+                                <div class="flex items-center gap-2">
+                                    <button type="button" class="px-3 py-1 text-xs bg-white border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 flex items-center gap-1" data-session-plan-trigger data-session-id="${session.id}">
+                                        <i class="fas fa-upload"></i>
+                                        <span>بارگذاری برنامه</span>
+                                    </button>
+                                    <input type="file" class="hidden" data-session-plan-input data-session-id="${session.id}">
                                 </div>
-                                <div class="flex items-center gap-3">
-                                    ${toggleHtml}
+                            `
+                            : '';
+
+                        return `
+                            <div class="space-y-3 bg-indigo-50 rounded-lg p-3" data-session-id="${session.id}">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="font-semibold text-gray-800">جلسه ${sessionNumber}</p>
+                                        <p class="text-xs text-gray-500">${sessionDate}</p>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        ${toggleHtml}
+                                    </div>
+                                </div>
+                                <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <div class="flex flex-col gap-1 text-xs text-gray-600">
+                                        ${planPrimaryHtml}
+                                        ${planMetaHtml}
+                                    </div>
+                                    ${uploadControls}
                                 </div>
                             </div>
                         `;
@@ -1920,6 +2397,49 @@
                     }).join('')
                     : '<p class="text-xs text-gray-400">فایلی ثبت نشده است.</p>';
 
+                const dayOptions = Object.entries(EN_TO_FA_DAYS).map(([code, label]) => `
+                    <option value="${code}" ${code === (course.dayCode || '') ? 'selected' : ''}>${label}</option>
+                `).join('');
+
+                const rescheduleSection = canReschedule ? `
+                    <section class="space-y-3">
+                        <h3 class="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base">
+                            <i class="fas fa-pen-to-square text-indigo-500"></i>
+                            ویرایش زمان‌بندی دوره
+                        </h3>
+                        <form id="course-schedule-form" class="space-y-4 bg-indigo-50 border border-indigo-100 rounded-lg p-3">
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700">روز هفته</label>
+                                    <select name="day_of_week" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                                        ${dayOptions}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-700">ساعت شروع</label>
+                                    <select name="start_time" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></select>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700">تاریخ اولین جلسه</label>
+                                <div class="mt-1 relative">
+                                    <input id="course-schedule-date-display" type="text" autocomplete="off" placeholder="انتخاب تاریخ (مثال: ۱۴۰۳/۰۱/۱۵)" class="block w-full border border-gray-300 rounded-md shadow-sm p-2 pr-10 focus:ring-2 focus:ring-indigo-500 focus:border-transparent">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                        <i class="far fa-calendar"></i>
+                                    </span>
+                                    <input id="course-schedule-date-hidden" type="hidden" name="start_date" value="${course.startDate ? escapeHtml(course.startDate) : ''}">
+                                </div>
+                                <p class="text-xs text-gray-400 mt-1">تاریخ انتخابی باید با روز هفته انتخاب‌شده هماهنگ باشد.</p>
+                            </div>
+                            <p id="course-schedule-slot-message" class="text-xs text-gray-500 hidden"></p>
+                            <p id="course-schedule-feedback" class="text-xs hidden"></p>
+                            <div class="flex justify-end">
+                                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">ذخیره تغییرات</button>
+                            </div>
+                        </form>
+                    </section>
+                ` : '';
+
                 const classLinkSection = canEditClassLink
                     ? `
                         <form id="course-class-link-form" class="space-y-3">
@@ -1977,6 +2497,7 @@
                                 <div class="space-y-2">${sessionItemsHtml}</div>
                                 ${canToggleSessions ? '<p class="text-xs text-gray-400">تنها مشاور قادر به تیک زدن جلسات است.</p>' : ''}
                             </section>
+                            ${rescheduleSection}
                             <section class="space-y-3">
                                 <h3 class="font-bold text-gray-800 flex items-center gap-2 text-sm sm:text-base"><i class="fas fa-link text-indigo-500"></i>لینک کلاس</h3>
                                 ${classLinkSection}
@@ -2393,6 +2914,143 @@
                     </section>
                 `;
             }
+            function renderChatThreadsSection(threads = []) {
+                const dataset = Array.isArray(threads) ? threads : [];
+
+                if (!dataset.length) {
+                    return `
+                        <section class="bg-white rounded-xl shadow-sm border border-gray-100">
+                            <div class="px-4 py-3 border-b border-gray-100">
+                                <h4 class="font-semibold text-gray-800">وضعیت گفتگوهای دانش‌آموزان</h4>
+                            </div>
+                            <p class="p-4 text-sm text-gray-500">گفتگویی در انتظار پاسخ یافت نشد.</p>
+                        </section>
+                    `;
+                }
+
+                const rows = dataset.map(thread => {
+                    const statusKey = thread?.status === 'answered' ? 'answered' : 'pending';
+                    const statusLabel = statusKey === 'answered' ? 'پاسخ داده شده' : 'در انتظار پاسخ';
+                    const statusClass = statusKey === 'answered' ? 'text-green-600' : 'text-amber-600';
+                    const advisorName = thread?.advisor_name ? escapeHtml(thread.advisor_name) : '---';
+                    const studentName = thread?.student_name ? escapeHtml(thread.student_name) : '---';
+                    const lastMessage = thread?.last_message ? escapeHtml(thread.last_message) : '---';
+                    const lastAt = thread?.last_message_at ? escapeHtml(formatToJalaliDateTime(thread.last_message_at)) : '---';
+                    const messageCount = formatCount(thread?.message_count || 0);
+                    return `
+                        <tr class="border-b border-gray-100 text-sm text-gray-700">
+                            <td class="px-4 py-2 whitespace-nowrap">${advisorName}</td>
+                            <td class="px-4 py-2 whitespace-nowrap">${studentName}</td>
+                            <td class="px-4 py-2">${lastMessage}</td>
+                            <td class="px-4 py-2 whitespace-nowrap">${lastAt}</td>
+                            <td class="px-4 py-2 text-center font-semibold">${messageCount}</td>
+                            <td class="px-4 py-2 text-center ${statusClass}">${statusLabel}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                return `
+                    <section class="bg-white rounded-xl shadow-sm border border-gray-100">
+                        <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                            <h4 class="font-semibold text-gray-800">وضعیت گفتگوهای دانش‌آموزان</h4>
+                            <span class="text-sm text-gray-500">${formatCount(dataset.length)} گفتگو</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-50 text-gray-600">
+                                    <tr>
+                                        <th class="px-4 py-2 text-right font-semibold">مشاور</th>
+                                        <th class="px-4 py-2 text-right font-semibold">دانش‌آموز</th>
+                                        <th class="px-4 py-2 text-right font-semibold">آخرین پیام</th>
+                                        <th class="px-4 py-2 text-right font-semibold">زمان آخرین پیام</th>
+                                        <th class="px-4 py-2 text-center font-semibold">تعداد پیام‌ها</th>
+                                        <th class="px-4 py-2 text-center font-semibold">وضعیت</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </section>
+                `;
+            }
+
+            function renderReportExportForm() {
+                const options = REPORT_EXPORT_OPTIONS.map(option => `
+                    <option value="${option.value}">${escapeHtml(option.label)}</option>
+                `).join('');
+
+                return `
+                    <section class="bg-white rounded-xl shadow-sm border border-gray-100">
+                        <div class="px-4 py-3 border-b border-gray-100">
+                            <h4 class="font-semibold text-gray-800">دانلود گزارش‌ها</h4>
+                        </div>
+                        <form id="report-download-form" class="p-4 grid gap-4 md:grid-cols-3">
+                            <div class="md:col-span-2 flex flex-col gap-2">
+                                <label for="report-download-section" class="text-sm font-medium text-gray-700">بخش گزارش</label>
+                                <select id="report-download-section" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    ${options}
+                                </select>
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <label for="report-download-format" class="text-sm font-medium text-gray-700">فرمت فایل</label>
+                                <select id="report-download-format" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                    <option value="csv">CSV</option>
+                                    <option value="xlsx">Excel</option>
+                                    <option value="json">JSON</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-3 flex justify-end">
+                                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition">دانلود</button>
+                            </div>
+                        </form>
+                        <p class="px-4 pb-4 text-xs text-gray-500">خروجی CSV و Excel برای گزینه «تمام گزارش‌ها» به صورت فایل فشرده ارائه می‌شود.</p>
+                    </section>
+                `;
+            }
+
+            function setupReportDownloadForm() {
+                const form = document.getElementById('report-download-form');
+                if (!form) {
+                    return;
+                }
+
+                form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    const sectionSelect = document.getElementById('report-download-section');
+                    const formatSelect = document.getElementById('report-download-format');
+                    const section = sectionSelect ? sectionSelect.value : 'all';
+                    const format = formatSelect ? formatSelect.value : 'csv';
+                    triggerReportDownload(section, format);
+                });
+            }
+
+            function triggerReportDownload(section, format) {
+                const filters = ensureReportFilters();
+                const params = new URLSearchParams();
+
+                if (filters.startDate) {
+                    params.append('start_date', filters.startDate);
+                }
+                if (filters.endDate) {
+                    params.append('end_date', filters.endDate);
+                }
+                if (filters.advisorId && filters.advisorId !== 'all') {
+                    params.append('advisor_id', filters.advisorId);
+                }
+
+                if (!section || section === 'all') {
+                    params.append('section', 'all');
+                } else {
+                    params.append('section', section);
+                }
+
+                if (format) {
+                    params.append('format', format);
+                }
+
+                const url = `/api/reports/export/?${params.toString()}`;
+                window.open(url, '_blank', 'noopener');
+            }
 
             function renderReportsData() {
                 const container = document.getElementById('reports-results');
@@ -2414,6 +3072,7 @@
                     advisor_non_renewal_counts: advisorNonRenewCounts = [],
                     student_distribution: studentDistribution = {},
                     advisor_chat_stats: advisorChatStats = [],
+                    chat_threads: chatThreads = [],
                 } = data;
 
                 const startLabel = filters?.start_date ? formatToJalaliShort(filters.start_date) : '---';
@@ -2427,6 +3086,7 @@
                         <span class="font-semibold">${endLabel}</span>
                     </div>
                 `;
+                const exportSection = renderReportExportForm();
 
                 const overdueSection = renderReportSessionSection({
                     title: 'کلاس‌های منقضی شده بدون تیک',
@@ -2450,16 +3110,22 @@
                     chatStats: advisorChatStats,
                 });
 
+                const chatThreadsSection = renderChatThreadsSection(chatThreads);
+
                 const distributionSection = renderDistributionSection(studentDistribution);
 
                 container.innerHTML = [
                     filterSummary,
+                    exportSection,
                     overdueSection,
                     completionsSection,
                     sessionsWithoutPlanSection,
+                    chatThreadsSection,
                     advisorStatsSection,
                     distributionSection,
                 ].join('');
+
+                setupReportDownloadForm();
             }
 
             function setupJalaliDatePicker(displayInput, hiddenInput, initialValue) {
@@ -3288,9 +3954,16 @@
                 }
             };
 
-            function openCourseDetailsModal(course) {
+            async function openCourseDetailsModal(course) {
                 if (!course) {
                     return;
+                }
+                if (CURRENT_USER.isStaff) {
+                    try {
+                        await getAdminData();
+                    } catch (error) {
+                        console.error('Error loading admin data before opening course details:', error);
+                    }
                 }
                 activeCourseId = course.id;
                 renderCourseDetails(course);
@@ -3501,7 +4174,7 @@
                 adminPanelContent.innerHTML = '<div class="loader" style="border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto;"></div>';
 
                 let data = null;
-                if (['add-student', 'assign-student'].includes(viewName)) {
+                if (['add-student', 'assign-student', 'manage-advisors'].includes(viewName)) {
                     data = await getAdminData();
                     if (!data) {
                         adminPanelContent.innerHTML = '<p class="text-red-500">امکان بارگذاری اطلاعات وجود ندارد.</p>';
@@ -3544,9 +4217,142 @@
                                         <input id="assign-start-date-hidden" type="hidden" name="start_date">
                                     </div>
                                 </div>
-                                <div><label class="block text-sm font-medium text-gray-700">ساعت جلسه</label><input name="start_time" type="time" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">ساعت جلسه</label>
+                                    <select name="start_time" id="assign-start-time-select" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"></select>
+                                    <p id="assign-slot-message" class="mt-2 text-xs text-gray-500"></p>
+                                </div>
                                 <div class="text-left"><button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg">تخصیص</button></div>
                             </form>`;
+                        break;
+                    }
+                    case 'manage-advisors': {
+                        const advisorList = Array.isArray(data.advisors) ? data.advisors.slice() : [];
+                        const hasAdvisors = advisorList.length > 0;
+                        const advisorSelectOptions = hasAdvisors
+                            ? ['<option value="">انتخاب مشاور</option>', ...advisorList.map(advisor => {
+                                const name = advisor?.full_name || advisor?.name || `مشاور ${advisor?.id || ''}`;
+                                return `<option value="${advisor.id}">${escapeHtml(name)}</option>`;
+                            })].join('')
+                            : '<option value="">مشاوری ثبت نشده است</option>';
+                        const dayOptions = daysOfWeek.map(d => `<option value="${d}">${d}</option>`).join('');
+                        const advisorCards = hasAdvisors
+                            ? advisorList.map(advisor => {
+                                const slots = Array.isArray(advisor.working_hours) ? advisor.working_hours : [];
+                                const phone = advisor?.phone_number ? `<span class="inline-flex items-center gap-1"><i class="fas fa-phone text-indigo-500"></i>${escapeHtml(advisor.phone_number)}</span>` : '';
+                                const telegram = advisor?.telegram_chat_id ? `<span class="inline-flex items-center gap-1"><i class="fab fa-telegram text-indigo-500"></i>${escapeHtml(advisor.telegram_chat_id)}</span>` : '';
+                                const metaParts = [phone, telegram].filter(Boolean);
+                                let slotContent = '<p class="text-sm text-gray-500">بازه‌ای ثبت نشده است.</p>';
+                                if (slots.length) {
+                                    const items = slots.map(slot => {
+                                        const assignedCount = Number(slot?.assigned_count || 0);
+                                        const maxCount = Number(slot?.max_students || 0);
+                                        const remaining = Number(slot?.remaining_capacity || 0);
+                                        const capacityClass = remaining > 0 ? 'text-green-600' : 'text-red-500';
+                                        const capacityText = remaining > 0 ? `ظرفیت باقی‌مانده: ${remaining}` : 'ظرفیت تکمیل است';
+                                        const removeDisabled = assignedCount > 0;
+                                        const removeButton = removeDisabled
+                                            ? '<button type="button" class="text-xs text-gray-400 cursor-not-allowed opacity-60" disabled>حذف</button>'
+                                            : `<button type="button" class="remove-availability-btn text-xs text-red-600 hover:text-red-700" data-availability-id="${slot.id}">حذف</button>`;
+                                        return `
+                                            <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 px-3 py-2 bg-gray-50">
+                                                <div class="text-sm text-gray-700 flex flex-wrap items-center gap-2">
+                                                    <span class="font-medium text-gray-800">${escapeHtml(slot.day_label || slot.day_of_week || '')}</span>
+                                                    <span class="text-gray-400">•</span>
+                                                    <span>${escapeHtml(slot.start_time || '')} تا ${escapeHtml(slot.end_time || '')}</span>
+                                                    <span class="text-gray-400">•</span>
+                                                    <span class="${capacityClass}">${escapeHtml(`ظرفیت: ${assignedCount}/${maxCount}`)}</span>
+                                                    <span class="text-gray-400">•</span>
+                                                    <span class="${capacityClass}">${escapeHtml(capacityText)}</span>
+                                                </div>
+                                                ${removeButton}
+                                            </li>
+                                        `;
+                                    }).join('');
+                                    slotContent = `<ul class="space-y-2">${items}</ul>`;
+                                }
+                                const meta = metaParts.length ? `<div class="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-2">${metaParts.join('<span class="text-gray-400">|</span>')}</div>` : '';
+                                const advisorName = advisor?.full_name || advisor?.name || 'مشاور';
+                                return `
+                                    <div class="border border-gray-200 rounded-xl p-4 space-y-3 bg-white shadow-sm">
+                                        <div>
+                                            <h4 class="text-base font-semibold text-gray-800">${escapeHtml(advisorName)}</h4>
+                                            ${meta}
+                                        </div>
+                                        <div>
+                                            <h5 class="text-sm font-semibold text-gray-700 mb-2">ساعات کاری</h5>
+                                            ${slotContent}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')
+                            : '<p class="text-sm text-gray-500">تا کنون مشاوری ثبت نشده است.</p>';
+
+                        content = `
+                            <div class="space-y-6">
+                                <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-4">
+                                    <h3 class="text-lg font-bold text-gray-800">افزودن مشاور جدید</h3>
+                                    <form id="create-advisor-form" class="grid gap-4 md:grid-cols-2">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">نام</label>
+                                            <input name="first_name" type="text" required autocomplete="off" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">نام خانوادگی</label>
+                                            <input name="last_name" type="text" required autocomplete="off" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">شماره موبایل</label>
+                                            <input name="phone_number" type="text" required autocomplete="off" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">ایمیل (اختیاری)</label>
+                                            <input name="email" type="email" autocomplete="off" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label class="block text-sm font-medium text-gray-700">شناسه تلگرام (اختیاری)</label>
+                                            <input name="telegram_chat_id" type="text" autocomplete="off" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                                        </div>
+                                        <div class="md:col-span-2 text-left">
+                                            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">ثبت مشاور</button>
+                                        </div>
+                                    </form>
+                                </section>
+                                <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-4">
+                                    <h3 class="text-lg font-bold text-gray-800">تعریف بازه کاری مشاور</h3>
+                                    <form id="add-availability-form" class="grid gap-4 md:grid-cols-2">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">مشاور</label>
+                                            <select name="advisor_id" id="availability-advisor-select" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" ${hasAdvisors ? '' : 'disabled'}>${advisorSelectOptions}</select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">روز</label>
+                                            <select name="day_of_week" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" ${hasAdvisors ? '' : 'disabled'}>${dayOptions}</select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">ساعت شروع</label>
+                                            <input name="start_time" type="time" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" ${hasAdvisors ? '' : 'disabled'}>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">ساعت پایان</label>
+                                            <input name="end_time" type="time" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" ${hasAdvisors ? '' : 'disabled'}>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700">ظرفیت دانش‌آموز</label>
+                                            <input name="max_students" type="number" min="1" value="1" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" ${hasAdvisors ? '' : 'disabled'}>
+                                        </div>
+                                        <div class="md:col-span-2 text-left">
+                                            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700" ${hasAdvisors ? '' : 'disabled'}>ثبت بازه</button>
+                                        </div>
+                                    </form>
+                                    ${hasAdvisors ? '' : '<p class="text-xs text-gray-500">برای تعریف بازه کاری ابتدا مشاور ایجاد کنید.</p>'}
+                                </section>
+                                <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-4">
+                                    <h3 class="text-lg font-bold text-gray-800">لیست مشاوران و ساعات کاری</h3>
+                                    ${advisorCards}
+                                </section>
+                            </div>
+                        `;
                         break;
                     }
                     case 'financials': {
@@ -3764,8 +4570,89 @@
                     setupJalaliDatePicker(assignStartDisplay, assignStartHidden);
                 }
                 if (assignStudentForm) {
+                    const assignAdvisorSelect = assignStudentForm.querySelector('select[name="advisor_id"]');
+                    const assignDaySelect = assignStudentForm.querySelector('select[name="day_of_week"]');
+                    const assignTimeSelect = document.getElementById('assign-start-time-select');
+                    const assignSlotMessage = document.getElementById('assign-slot-message');
+                    const assignSubmitBtn = assignStudentForm.querySelector('button[type="submit"]');
+
+                    const updateAssignSlotOptions = () => {
+                        if (!assignTimeSelect) {
+                            return;
+                        }
+                        const advisorId = Number(assignAdvisorSelect?.value || '');
+                        const selectedDay = assignDaySelect?.value || '';
+                        const dayCode = selectedDay ? (FA_TO_EN_DAYS[selectedDay] || selectedDay) : '';
+                        const advisorInfo = Array.isArray(data?.advisors)
+                            ? data.advisors.find(item => Number(item?.id) === advisorId)
+                            : null;
+                        const slots = advisorInfo && Array.isArray(advisorInfo.working_hours)
+                            ? advisorInfo.working_hours.filter(slot => slot.day_of_week === dayCode)
+                            : [];
+                        const availableSlots = slots.filter(slot => Number(slot.remaining_capacity || 0) > 0);
+
+                        assignTimeSelect.innerHTML = '';
+
+                        if (!advisorId || !dayCode) {
+                            assignTimeSelect.disabled = true;
+                            if (assignSubmitBtn) assignSubmitBtn.disabled = true;
+                            if (assignSlotMessage) assignSlotMessage.textContent = 'لطفاً مشاور و روز را انتخاب کنید.';
+                            return;
+                        }
+
+                        if (!slots.length) {
+                            assignTimeSelect.disabled = true;
+                            if (assignSubmitBtn) assignSubmitBtn.disabled = true;
+                            if (assignSlotMessage) assignSlotMessage.textContent = 'برای این روز بازه فعالی ثبت نشده است.';
+                            return;
+                        }
+
+                        if (!availableSlots.length) {
+                            assignTimeSelect.disabled = true;
+                            if (assignSubmitBtn) assignSubmitBtn.disabled = true;
+                            if (assignSlotMessage) assignSlotMessage.textContent = 'ظرفیت بازه‌های این روز تکمیل شده است.';
+                            return;
+                        }
+
+                        availableSlots.forEach(slot => {
+                            const option = document.createElement('option');
+                            const startLabel = slot.start_time || '';
+                            const endLabel = slot.end_time || '';
+                            const remaining = Number(slot.remaining_capacity || 0);
+                            option.value = startLabel;
+                            option.textContent = `${startLabel} تا ${endLabel} (ظرفیت باقی‌مانده: ${remaining})`;
+                            assignTimeSelect.appendChild(option);
+                        });
+
+                        assignTimeSelect.disabled = false;
+                        if (assignSubmitBtn) assignSubmitBtn.disabled = false;
+                        if (assignSlotMessage) assignSlotMessage.textContent = '';
+                    };
+
+                    if (assignAdvisorSelect) {
+                        assignAdvisorSelect.addEventListener('change', updateAssignSlotOptions);
+                    }
+                    if (assignDaySelect) {
+                        assignDaySelect.addEventListener('change', updateAssignSlotOptions);
+                    }
+
+                    updateAssignSlotOptions();
                     assignStudentForm.addEventListener('submit', handleAssignStudent);
                 }
+
+                const createAdvisorForm = document.getElementById('create-advisor-form');
+                if (createAdvisorForm) {
+                    createAdvisorForm.addEventListener('submit', handleCreateAdvisor);
+                }
+
+                const addAvailabilityForm = document.getElementById('add-availability-form');
+                if (addAvailabilityForm) {
+                    addAvailabilityForm.addEventListener('submit', handleAddAdvisorAvailability);
+                }
+
+                adminPanelContent.querySelectorAll('.remove-availability-btn').forEach(button => {
+                    button.addEventListener('click', handleRemoveAvailabilityClick);
+                });
                 const adminPaymentsTable = document.getElementById('admin-payments-table');
                 if (adminPaymentsTable) {
                     adminPaymentsTable.addEventListener('click', handleAdminPaymentAction);
@@ -3864,6 +4751,134 @@
                     }
                 } catch (error) {
                     alert('یک خطای شبکه رخ داد.');
+                }
+            }
+
+            async function handleCreateAdvisor(event) {
+                event.preventDefault();
+                const formData = new FormData(event.target);
+                const payload = Object.fromEntries(formData.entries());
+                payload.first_name = (payload.first_name || '').trim();
+                payload.last_name = (payload.last_name || '').trim();
+                payload.phone_number = (payload.phone_number || '').trim();
+                payload.email = (payload.email || '').trim();
+                if (!payload.first_name || !payload.last_name || !payload.phone_number) {
+                    showToast('لطفاً نام، نام خانوادگی و شماره موبایل مشاور را تکمیل کنید.', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/admin/advisors/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                        body: JSON.stringify(payload),
+                    });
+                    const result = await response.json();
+                    if (response.status === 201) {
+                        showToast('مشاور جدید با موفقیت ثبت شد.', 'success');
+                        event.target.reset();
+                        state.adminData = null;
+                        state.advisorsLoaded = false;
+                        await loadAdvisors();
+                        updateAdvisorFilterOptions();
+                        await renderAdminView('manage-advisors');
+                    } else {
+                        showToast(result.message || 'ثبت مشاور با خطا مواجه شد.', 'error');
+                    }
+                } catch (error) {
+                    showToast('ثبت مشاور با خطای شبکه مواجه شد.', 'error');
+                }
+            }
+
+            async function handleAddAdvisorAvailability(event) {
+                event.preventDefault();
+                const formData = new FormData(event.target);
+                const advisorId = formData.get('advisor_id');
+                if (!advisorId) {
+                    showToast('لطفاً مشاور را انتخاب کنید.', 'error');
+                    return;
+                }
+
+                const payload = {
+                    day_of_week: formData.get('day_of_week'),
+                    start_time: formData.get('start_time'),
+                    end_time: formData.get('end_time'),
+                    max_students: formData.get('max_students'),
+                };
+                payload.day_of_week = payload.day_of_week ? (FA_TO_EN_DAYS[payload.day_of_week] || payload.day_of_week) : '';
+
+                if (!payload.day_of_week) {
+                    showToast('لطفاً روز بازه کاری را انتخاب کنید.', 'error');
+                    return;
+                }
+
+                if (!payload.start_time || !payload.end_time) {
+                    showToast('لطفاً ساعات شروع و پایان را مشخص کنید.', 'error');
+                    return;
+                }
+
+                const maxStudentsValue = Number(payload.max_students || 1);
+                payload.max_students = Number.isFinite(maxStudentsValue) && maxStudentsValue > 0 ? maxStudentsValue : 1;
+
+                try {
+                    const response = await fetch(`/api/admin/advisors/${advisorId}/availability/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                        body: JSON.stringify(payload),
+                    });
+                    const result = await response.json();
+                    if (response.status === 201) {
+                        showToast('بازه کاری با موفقیت ثبت شد.', 'success');
+                        event.target.reset();
+                        state.adminData = null;
+                        await renderAdminView('manage-advisors');
+                    } else {
+                        showToast(result.message || 'ثبت بازه کاری با خطا مواجه شد.', 'error');
+                    }
+                } catch (error) {
+                    showToast('ثبت بازه کاری با خطای شبکه مواجه شد.', 'error');
+                }
+            }
+
+            async function handleRemoveAvailabilityClick(event) {
+                event.preventDefault();
+                const button = event.currentTarget;
+                const availabilityId = button?.dataset?.availabilityId;
+                if (!availabilityId) {
+                    return;
+                }
+
+                const confirmed = confirm('آیا از حذف این بازه کاری مطمئن هستید؟');
+                if (!confirmed) {
+                    return;
+                }
+
+                const originalContent = button.innerHTML;
+                button.disabled = true;
+                button.classList.add('opacity-60', 'cursor-not-allowed');
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+                try {
+                    const response = await fetch(`/api/admin/advisors/availability/${availabilityId}/`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRFToken': csrftoken },
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (response.ok) {
+                        showToast('بازه کاری با موفقیت حذف شد.', 'success');
+                        state.adminData = null;
+                        await renderAdminView('manage-advisors');
+                    } else {
+                        showToast(result.message || 'حذف بازه کاری با خطا مواجه شد.', 'error');
+                        button.disabled = false;
+                        button.classList.remove('opacity-60', 'cursor-not-allowed');
+                        button.innerHTML = originalContent;
+                    }
+                } catch (error) {
+                    showToast('حذف بازه کاری با خطای شبکه مواجه شد.', 'error');
+                    button.disabled = false;
+                    button.classList.remove('opacity-60', 'cursor-not-allowed');
+                    button.innerHTML = originalContent;
                 }
             }
 
@@ -4251,7 +5266,8 @@
                 updateAdvisorFilterOptions();
                 renderCalendar();
                 if (CURRENT_USER.isStaff) {
-                    loadPayments();
+                    await getAdminData();
+                    await loadPayments();
                 }
                 try {
                     await loadNotifications({ force: true });

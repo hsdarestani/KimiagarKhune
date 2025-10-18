@@ -10,9 +10,34 @@ class CommentSerializer(serializers.ModelSerializer):
         read_only_fields = ['author', 'created_at']
 
 class SessionSerializer(serializers.ModelSerializer):
+    plan_uploaded_by = serializers.SerializerMethodField()
+
     class Meta:
         model = Session
-        fields = ['id', 'session_number', 'date', 'is_completed', 'video_url']
+        fields = [
+            'id',
+            'session_number',
+            'date',
+            'is_completed',
+            'video_url',
+            'plan_file',
+            'plan_uploaded_at',
+            'plan_uploaded_by',
+        ]
+        read_only_fields = ['plan_file', 'plan_uploaded_at', 'plan_uploaded_by']
+
+    def get_plan_uploaded_by(self, obj):
+        user = getattr(obj, 'plan_uploaded_by', None)
+        if not user:
+            return None
+        profile = getattr(user, 'profile', None)
+        if profile:
+            return ProfileSerializer(profile, context=self.context).data
+        return {
+            'id': user.id,
+            'username': user.get_username(),
+            'full_name': user.get_full_name() or user.get_username(),
+        }
 
 class CourseSerializer(serializers.ModelSerializer):
     # Serializer های تو در تو برای نمایش کامل جزئیات

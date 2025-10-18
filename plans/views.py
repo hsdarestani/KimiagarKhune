@@ -8,15 +8,152 @@ import json, datetime
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Course, Session, Comment
 from .serializers import CourseSerializer, SessionSerializer, CommentSerializer
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 from django.contrib.auth.models import User
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import Count
+from management.models import Notification, NotificationRecipient
+from management.utils import send_sms_message, send_telegram_message
+
+
+DAY_LABELS = {code: label for code, label in Course.DAY_CHOICES}
+DAY_FA_TO_EN = {label: code for code, label in Course.DAY_CHOICES}
+DAY_ORDER = {code: index for index, (code, _label) in enumerate(Course.DAY_CHOICES)}
+PY_WEEKDAY_MAP = {
+    'Monday': 0,
+    'Tuesday': 1,
+    'Wednesday': 2,
+    'Thursday': 3,
+    'Friday': 4,
+    'Saturday': 5,
+    'Sunday': 6,
+}
+
+AVAILABILITY_ERROR_MESSAGES = {
+    'invalid_day': 'روز انتخاب‌شده معتبر نیست.',
+    'invalid_time': 'ساعت شروع یا پایان بازه معتبر نیست.',
+    'invalid_range': 'ساعت پایان باید بعد از ساعت شروع باشد.',
+    'invalid_capacity': 'ظرفیت باید عددی بزرگتر از صفر باشد.',
+    'duplicate': 'این بازه زمانی برای مشاور انتخاب‌شده قبلاً ثبت شده است.',
+}
+
+
+def normalize_day_code(value):
+    if not value:
+        return None
+    normalized = value.strip()
+    if normalized in DAY_LABELS:
+        return normalized
+    return DAY_FA_TO_EN.get(normalized, normalized)
+
+
+def parse_time_string(value):
+    if not value:
+        raise ValueError('Missing time value')
+    return datetime.datetime.strptime(value, '%H:%M').time()
+
+
+def serialize_advisors_with_schedule(advisors):
+    advisors = list(advisors)
+    advisor_ids = [advisor.id for advisor in advisors]
+
+    counts_map = {}
+    if advisor_ids:
+        course_counts = (
+            Course.objects.filter(advisor_id__in=advisor_ids, is_active=True)
+            .values('advisor_id', 'day_of_week', 'start_time')
+            .annotate(total=Count('id'))
+        )
+        counts_map = {
+            (entry['advisor_id'], entry['day_of_week'], entry['start_time']): entry['total']
+            for entry in course_counts
+        }
+
+    serialized = []
+    for advisor in advisors:
+        profile = getattr(advisor, 'profile', None)
+        working_hours = []
+        availabilities = getattr(advisor, 'availabilities', [])
+        sorted_slots = sorted(
+            availabilities.all() if hasattr(availabilities, 'all') else availabilities,
+            key=lambda slot: (DAY_ORDER.get(slot.day_of_week, 0), slot.start_time),
+        )
+        for slot in sorted_slots:
+            assigned_count = counts_map.get((advisor.id, slot.day_of_week, slot.start_time), 0)
+            remaining_capacity = max(slot.max_students - assigned_count, 0)
+            working_hours.append({
+                'id': slot.id,
+                'day_of_week': slot.day_of_week,
+                'day_label': DAY_LABELS.get(slot.day_of_week, slot.day_of_week),
+                'start_time': slot.start_time.strftime('%H:%M'),
+                'end_time': slot.end_time.strftime('%H:%M'),
+                'max_students': slot.max_students,
+                'assigned_count': assigned_count,
+                'remaining_capacity': remaining_capacity,
+            })
+
+        serialized.append({
+            'id': advisor.id,
+            'user_id': profile.user_id if profile and profile.user_id else None,
+            'name': profile.get_full_name() if profile else '',
+            'full_name': profile.get_full_name() if profile else '',
+            'phone_number': getattr(profile, 'phone_number', ''),
+            'telegram_chat_id': getattr(profile, 'telegram_chat_id', ''),
+            'working_hours': working_hours,
+        })
+
+    return serialized
+
+
+def create_advisor_availability_slot(advisor, payload):
+    day_code = normalize_day_code(payload.get('day_of_week'))
+    if not day_code or day_code not in DAY_LABELS:
+        raise ValueError('invalid_day')
+
+    try:
+        start_time = parse_time_string(payload.get('start_time'))
+        end_time = parse_time_string(payload.get('end_time'))
+    except ValueError as exc:
+        raise ValueError('invalid_time') from exc
+
+    if end_time <= start_time:
+        raise ValueError('invalid_range')
+
+    try:
+        max_students = int(payload.get('max_students') or 1)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('invalid_capacity') from exc
+
+    if max_students < 1:
+        raise ValueError('invalid_capacity')
+
+    availability = AdvisorAvailability.objects.create(
+        advisor=advisor,
+        day_of_week=day_code,
+        start_time=start_time,
+        end_time=end_time,
+        max_students=max_students,
+    )
+
+    assigned_count = Course.objects.filter(
+        advisor=advisor,
+        day_of_week=day_code,
+        start_time=start_time,
+        is_active=True,
+    ).count()
+
+    return availability, assigned_count
+
+
+def availability_error_message(code):
+    return AVAILABILITY_ERROR_MESSAGES.get(code, 'اطلاعات بازه زمانی معتبر نیست.')
 
 
 @login_required
@@ -62,7 +199,10 @@ def get_admin_panel_data(request):
         return JsonResponse({'error': 'Permission denied'}, status=403)
 
     students = Student.objects.select_related('profile').all()
-    advisors = Advisor.objects.select_related('profile').all()
+    advisors = (
+        Advisor.objects.select_related('profile')
+        .prefetch_related('availabilities')
+    )
     majors = Major.objects.all()
     grades = Grade.objects.all()
 
@@ -72,12 +212,7 @@ def get_admin_panel_data(request):
         'phone_number': s.profile.phone_number,
         'telegram_chat_id': getattr(s.profile, 'telegram_chat_id', ''),
     } for s in students]
-    advisors_data = [{
-        'id': a.id,
-        'name': f"{a.profile.first_name} {a.profile.last_name}",
-        'phone_number': a.profile.phone_number,
-        'telegram_chat_id': getattr(a.profile, 'telegram_chat_id', ''),
-    } for a in advisors]
+    advisors_data = serialize_advisors_with_schedule(advisors)
     majors_data = [{'id': m.id, 'name': m.name} for m in majors]
     grades_data = [{'id': g.id, 'name': g.name} for g in grades]
 
@@ -141,6 +276,157 @@ def add_student_view(request):
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
+@login_required
+@require_http_methods(["GET", "POST"])
+def admin_advisors_view(request):
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    if request.method == 'GET':
+        advisors = (
+            Advisor.objects.select_related('profile')
+            .prefetch_related('availabilities')
+        )
+        data = serialize_advisors_with_schedule(advisors)
+        return JsonResponse({'advisors': data})
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest('Invalid JSON.')
+
+    required_fields = ['first_name', 'last_name', 'phone_number']
+    if any(not str(payload.get(field, '')).strip() for field in required_fields):
+        return JsonResponse({
+            'status': 'error',
+            'message': 'لطفاً نام، نام خانوادگی و شماره موبایل مشاور را تکمیل کنید.',
+        }, status=400)
+
+    phone_number = str(payload.get('phone_number')).strip()
+
+    if User.objects.filter(username=phone_number).exists():
+        return JsonResponse({
+            'status': 'error',
+            'message': 'کاربری با این شماره موبایل از قبل وجود دارد.',
+        }, status=400)
+
+    first_name = str(payload.get('first_name')).strip()
+    last_name = str(payload.get('last_name')).strip()
+    email = payload.get('email')
+    telegram_chat_id = payload.get('telegram_chat_id') or None
+
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=phone_number,
+                password=User.objects.make_random_password(),
+            )
+            profile = Profile.objects.create(
+                user=user,
+                role='advisor',
+                first_name=first_name,
+                last_name=last_name,
+                phone_number=phone_number,
+                email=email.strip() if isinstance(email, str) else email,
+                telegram_chat_id=telegram_chat_id,
+            )
+            advisor = Advisor.objects.create(profile=profile)
+
+            for slot_payload in payload.get('working_hours') or []:
+                try:
+                    create_advisor_availability_slot(advisor, slot_payload)
+                except ValueError as exc:
+                    raise ValueError(str(exc))
+                except IntegrityError:
+                    raise ValueError('duplicate')
+    except ValueError as exc:
+        message = availability_error_message(str(exc))
+        return JsonResponse({'status': 'error', 'message': message}, status=400)
+    except IntegrityError:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'ثبت مشاور با خطا مواجه شد. لطفاً دوباره تلاش کنید.',
+        }, status=400)
+
+    serialized = serialize_advisors_with_schedule([advisor])
+    advisor_payload = serialized[0] if serialized else {}
+
+    return JsonResponse({
+        'status': 'success',
+        'advisor': advisor_payload,
+    }, status=201)
+
+
+@login_required
+@require_POST
+def admin_advisor_add_availability(request, advisor_id):
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    try:
+        advisor = Advisor.objects.select_related('profile').get(pk=advisor_id)
+    except Advisor.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'مشاور مورد نظر یافت نشد.'}, status=404)
+
+    try:
+        payload = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest('Invalid JSON.')
+
+    try:
+        availability, assigned_count = create_advisor_availability_slot(advisor, payload)
+    except ValueError as exc:
+        message = availability_error_message(str(exc))
+        return JsonResponse({'status': 'error', 'message': message}, status=400)
+    except IntegrityError:
+        message = availability_error_message('duplicate')
+        return JsonResponse({'status': 'error', 'message': message}, status=400)
+
+    remaining_capacity = max(availability.max_students - assigned_count, 0)
+
+    return JsonResponse({
+        'status': 'success',
+        'availability': {
+            'id': availability.id,
+            'day_of_week': availability.day_of_week,
+            'day_label': DAY_LABELS.get(availability.day_of_week, availability.day_of_week),
+            'start_time': availability.start_time.strftime('%H:%M'),
+            'end_time': availability.end_time.strftime('%H:%M'),
+            'max_students': availability.max_students,
+            'assigned_count': assigned_count,
+            'remaining_capacity': remaining_capacity,
+        },
+    }, status=201)
+
+
+@login_required
+@require_http_methods(["DELETE"])
+def admin_advisor_delete_availability(request, availability_id):
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    try:
+        availability = AdvisorAvailability.objects.select_related('advisor').get(pk=availability_id)
+    except AdvisorAvailability.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'بازه مورد نظر یافت نشد.'}, status=404)
+
+    active_assignments = Course.objects.filter(
+        advisor=availability.advisor,
+        day_of_week=availability.day_of_week,
+        start_time=availability.start_time,
+        is_active=True,
+    ).count()
+
+    if active_assignments:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'برای این بازه زمانی دانش‌آموز فعال ثبت شده است و امکان حذف وجود ندارد.',
+        }, status=400)
+
+    availability.delete()
+    return JsonResponse({'status': 'success'})
+
+
 @require_POST
 @login_required
 @transaction.atomic
@@ -163,6 +449,31 @@ def assign_student_view(request):
         advisor = Advisor.objects.get(pk=advisor_id)
         start_date = datetime.datetime.strptime(start_date_str, '%Y-%m-%d').date()
         start_time = datetime.datetime.strptime(start_time_str, '%H:%M').time()
+
+        availability = AdvisorAvailability.objects.filter(
+            advisor=advisor,
+            day_of_week=day_of_week,
+            start_time=start_time,
+        ).first()
+
+        if not availability:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'برای مشاور انتخاب‌شده در این روز ساعت فعالی ثبت نشده است.',
+            }, status=400)
+
+        existing_assignments = Course.objects.filter(
+            advisor=advisor,
+            day_of_week=day_of_week,
+            start_time=start_time,
+            is_active=True,
+        ).count()
+
+        if existing_assignments >= availability.max_students:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'ظرفیت این بازه زمانی برای مشاور انتخاب‌شده تکمیل است.',
+            }, status=400)
 
         course = Course.objects.create(
             student=student,
@@ -254,7 +565,11 @@ class CourseViewSet(viewsets.ModelViewSet):
     """
     API endpoint for Courses.
     """
-    queryset = Course.objects.select_related('student__profile', 'advisor__profile').prefetch_related('sessions', 'comments__author__profile').all()
+    queryset = (
+        Course.objects.select_related('student__profile', 'advisor__profile')
+        .prefetch_related('sessions', 'sessions__plan_uploaded_by__profile', 'comments__author__profile')
+        .all()
+    )
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrAdminOrAdvisor]
 
@@ -280,6 +595,98 @@ class CourseViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
 
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        data = request.data.copy()
+
+        schedule_fields = {'day_of_week', 'start_time', 'start_date'}
+        provided_schedule_fields = {
+            field for field in schedule_fields
+            if field in data and str(data.get(field, '')).strip() != ''
+        }
+
+        user = request.user
+
+        schedule_changed = False
+        normalized_day = None
+        parsed_start_time = None
+        parsed_start_date = None
+
+        if provided_schedule_fields:
+            if not user.is_staff:
+                raise PermissionDenied('تنها ادمین مجاز به تغییر زمان‌بندی دوره است.')
+
+            day_value = data.get('day_of_week', instance.day_of_week)
+            normalized_day = normalize_day_code(day_value)
+            if normalized_day not in DAY_LABELS:
+                return Response({'detail': 'روز انتخاب‌شده معتبر نیست.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            time_value = data.get('start_time', instance.start_time.strftime('%H:%M'))
+            try:
+                parsed_start_time = parse_time_string(time_value)
+            except ValueError:
+                return Response({'detail': 'ساعت انتخاب‌شده معتبر نیست.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            date_value = data.get('start_date') or instance.start_date
+            if isinstance(date_value, datetime.date):
+                parsed_start_date = date_value
+            else:
+                try:
+                    parsed_start_date = datetime.datetime.strptime(str(date_value), '%Y-%m-%d').date()
+                except (TypeError, ValueError):
+                    return Response({'detail': 'تاریخ انتخاب‌شده معتبر نیست.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            expected_weekday = PY_WEEKDAY_MAP.get(normalized_day)
+            if expected_weekday is not None and parsed_start_date.weekday() != expected_weekday:
+                return Response(
+                    {'detail': 'تاریخ انتخاب‌شده با روز هفته هم‌خوانی ندارد.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            availability = AdvisorAvailability.objects.filter(
+                advisor=instance.advisor,
+                day_of_week=normalized_day,
+                start_time=parsed_start_time,
+            ).first()
+
+            if not availability:
+                return Response(
+                    {'detail': 'برای مشاور بازه زمانی انتخاب‌شده ثبت نشده است.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            existing_assignments = Course.objects.filter(
+                advisor=instance.advisor,
+                day_of_week=normalized_day,
+                start_time=parsed_start_time,
+                is_active=True,
+            ).exclude(pk=instance.pk).count()
+
+            if existing_assignments >= availability.max_students:
+                return Response(
+                    {'detail': 'ظرفیت این بازه زمانی برای مشاور تکمیل است.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            data['day_of_week'] = normalized_day
+            data['start_time'] = parsed_start_time.strftime('%H:%M')
+            data['start_date'] = parsed_start_date.isoformat()
+            schedule_changed = True
+
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            instance._prefetched_objects_cache = {}
+
+        if schedule_changed:
+            instance.refresh_from_db()
+            self._synchronize_course_sessions(instance)
+
+        return Response(serializer.data)
+
     def perform_update(self, serializer):
         user = self.request.user
         role = getattr(getattr(user, 'profile', None), 'role', None)
@@ -287,13 +694,159 @@ class CourseViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('شما اجازه ویرایش این دوره را ندارید.')
         serializer.save()
 
+    def _synchronize_course_sessions(self, course):
+        if not course or not course.start_date:
+            return
+
+        base_date = course.start_date
+        sessions = course.sessions.order_by('session_number')
+        for session in sessions:
+            desired_date = base_date + datetime.timedelta(days=7 * (session.session_number - 1))
+            if session.date != desired_date:
+                Session.objects.filter(pk=session.pk).update(date=desired_date)
+
 class SessionViewSet(viewsets.ModelViewSet):
     """
     API endpoint for managing individual sessions within a course.
     """
-    queryset = Session.objects.all()
+    queryset = Session.objects.select_related('course', 'plan_uploaded_by__profile').all()
     serializer_class = SessionSerializer
     permission_classes = [permissions.IsAuthenticated, IsOwnerOrAdminOrAdvisor]
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
+
+    @action(detail=True, methods=['post'], url_path='upload-plan', parser_classes=[MultiPartParser, FormParser])
+    def upload_plan(self, request, pk=None):
+        session = self.get_object()
+        user = request.user
+        role = getattr(getattr(user, 'profile', None), 'role', None)
+
+        if not (user.is_staff or role == 'advisor'):
+            return Response(
+                {'detail': 'تنها ادمین یا مشاور مجاز به بارگذاری برنامه است.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        file_obj = request.FILES.get('plan_file') or request.FILES.get('file')
+        if not file_obj:
+            return Response(
+                {'plan_file': ['ارسال فایل برنامه الزامی است.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if session.plan_file:
+            session.plan_file.delete(save=False)
+
+        session.plan_file = file_obj
+        session.plan_uploaded_by = user
+        session.plan_uploaded_at = timezone.now()
+        session.save(update_fields=['plan_file', 'plan_uploaded_by', 'plan_uploaded_at'])
+
+        serializer = self.get_serializer(session)
+        return Response(serializer.data)
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        was_completed = instance.is_completed
+        course = instance.course
+        course_id = course.id if course else None
+
+        serializer.save()
+        instance.refresh_from_db()
+
+        if (
+            course_id
+            and not was_completed
+            and instance.is_completed
+            and instance.session_number == 4
+        ):
+            course_obj = (
+                Course.objects.select_related('student__profile__user', 'advisor__profile')
+                .filter(pk=course_id)
+                .first()
+            )
+            if (
+                course_obj
+                and not course_obj.payment_notification_sent
+                and not course_obj.sessions.filter(is_completed=False).exists()
+            ):
+                self._send_payment_notification(course_obj)
+
+    def _send_payment_notification(self, course):
+        student = getattr(course, 'student', None)
+        profile = getattr(student, 'profile', None) if student else None
+        user = getattr(profile, 'user', None) if profile else None
+        if not user:
+            return
+
+        student_name = profile.get_full_name() if profile else user.get_username()
+        advisor = getattr(course, 'advisor', None)
+        advisor_profile = getattr(advisor, 'profile', None) if advisor else None
+        advisor_name = advisor_profile.get_full_name() if advisor_profile else ''
+
+        message_parts = []
+        if student_name:
+            message_parts.append(f"دانش‌آموز گرامی {student_name}،")
+        else:
+            message_parts.append("دانش‌آموز گرامی،")
+
+        if advisor_name:
+            message_parts.append(f"دوره چهار جلسه‌ای شما با مشاور {advisor_name} به پایان رسیده است.")
+        else:
+            message_parts.append("دوره چهار جلسه‌ای شما به پایان رسیده است.")
+
+        message_parts.append(
+            "لطفاً جهت ثبت دوره بعدی و ادامه برنامه‌ریزی، پرداخت دوره جدید را انجام دهید تا پس از تایید، ثبت دوره توسط ادمین انجام شود."
+        )
+        message = ' '.join(message_parts)
+
+        notification = Notification.objects.create(
+            sender=self.request.user if self.request.user.is_authenticated else None,
+            message=message,
+            send_via_panel=True,
+            send_via_telegram=True,
+            send_via_sms=True,
+        )
+
+        telegram_sent = False
+        sms_sent = False
+        telegram_error = None
+        sms_error = None
+
+        if profile:
+            chat_id = getattr(profile, 'telegram_chat_id', None)
+            if chat_id:
+                try:
+                    send_telegram_message(chat_id, message)
+                    telegram_sent = True
+                except Exception as exc:  # noqa: BLE001
+                    telegram_error = str(exc)
+            else:
+                telegram_error = 'شناسه تلگرام ثبت نشده است.'
+
+            phone_number = getattr(profile, 'phone_number', None)
+            if phone_number:
+                try:
+                    send_sms_message(phone_number, message)
+                    sms_sent = True
+                except Exception as exc:  # noqa: BLE001
+                    sms_error = str(exc)
+            else:
+                sms_error = 'شماره موبایل در پروفایل موجود نیست.'
+        else:
+            telegram_error = 'پروفایل کاربر یافت نشد.'
+            sms_error = 'پروفایل کاربر یافت نشد.'
+
+        NotificationRecipient.objects.create(
+            notification=notification,
+            user=user,
+            telegram_sent=telegram_sent,
+            sms_sent=sms_sent,
+            telegram_error=telegram_error or None,
+            sms_error=sms_error or None,
+        )
+
+        Course.objects.filter(pk=course.pk).update(payment_notification_sent=True)
+        course.payment_notification_sent = True
 
 
 

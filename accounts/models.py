@@ -56,11 +56,47 @@ class Grade(models.Model):
 
     def __str__(self):
         return self.name
+WEEKDAY_CHOICES = [
+    ('Saturday', 'شنبه'),
+    ('Sunday', 'یکشنبه'),
+    ('Monday', 'دوشنبه'),
+    ('Tuesday', 'سه‌شنبه'),
+    ('Wednesday', 'چهارشنبه'),
+    ('Thursday', 'پنج‌شنبه'),
+    ('Friday', 'جمعه'),
+]
+
+
 class Advisor(models.Model):
-    profile = models.OneToOneField(Profile, on_delete=models.CASCADE)  
+    profile = models.OneToOneField(Profile, on_delete=models.CASCADE)
 
     def __str__(self):
         return f'{self.profile.first_name} {self.profile.last_name} - Advisor'
+
+
+class AdvisorAvailability(models.Model):
+    advisor = models.ForeignKey(
+        Advisor,
+        on_delete=models.CASCADE,
+        related_name='availabilities',
+        verbose_name='مشاور',
+    )
+    day_of_week = models.CharField(
+        max_length=10,
+        choices=WEEKDAY_CHOICES,
+        verbose_name='روز هفته',
+    )
+    start_time = models.TimeField(verbose_name='ساعت شروع')
+    end_time = models.TimeField(verbose_name='ساعت پایان')
+    max_students = models.PositiveSmallIntegerField(default=1, verbose_name='حداکثر دانش‌آموز')
+
+    class Meta:
+        unique_together = ('advisor', 'day_of_week', 'start_time')
+        ordering = ['advisor_id', 'day_of_week', 'start_time']
+
+    def __str__(self):
+        day_display = dict(WEEKDAY_CHOICES).get(self.day_of_week, self.day_of_week)
+        return f"{self.advisor} - {day_display} {self.start_time} تا {self.end_time}"
 
 class Student(models.Model):
     profile = models.OneToOneField(Profile, on_delete=models.CASCADE)

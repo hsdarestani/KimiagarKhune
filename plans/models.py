@@ -24,6 +24,10 @@ class Course(models.Model):
     is_active = models.BooleanField(default=True, verbose_name="دوره فعال است؟")
     class_link = models.URLField(blank=True, null=True, verbose_name="لینک کلاس")
     created_at = models.DateTimeField(auto_now_add=True)
+    payment_notification_sent = models.BooleanField(
+        default=False,
+        verbose_name="اطلاع‌رسانی پرداخت ارسال شده؟",
+    )
 
     def __str__(self):
         return f"دوره {self.student} با {self.advisor} - {self.get_day_of_week_display()} ها"
@@ -37,6 +41,21 @@ class Session(models.Model):
     date = models.DateField(verbose_name="تاریخ جلسه")
     is_completed = models.BooleanField(default=False, verbose_name="تیک خورده؟")
     video_url = models.URLField(blank=True, null=True, verbose_name="لینک فیلم جلسه")
+    plan_file = models.FileField(
+        upload_to='session_plans/',
+        blank=True,
+        null=True,
+        verbose_name="برنامه هفتگی جلسه",
+    )
+    plan_uploaded_at = models.DateTimeField(blank=True, null=True, verbose_name="تاریخ بارگذاری برنامه")
+    plan_uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='uploaded_session_plans',
+        verbose_name="بارگذاری توسط",
+    )
     
     class Meta:
         unique_together = ('course', 'session_number')

@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (AdminReportSummaryView, AdvisorListView,
+from .views import (AdminReportExportView, AdminReportSummaryView, AdvisorListView,
                     ConversationListView, CurrentUserProfileView, MessageListView,
                     NotificationInboxView, NotificationMarkReadView,
                     NotificationRecipientListView, NotificationSendView,
@@ -21,6 +21,7 @@ urlpatterns = [
     path('notifications/mark-read/', NotificationMarkReadView.as_view(), name='notification-mark-read'),
     path('advisors/', AdvisorListView.as_view(), name='advisor-list'),
     path('reports/summary/', AdminReportSummaryView.as_view(), name='reports-summary'),
+    path('reports/export/', AdminReportExportView.as_view(), name='reports-export'),
     path('profile/', CurrentUserProfileView.as_view(), name='current-user-profile'),
 
     # URL های مربوط به چت
