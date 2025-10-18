@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from rest_framework import viewsets, permissions
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Course, Session, Comment
@@ -278,6 +279,13 @@ class CourseViewSet(viewsets.ModelViewSet):
             serializer.save(course=course, author=request.user)
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        role = getattr(getattr(user, 'profile', None), 'role', None)
+        if not user.is_staff and role != 'advisor':
+            raise PermissionDenied('شما اجازه ویرایش این دوره را ندارید.')
+        serializer.save()
 
 class SessionViewSet(viewsets.ModelViewSet):
     """

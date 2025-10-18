@@ -42,3 +42,56 @@ class ChatMessage(models.Model):
     class Meta:
         ordering = ['timestamp']
 
+
+class Notification(models.Model):
+    """Announcement created by staff for platform users."""
+
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='sent_notifications',
+        verbose_name='فرستنده',
+    )
+    message = models.TextField(verbose_name='متن اعلان')
+    send_via_panel = models.BooleanField(default=True, verbose_name='نمایش در پنل')
+    send_via_telegram = models.BooleanField(default=False, verbose_name='ارسال تلگرام')
+    send_via_sms = models.BooleanField(default=False, verbose_name='ارسال پیامک')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        preview = (self.message or '').strip()
+        if len(preview) > 48:
+            preview = f"{preview[:45]}..."
+        return f"اعلان {self.id}: {preview}" if preview else f"اعلان {self.id}"
+
+
+class NotificationRecipient(models.Model):
+    """Recipient delivery state for a notification."""
+
+    notification = models.ForeignKey(
+        Notification,
+        on_delete=models.CASCADE,
+        related_name='recipients',
+        verbose_name='اعلان',
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='received_notifications',
+        verbose_name='کاربر',
+    )
+    is_read = models.BooleanField(default=False, verbose_name='خوانده شده')
+    telegram_sent = models.BooleanField(default=False, verbose_name='تلگرام ارسال شد')
+    sms_sent = models.BooleanField(default=False, verbose_name='پیامک ارسال شد')
+    telegram_error = models.TextField(blank=True, null=True, verbose_name='خطای تلگرام')
+    sms_error = models.TextField(blank=True, null=True, verbose_name='خطای پیامک')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('notification', 'user')
+
+    def __str__(self):
+        return f"اعلان {self.notification_id} برای {self.user_id}"
+
