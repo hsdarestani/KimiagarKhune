@@ -525,7 +525,11 @@
                 if (advisorFilter.disabled) {
                     advisorSelectInstance.disable();
                 }
-            }
+                chatVoiceBtn.classList.remove('bg-red-500', 'text-white', 'animate-pulse', 'border-red-200', 'hover:bg-red-500');
+                chatVoiceBtn.classList.add('border-amber-100', 'text-amber-600', 'hover:bg-amber-50');
+                chatVoiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+                chatVoiceBtn.title = 'ارسال پیام صوتی';
+            };
 
             const toastContainer = document.getElementById('toast-container');
             const showToast = (message, type = 'info') => {
