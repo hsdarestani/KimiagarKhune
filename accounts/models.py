@@ -120,8 +120,14 @@ class LoginOTP(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['phone_number']),
-            models.Index(fields=['expires_at']),
+            models.Index(
+                fields=['phone_number'],
+                name='accounts_lo_phone_n_97a5e1_idx',
+            ),
+            models.Index(
+                fields=['expires_at'],
+                name='accounts_lo_expires_3b86f9_idx',
+            ),
         ]
         ordering = ['-created_at']
 
