@@ -1,0 +1,55 @@
+name: Deploy production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: kimiagarkhune-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy to panel.kimiagarkhoone.com
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate required secrets
+        shell: bash
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+          SERVER_PORT: ${{ secrets.SERVER_PORT }}
+        run: |
+          set -euo pipefail
+          test -n "$SERVER_HOST" || { echo "Missing SERVER_HOST secret"; exit 1; }
+          test -n "$SERVER_USER" || { echo "Missing SERVER_USER secret"; exit 1; }
+          test -n "$SERVER_PASSWORD" || { echo "Missing SERVER_PASSWORD secret"; exit 1; }
+          test -n "$SERVER_PORT" || { echo "Missing SERVER_PORT secret"; exit 1; }
+
+      - name: Bootstrap and deploy server
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          DEPLOY_SSL_EMAIL: ${{ secrets.SSL_EMAIL }}
+          DEPLOY_TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          DEPLOY_TELEGRAM_WORKER_URL: ${{ secrets.TELEGRAM_WORKER_URL }}
+          DEPLOY_KAVENEGAR_API_KEY: ${{ secrets.KAVENEGAR_API_KEY }}
+          DEPLOY_KAVENEGAR_SENDER: ${{ secrets.KAVENEGAR_SENDER }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          timeout: 60s
+          command_timeout: 30m
+          envs: DEPLOY_SSL_EMAIL,DEPLOY_TELEGRAM_BOT_TOKEN,DEPLOY_TELEGRAM_WORKER_URL,DEPLOY_KAVENEGAR_API_KEY,DEPLOY_KAVENEGAR_SENDER
+          script_path: deploy/deploy.sh
