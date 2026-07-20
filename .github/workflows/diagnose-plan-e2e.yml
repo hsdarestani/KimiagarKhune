@@ -1,0 +1,55 @@
+name: Diagnose Plan browser regression
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/diagnose-plan-e2e.yml'
+      - 'deploy/plan_e2e.py'
+      - 'plans/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-plan-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Playwright
+        run: |
+          set -euo pipefail
+          python3 -m venv .plan-browser-venv
+          .plan-browser-venv/bin/pip install -q --upgrade pip
+          .plan-browser-venv/bin/pip install -q playwright
+          .plan-browser-venv/bin/python -m playwright install --with-deps chromium
+
+      - name: Run Plan browser regression with full output
+        id: browser-test
+        shell: bash
+        env:
+          PLAN_BASE_URL: https://panel.kimiagarkhoone.com
+          PLAN_USERNAME: ${{ secrets.DJANGO_ADMIN_USERNAME }}
+          PLAN_PASSWORD: ${{ secrets.DJANGO_ADMIN_PASSWORD }}
+          PLAN_STUDENT_LABEL: نمونه تجربی دوازدهم
+          PLAN_TEST_WEEK: 1499-01-01
+        run: |
+          set +e
+          export PLAN_USERNAME="${PLAN_USERNAME:-admin}"
+          .plan-browser-venv/bin/python deploy/plan_e2e.py > plan-e2e-output.txt 2>&1
+          status=$?
+          cat plan-e2e-output.txt
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Upload browser output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plan-e2e-output
+          path: plan-e2e-output.txt
+          retention-days: 3
