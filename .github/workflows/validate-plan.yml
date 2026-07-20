@@ -27,11 +27,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y default-libmysqlclient-dev pkg-config
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq default-libmysqlclient-dev pkg-config >/dev/null
           python3 -m venv .venv
-          .venv/bin/pip install --upgrade pip setuptools wheel
-          .venv/bin/pip install -r requirements.txt
+          .venv/bin/pip install -q --upgrade pip setuptools wheel
+          .venv/bin/pip install -q -r requirements.txt
 
       - name: Run Plan regression tests
         env:
@@ -40,4 +40,4 @@ jobs:
           .venv/bin/python manage.py test \
             plans.test_plan_runtime \
             plans.test_plan_defaults \
-            --verbosity 2
+            --verbosity 1
