@@ -183,12 +183,25 @@
     }
   }
 
+  function droppableInstance($container) {
+    // jQuery UI temporarily removes the widget instance while the core runtime
+    // rebuilds a week. Reading the widget through `.droppable('option', ...)`
+    // during that tiny window throws an uncaught error even when the CSS class
+    // has not yet been removed. Read the instance directly instead.
+    return (
+      $container.data('ui-droppable') ||
+      $container.data('uiDroppable') ||
+      null
+    );
+  }
+
   function wrapDroppable($container) {
-    if (!$container.hasClass('ui-droppable')) {
+    const instance = droppableInstance($container);
+    if (!instance || !instance.options) {
       return;
     }
 
-    const currentDrop = $container.droppable('option', 'drop');
+    const currentDrop = instance.options.drop;
     if (!currentDrop || currentDrop.planSecondaryWrapped) {
       return;
     }
@@ -210,7 +223,7 @@
     };
     wrapped.planSecondaryWrapped = true;
     wrapped.planSecondaryOriginal = currentDrop;
-    $container.droppable('option', 'drop', wrapped);
+    instance.options.drop = wrapped;
   }
 
   function synchronizeDroppables() {
