@@ -2,19 +2,20 @@ from django.db import migrations, models
 
 
 def ensure_index(schema_editor, table_name, index_name, columns):
-    """Create the given index only when it is missing."""
+    """Create the given index only when it is missing on the active backend."""
 
-    schema_editor.connection.ensure_connection()
-    with schema_editor.connection.cursor() as cursor:
-        cursor.execute(f"SHOW INDEX FROM `{table_name}`")
-        existing_indexes = {row[2] for row in cursor.fetchall()}
+    connection = schema_editor.connection
+    connection.ensure_connection()
+    with connection.cursor() as cursor:
+        constraints = connection.introspection.get_constraints(cursor, table_name)
 
-    if index_name in existing_indexes:
+    if index_name in constraints:
         return
 
-    column_sql = ", ".join(f"`{column}`" for column in columns)
+    quote = schema_editor.quote_name
+    column_sql = ", ".join(quote(column) for column in columns)
     schema_editor.execute(
-        f"CREATE INDEX `{index_name}` ON `{table_name}` ({column_sql})"
+        f"CREATE INDEX {quote(index_name)} ON {quote(table_name)} ({column_sql})"
     )
 
 
