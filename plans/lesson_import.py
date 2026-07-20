@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import base64
 import csv
+import io
 from dataclasses import dataclass
 from pathlib import Path
 from django.db import transaction
@@ -75,8 +77,12 @@ def _source_files(path: Path) -> list[Path]:
     if path.exists():
         return [path]
 
-    shard_pattern = f"{path.stem}_part_*.csv"
-    shards = sorted(path.parent.glob(shard_pattern))
+    shard_pattern = f"{path.stem}_part_*"
+    shards = sorted(
+        candidate
+        for candidate in path.parent.glob(shard_pattern)
+        if candidate.name.endswith((".csv", ".csv.b64"))
+    )
     if shards:
         return shards
 
@@ -86,7 +92,14 @@ def _source_files(path: Path) -> list[Path]:
 def _read_rows(path: Path) -> list[dict[str, str]]:
     rows: list[dict[str, str]] = []
     for source_path in _source_files(path):
-        with source_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+        if source_path.name.endswith(".csv.b64"):
+            encoded = source_path.read_text(encoding="ascii")
+            csv_text = base64.b64decode(encoded).decode("utf-8-sig")
+            csv_file = io.StringIO(csv_text, newline="")
+        else:
+            csv_file = source_path.open("r", encoding="utf-8-sig", newline="")
+
+        with csv_file:
             reader = csv.DictReader(csv_file)
             fieldnames = set(reader.fieldnames or [])
             missing = REQUIRED_COLUMNS - fieldnames
