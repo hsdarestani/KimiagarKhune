@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render
@@ -89,6 +90,19 @@ def _student_is_visible(request, student: Student) -> bool:
     return bool(advisor and student.advisor_id == advisor.pk)
 
 
+def _inject_plan_defaults_script(response):
+    static_url = f"{settings.STATIC_URL.rstrip('/')}/plans/plan-defaults.js"
+    script = f'<script src="{static_url}"></script>'.encode("utf-8")
+    body_marker = b"</body>"
+    if script not in response.content and body_marker in response.content:
+        response.content = response.content.replace(
+            body_marker,
+            script + body_marker,
+            1,
+        )
+    return response
+
+
 def sort_lessons_for_student(student: Student) -> dict[str, list[Lesson]]:
     major_name = student.major.name
     major_code = MAJOR_TO_CODE.get(major_name)
@@ -164,7 +178,7 @@ def plan_view(request):
             request.user.get_full_name().strip() or request.user.get_username()
         )
 
-    return render(
+    response = render(
         request,
         "plans/plan.html",
         {
@@ -175,6 +189,7 @@ def plan_view(request):
             "consultant_name": consultant_name,
         },
     )
+    return _inject_plan_defaults_script(response)
 
 
 @login_required
