@@ -1,0 +1,43 @@
+name: Validate Plan behavior
+
+on:
+  pull_request:
+    paths:
+      - 'plans/**'
+      - 'config/test_settings.py'
+      - '.github/workflows/validate-plan.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate JavaScript syntax
+        run: node --check plans/static/plans/plan-runtime.js
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y default-libmysqlclient-dev pkg-config
+          python3 -m venv .venv
+          .venv/bin/pip install --upgrade pip setuptools wheel
+          .venv/bin/pip install -r requirements.txt
+
+      - name: Run Plan regression tests
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+        run: |
+          .venv/bin/python manage.py test \
+            plans.test_plan_runtime \
+            plans.test_plan_defaults \
+            --verbosity 2
