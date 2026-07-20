@@ -1,24 +1,24 @@
-from django.urls import path, include
-from .views import *
-from . import lesson_catalog
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from . import lesson_catalog, plan_page, weekly_plans_v2
+from .views import *
 
-# ساخت یک روتر برای ثبت خودکار URL ها برای ViewSet ها
+
 router = DefaultRouter()
 router.register(r'courses', CourseViewSet, basename='course')
 router.register(r'sessions', SessionViewSet, basename='session')
 
 
 urlpatterns = [
-    path('plan/', lesson_catalog.plan_view, name='plan'),
+    path('plan/', plan_page.plan_view, name='plan'),
     path('move-lesson-to-end/', lesson_catalog.move_lesson_to_end, name='move_lesson_to_end'),
     path('get-chapters/', get_chapters, name='get-chapters'),
-    path('save-weekly-report/', save_weekly_report, name='save_weekly_report'),
-    path('get-weekly-report-details/', get_weekly_report_details, name='get_weekly_report_details'),
+    path('save-weekly-report/', weekly_plans_v2.save_weekly_report, name='save_weekly_report'),
+    path('get-weekly-report-details/', weekly_plans_v2.get_weekly_report_details, name='get_weekly_report_details'),
     path('update-lesson-order/', update_lesson_order, name='update_lesson_order'),
-    path('check-weekly-report/', check_weekly_report, name='check_weekly_report'),
-    path('copy_day_plan/', copy_day_plan, name='copy_day_plan'),
+    path('check-weekly-report/', weekly_plans_v2.check_weekly_report, name='check_weekly_report'),
+    path('copy_day_plan/', weekly_plans_v2.copy_day_plan, name='copy_day_plan'),
     path('get_default_boxes/', lesson_catalog.get_default_boxes, name='get_default_boxes'),
     path('get_default_events/', lesson_catalog.get_default_events, name='get_default_events'),
     path('get-lessons-for-student/', lesson_catalog.get_lessons_for_student, name='get_lessons_for_student'),

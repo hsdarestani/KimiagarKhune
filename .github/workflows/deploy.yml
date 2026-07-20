@@ -22,6 +22,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Validate Plan source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check plans/static/plans/plan-runtime.js
+          python3 -m py_compile \
+            deploy/plan_e2e.py \
+            plans/plan_page.py \
+            plans/weekly_plans.py
+
       - name: Validate required secrets
         shell: bash
         env:
@@ -29,12 +39,14 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
           SERVER_PORT: ${{ secrets.SERVER_PORT }}
+          DJANGO_ADMIN_PASSWORD: ${{ secrets.DJANGO_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           test -n "$SERVER_HOST" || { echo "Missing SERVER_HOST secret"; exit 1; }
           test -n "$SERVER_USER" || { echo "Missing SERVER_USER secret"; exit 1; }
           test -n "$SERVER_PASSWORD" || { echo "Missing SERVER_PASSWORD secret"; exit 1; }
           test -n "$SERVER_PORT" || { echo "Missing SERVER_PORT secret"; exit 1; }
+          test -n "$DJANGO_ADMIN_PASSWORD" || { echo "Missing DJANGO_ADMIN_PASSWORD secret"; exit 1; }
 
       - name: Bootstrap and deploy server
         uses: appleboy/ssh-action@v1.2.5
@@ -238,3 +250,20 @@ jobs:
             --retry 10 --retry-delay 10 --retry-all-errors \
             --connect-timeout 10 --max-time 30 \
             "https://${DOMAIN}/"
+
+      - name: Run Plan browser regression
+        shell: bash
+        env:
+          PLAN_BASE_URL: https://panel.kimiagarkhoone.com
+          PLAN_USERNAME: ${{ secrets.DJANGO_ADMIN_USERNAME }}
+          PLAN_PASSWORD: ${{ secrets.DJANGO_ADMIN_PASSWORD }}
+          PLAN_STUDENT_LABEL: نمونه تجربی دوازدهم
+          PLAN_TEST_WEEK: 1499-01-01
+        run: |
+          set -euo pipefail
+          export PLAN_USERNAME="${PLAN_USERNAME:-admin}"
+          python3 -m venv .plan-browser-venv
+          .plan-browser-venv/bin/pip install -q --upgrade pip
+          .plan-browser-venv/bin/pip install -q playwright
+          .plan-browser-venv/bin/python -m playwright install --with-deps chromium
+          .plan-browser-venv/bin/python deploy/plan_e2e.py
