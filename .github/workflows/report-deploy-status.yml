@@ -1,0 +1,53 @@
+name: Report deployment status
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy production
+    types:
+      - completed
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  report:
+    name: Publish deployment result
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create commit status
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+
+          if [ "$CONCLUSION" = "success" ]; then
+            STATE='success'
+            DESCRIPTION='Production deployment completed successfully.'
+          else
+            STATE='failure'
+            DESCRIPTION="Production deployment finished with: ${CONCLUSION}."
+          fi
+
+          jq -n \
+            --arg state "$STATE" \
+            --arg target_url "$RUN_URL" \
+            --arg description "$DESCRIPTION" \
+            --arg context 'deployment/production' \
+            '{state: $state, target_url: $target_url, description: $description, context: $context}' \
+            > /tmp/deployment-status.json
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${REPOSITORY}/statuses/${HEAD_SHA}" \
+            --data-binary @/tmp/deployment-status.json
