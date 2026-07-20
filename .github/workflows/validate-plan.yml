@@ -36,8 +36,21 @@ jobs:
       - name: Run Plan regression tests
         env:
           DJANGO_SETTINGS_MODULE: config.test_settings
+        shell: bash
         run: |
+          set +e
           .venv/bin/python manage.py test \
             plans.test_plan_runtime \
             plans.test_plan_defaults \
-            --verbosity 1
+            --verbosity 1 > plan-test-output.txt 2>&1
+          status=$?
+          cat plan-test-output.txt
+          exit "$status"
+
+      - name: Upload Plan test output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plan-test-output
+          path: plan-test-output.txt
+          retention-days: 3
