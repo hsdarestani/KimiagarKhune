@@ -71,19 +71,31 @@ def _first_or_create(queryset, *, create_kwargs: dict):
     return queryset.model.objects.using(queryset.db).create(**create_kwargs), True
 
 
-def _read_rows(path: Path) -> list[dict[str, str]]:
-    if not path.exists():
-        raise FileNotFoundError(f"فایل گراف دروس پیدا نشد: {path}")
+def _source_files(path: Path) -> list[Path]:
+    if path.exists():
+        return [path]
 
-    with path.open("r", encoding="utf-8-sig", newline="") as csv_file:
-        reader = csv.DictReader(csv_file)
-        fieldnames = set(reader.fieldnames or [])
-        missing = REQUIRED_COLUMNS - fieldnames
-        if missing:
-            raise ValueError(
-                "ستون‌های الزامی فایل موجود نیستند: " + ", ".join(sorted(missing))
-            )
-        rows = list(reader)
+    shard_pattern = f"{path.stem}_part_*.csv"
+    shards = sorted(path.parent.glob(shard_pattern))
+    if shards:
+        return shards
+
+    raise FileNotFoundError(f"فایل گراف دروس پیدا نشد: {path}")
+
+
+def _read_rows(path: Path) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for source_path in _source_files(path):
+        with source_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+            reader = csv.DictReader(csv_file)
+            fieldnames = set(reader.fieldnames or [])
+            missing = REQUIRED_COLUMNS - fieldnames
+            if missing:
+                raise ValueError(
+                    f"ستون‌های الزامی فایل {source_path.name} موجود نیستند: "
+                    + ", ".join(sorted(missing))
+                )
+            rows.extend(reader)
 
     if not rows:
         raise ValueError("فایل گراف دروس هیچ ردیف داده‌ای ندارد.")
