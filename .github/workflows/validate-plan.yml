@@ -26,10 +26,12 @@ jobs:
       - name: Validate Plan source syntax
         run: |
           node --check plans/static/plans/plan-runtime.js
+          node --check plans/static/plans/plan-secondary.js
           python3 -m py_compile \
             deploy/plan_e2e.py \
             plans/plan_page.py \
-            plans/weekly_plans.py
+            plans/weekly_plans.py \
+            plans/weekly_plans_v2.py
 
       - name: Install Python dependencies
         shell: bash
@@ -49,6 +51,7 @@ jobs:
           set +e
           .venv/bin/python manage.py test \
             plans.test_plan_runtime \
+            plans.test_plan_secondary \
             plans.test_plan_defaults \
             --verbosity 1 > plan-test-output.txt 2>&1
           status=$?
