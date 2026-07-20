@@ -3,8 +3,11 @@ name: Validate Plan behavior
 on:
   pull_request:
     paths:
+      - 'accounts/migrations/0004_loginotp.py'
       - 'plans/**'
+      - 'deploy/plan_e2e.py'
       - 'config/test_settings.py'
+      - '.github/workflows/deploy.yml'
       - '.github/workflows/validate-plan.yml'
   workflow_dispatch:
 
@@ -20,8 +23,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Validate JavaScript syntax
-        run: node --check plans/static/plans/plan-runtime.js
+      - name: Validate Plan source syntax
+        run: |
+          node --check plans/static/plans/plan-runtime.js
+          python3 -m py_compile \
+            deploy/plan_e2e.py \
+            plans/plan_page.py \
+            plans/weekly_plans.py
 
       - name: Install Python dependencies
         shell: bash
