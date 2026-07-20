@@ -1,14 +1,13 @@
 # Generated manually for persistent plan defaults.
 
-from django.db import migrations, models
 import django.db.models.deletion
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0001_initial'),
-        ('plans', '0001_initial'),
+        ('plans', '0013_session_plan_fields'),
     ]
 
     operations = [
