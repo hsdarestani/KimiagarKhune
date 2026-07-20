@@ -54,7 +54,7 @@ jobs:
           envs: DEPLOY_SSL_EMAIL,DEPLOY_TELEGRAM_BOT_TOKEN,DEPLOY_TELEGRAM_WORKER_URL,DEPLOY_KAVENEGAR_API_KEY,DEPLOY_KAVENEGAR_SENDER
           script_path: deploy/deploy.sh
 
-      - name: Create or update initial admin
+      - name: Create or update initial admin and plan defaults
         uses: appleboy/ssh-action@v1.2.5
         env:
           DEPLOY_ADMIN_USERNAME: ${{ secrets.DJANGO_ADMIN_USERNAME }}
@@ -84,6 +84,7 @@ jobs:
             ./venv/bin/python manage.py shell <<'PY'
             import os
             from django.contrib.auth import get_user_model
+            from plans.default_plan_data import ensure_advisor_for_user, seed_plan_defaults
 
             username = (os.environ.get('DEPLOY_ADMIN_USERNAME') or 'admin').strip()
             email = (os.environ.get('DEPLOY_ADMIN_EMAIL') or '').strip()
@@ -102,8 +103,17 @@ jobs:
             user.set_password(password)
             user.save()
 
+            advisor = ensure_advisor_for_user(user)
+            summary = seed_plan_defaults(advisor=advisor)
+
             action = 'Created' if created else 'Updated'
             print(f'{action} Django admin: {username}')
+            print(
+                'Plan defaults assigned: '
+                f'{summary.students_created} students created, '
+                f'{summary.students_updated} students updated, '
+                f'{summary.events_created} events created.'
+            )
             PY
 
       - name: Repair upstream, open ports and verify services
