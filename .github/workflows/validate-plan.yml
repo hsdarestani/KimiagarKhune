@@ -6,6 +6,7 @@ on:
       - 'accounts/migrations/0004_loginotp.py'
       - 'plans/**'
       - 'deploy/plan_e2e.py'
+      - 'deploy/plan_e2e_runner.py'
       - 'config/test_settings.py'
       - '.github/workflows/deploy.yml'
       - '.github/workflows/validate-plan.yml'
@@ -29,6 +30,7 @@ jobs:
           node --check plans/static/plans/plan-secondary.js
           python3 -m py_compile \
             deploy/plan_e2e.py \
+            deploy/plan_e2e_runner.py \
             plans/plan_page.py \
             plans/weekly_plans.py \
             plans/weekly_plans_v2.py

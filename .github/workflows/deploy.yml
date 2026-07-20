@@ -27,10 +27,13 @@ jobs:
         run: |
           set -euo pipefail
           node --check plans/static/plans/plan-runtime.js
+          node --check plans/static/plans/plan-secondary.js
           python3 -m py_compile \
             deploy/plan_e2e.py \
+            deploy/plan_e2e_runner.py \
             plans/plan_page.py \
-            plans/weekly_plans.py
+            plans/weekly_plans.py \
+            plans/weekly_plans_v2.py
 
       - name: Validate required secrets
         shell: bash
@@ -266,4 +269,4 @@ jobs:
           .plan-browser-venv/bin/pip install -q --upgrade pip
           .plan-browser-venv/bin/pip install -q playwright
           .plan-browser-venv/bin/python -m playwright install --with-deps chromium
-          .plan-browser-venv/bin/python deploy/plan_e2e.py
+          .plan-browser-venv/bin/python deploy/plan_e2e_runner.py
