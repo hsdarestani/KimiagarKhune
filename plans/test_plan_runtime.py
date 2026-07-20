@@ -7,6 +7,7 @@ from accounts.models import Student
 from plans.default_plan_data import ensure_advisor_for_user, seed_plan_defaults
 from plans.models import Box, WeeklyReport, WeeklyReportDetail
 from plans.weekly_plans import normalize_day_name
+from plans.weekly_plans_v2 import date_for_day
 
 
 class PlanRuntimeRegressionTests(TestCase):
@@ -50,6 +51,75 @@ class PlanRuntimeRegressionTests(TestCase):
         self.assertEqual(normalize_day_name("سه شنبه"), "سه‌شنبه")
         self.assertEqual(normalize_day_name("پنج\u200cشنبه"), "پنج‌شنبه")
         self.assertIsNone(normalize_day_name("روز نامعتبر"))
+
+    def test_selected_start_day_is_calendar_offset_zero(self):
+        self.assertEqual(
+            date_for_day(
+                __import__("datetime").date(2038, 1, 6),
+                "چهارشنبه",
+            ).isoformat(),
+            "2038-01-06",
+        )
+
+        payload = {
+            "student_id": self.student.pk,
+            "week_start": "2038-01-06",
+            "week_end": "2038-01-12",
+            "days": [
+                {
+                    "day": "چهارشنبه",
+                    "disabled": False,
+                    "tasks": [
+                        {
+                            "title": "روز اول واقعی",
+                            "start": "08:00:00",
+                            "end": "09:00:00",
+                            "box_type": "ایونت",
+                        }
+                    ],
+                },
+                {
+                    "day": "پنجشنبه",
+                    "disabled": False,
+                    "tasks": [
+                        {
+                            "title": "روز دوم واقعی",
+                            "start": "10:00:00",
+                            "end": "11:00:00",
+                            "box_type": "ایونت",
+                        }
+                    ],
+                },
+                {
+                    "day": "سه شنبه",
+                    "disabled": False,
+                    "tasks": [
+                        {
+                            "title": "روز هفتم واقعی",
+                            "start": "12:00:00",
+                            "end": "13:00:00",
+                            "box_type": "ایونت",
+                        }
+                    ],
+                },
+            ],
+        }
+        response = self.client.post(
+            "/save-weekly-report/",
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+
+        dates = {
+            detail.box.name: detail.start_time.date().isoformat()
+            for detail in WeeklyReportDetail.objects.filter(
+                report__student=self.student
+            ).select_related("box")
+        }
+        self.assertEqual(dates["روز اول واقعی"], "2038-01-06")
+        self.assertEqual(dates["روز دوم واقعی"], "2038-01-07")
+        self.assertEqual(dates["روز هفتم واقعی"], "2038-01-12")
 
     def test_save_and_reload_preserves_types_times_duration_and_selected_week(self):
         payload = {
@@ -140,8 +210,14 @@ class PlanRuntimeRegressionTests(TestCase):
         details = details_response.json()
         self.assertEqual(details["report_id"], report.pk)
         self.assertEqual(details["disabled_days"], ["سه‌شنبه"])
-        self.assertEqual({task["box_type"] for task in details["tasks"]}, {"ایونت", "شناور", "تکلیف"})
-        self.assertEqual({task["day_of_week"] for task in details["tasks"]}, {"شنبه", "یک‌شنبه"})
+        self.assertEqual(
+            {task["box_type"] for task in details["tasks"]},
+            {"ایونت", "شناور", "تکلیف"},
+        )
+        self.assertEqual(
+            {task["day_of_week"] for task in details["tasks"]},
+            {"شنبه", "یک‌شنبه"},
+        )
 
         updated_payload = {
             **payload,
@@ -168,9 +244,13 @@ class PlanRuntimeRegressionTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(second_response.status_code, 200, second_response.content)
-        self.assertEqual(WeeklyReport.objects.filter(student=self.student).count(), 1)
+        self.assertEqual(
+            WeeklyReport.objects.filter(student=self.student).count(), 1
+        )
         self.assertFalse(Box.objects.filter(name="جلسه مشاوره").exists())
-        self.assertTrue(Box.objects.filter(name="نسخه دوم ایونت", is_default=False).exists())
+        self.assertTrue(
+            Box.objects.filter(name="نسخه دوم ایونت", is_default=False).exists()
+        )
 
     def test_invalid_day_is_rejected_instead_of_saved_as_saturday(self):
         response = self.client.post(
@@ -181,7 +261,11 @@ class PlanRuntimeRegressionTests(TestCase):
                     "week_start": "2038-02-01",
                     "week_end": "2038-02-07",
                     "days": [
-                        {"day": "روز نامعتبر", "disabled": False, "tasks": []}
+                        {
+                            "day": "روز نامعتبر",
+                            "disabled": False,
+                            "tasks": [],
+                        }
                     ],
                 }
             ),
@@ -221,7 +305,9 @@ class PlanRuntimeRegressionTests(TestCase):
             data=json.dumps(source_payload),
             content_type="application/json",
         )
-        self.assertEqual(source_response.status_code, 200, source_response.content)
+        self.assertEqual(
+            source_response.status_code, 200, source_response.content
+        )
 
         copy_response = self.client.post(
             "/copy_day_plan/",
