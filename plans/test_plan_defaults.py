@@ -90,10 +90,9 @@ class PlanDefaultSeedTests(TestCase):
 
         plan_response = self.client.get("/plan/")
         self.assertEqual(plan_response.status_code, 200)
-        self.assertContains(
-            plan_response,
-            '/static/plans/plan-defaults.js',
-        )
+        self.assertNotContains(plan_response, "/static/plans/plan-defaults.js")
+        self.assertContains(plan_response, "function initCalendarTask")
+        self.assertContains(plan_response, "function updateTimeLabel")
         self.assertContains(plan_response, "نمونه تجربی دوازدهم")
 
         palette_response = self.client.get("/get_default_boxes/")
