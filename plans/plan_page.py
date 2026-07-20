@@ -9,11 +9,18 @@ from plans import lesson_catalog
 RUNTIME_PATH = "plans/plan-runtime.js"
 
 
+def _runtime_url() -> str:
+    static_url = str(settings.STATIC_URL or "/static/")
+    if not static_url.startswith(("/", "http://", "https://")):
+        static_url = "/" + static_url
+    return f"{static_url.rstrip('/')}/{RUNTIME_PATH}"
+
+
 def _append_runtime_script(response):
     """Append the isolated Plan runtime immediately before the real closing body.
 
     The legacy template contains literal ``</body>`` strings inside JavaScript
-    template literals used for PDF windows.  Therefore this intentionally uses
+    template literals used for PDF windows. Therefore this intentionally uses
     the final closing body marker and never a first-match replacement.
     """
 
@@ -21,8 +28,7 @@ def _append_runtime_script(response):
     if response.status_code != 200 or "text/html" not in content_type:
         return response
 
-    static_url = f"{settings.STATIC_URL.rstrip('/')}/{RUNTIME_PATH}"
-    script = f'<script src="{static_url}" data-plan-runtime="true"></script>'.encode(
+    script = f'<script src="{_runtime_url()}" data-plan-runtime="true"></script>'.encode(
         "utf-8"
     )
     if script in response.content:
