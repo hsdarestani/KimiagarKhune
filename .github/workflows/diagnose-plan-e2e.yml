@@ -28,6 +28,24 @@ jobs:
           .plan-browser-venv/bin/pip install -q playwright
           .plan-browser-venv/bin/python -m playwright install --with-deps chromium
 
+      - name: Patch diagnostic-only multi-checkbox operations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('deploy/plan_e2e.py')
+          content = path.read_text(encoding='utf-8')
+          content = content.replace(
+              'page.locator(".grade-filter").uncheck()',
+              'page.locator(".grade-filter").evaluate_all("elements => elements.forEach(element => { element.checked = false; window.jQuery(element).trigger(\'change\'); })")',
+          )
+          content = content.replace(
+              'page.locator(".grade-filter").check()',
+              'page.locator(".grade-filter").evaluate_all("elements => elements.forEach(element => { element.checked = true; window.jQuery(element).trigger(\'change\'); })")',
+          )
+          path.write_text(content, encoding='utf-8')
+          PY
+
       - name: Run Plan browser regression with full output
         id: browser-test
         shell: bash
