@@ -54,6 +54,58 @@ jobs:
           envs: DEPLOY_SSL_EMAIL,DEPLOY_TELEGRAM_BOT_TOKEN,DEPLOY_TELEGRAM_WORKER_URL,DEPLOY_KAVENEGAR_API_KEY,DEPLOY_KAVENEGAR_SENDER
           script_path: deploy/deploy.sh
 
+      - name: Create or update initial admin
+        uses: appleboy/ssh-action@v1.2.5
+        env:
+          DEPLOY_ADMIN_USERNAME: ${{ secrets.DJANGO_ADMIN_USERNAME }}
+          DEPLOY_ADMIN_EMAIL: ${{ secrets.DJANGO_ADMIN_EMAIL }}
+          DEPLOY_ADMIN_PASSWORD: ${{ secrets.DJANGO_ADMIN_PASSWORD }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          timeout: 60s
+          command_timeout: 5m
+          envs: DEPLOY_ADMIN_USERNAME,DEPLOY_ADMIN_EMAIL,DEPLOY_ADMIN_PASSWORD
+          script: |
+            set -eu
+
+            if [ -z "${DEPLOY_ADMIN_PASSWORD:-}" ]; then
+              echo 'DJANGO_ADMIN_PASSWORD is not configured; skipping initial admin creation.'
+              exit 0
+            fi
+
+            set -a
+            . /etc/kimiagarkhune.env
+            set +a
+            cd /var/www/KimiagarKhune
+
+            ./venv/bin/python manage.py shell <<'PY'
+            import os
+            from django.contrib.auth import get_user_model
+
+            username = (os.environ.get('DEPLOY_ADMIN_USERNAME') or 'admin').strip()
+            email = (os.environ.get('DEPLOY_ADMIN_EMAIL') or '').strip()
+            password = os.environ['DEPLOY_ADMIN_PASSWORD']
+
+            User = get_user_model()
+            user, created = User.objects.get_or_create(
+                username=username,
+                defaults={'email': email},
+            )
+            if email:
+                user.email = email
+            user.is_active = True
+            user.is_staff = True
+            user.is_superuser = True
+            user.set_password(password)
+            user.save()
+
+            action = 'Created' if created else 'Updated'
+            print(f'{action} Django admin: {username}')
+            PY
+
       - name: Repair upstream, open ports and verify services
         uses: appleboy/ssh-action@v1.2.5
         env:
