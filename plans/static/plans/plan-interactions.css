@@ -76,7 +76,8 @@ body.plan-resize-cursor * {
   min-width: 0;
 }
 
-.extended-task.plan-study-editing .task-info {
+.extended-task.plan-study-editing .task-info,
+.extended-task.plan-study-editor-pinned .task-info {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) minmax(62px, 0.45fr);
   gap: 5px;
@@ -85,17 +86,30 @@ body.plan-resize-cursor * {
   padding-left: 4px;
 }
 
-.extended-task.plan-study-editing .task-info > .time-label {
+.extended-task.plan-study-editing .task-info > .time-label,
+.extended-task.plan-study-editor-pinned .task-info > .time-label {
   grid-column: 1 / -1;
 }
 
-.extended-task.plan-study-editing .task-info > .select2-container {
+.extended-task.plan-study-editing .task-info > .select2-container,
+.extended-task.plan-study-editor-pinned .task-info > .select2-container {
   min-width: 0 !important;
   width: 100% !important;
   margin: 0 !important;
 }
 
-.extended-task.plan-study-editing .select2-selection {
+.extended-task.plan-study-editor-pinned .task-info > .select2-container,
+.extended-task.plan-study-editor-pinned .task-chapter:not(.select2-hidden-accessible),
+.extended-task.plan-study-editor-pinned .task-extra:not(.select2-hidden-accessible) {
+  display: block !important;
+}
+
+.extended-task.plan-study-editor-pinned .plan-study-compact {
+  display: none !important;
+}
+
+.extended-task.plan-study-editing .select2-selection,
+.extended-task.plan-study-editor-pinned .select2-selection {
   min-height: 28px !important;
   height: 28px !important;
   border: 1px solid rgba(100, 116, 139, 0.35) !important;
@@ -104,14 +118,16 @@ body.plan-resize-cursor * {
   box-shadow: none !important;
 }
 
-.extended-task.plan-study-editing .select2-selection__rendered {
+.extended-task.plan-study-editing .select2-selection__rendered,
+.extended-task.plan-study-editor-pinned .select2-selection__rendered {
   line-height: 26px !important;
   padding-right: 7px !important;
   padding-left: 20px !important;
   font-size: 10px !important;
 }
 
-.extended-task.plan-study-editing .select2-selection__arrow {
+.extended-task.plan-study-editing .select2-selection__arrow,
+.extended-task.plan-study-editor-pinned .select2-selection__arrow {
   height: 26px !important;
 }
 
