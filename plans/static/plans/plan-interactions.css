@@ -32,6 +32,16 @@
   z-index: 1000 !important;
 }
 
+body.plan-resize-cursor,
+body.plan-resize-cursor * {
+  cursor: ns-resize !important;
+  user-select: none !important;
+}
+
+.calendar-task > .ui-resizable-s:not(.plan-resize-handle) {
+  display: none !important;
+}
+
 .plan-resize-handle {
   position: absolute !important;
   right: 8px !important;
