@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from plans import lesson_catalog
 
 
-ASSET_VERSION = "20260721-4"
+ASSET_VERSION = "20260721-5"
 STYLE_PATHS = (
     ("plans/plan-interactions.css", "data-plan-interactions-style"),
 )
