@@ -1,0 +1,94 @@
+name: Verify real Plan interactions
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy production
+    types:
+      - completed
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  verify-real-interactions:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout deployed commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Install Playwright
+        run: |
+          set -euo pipefail
+          python3 -m venv .plan-real-browser-venv
+          .plan-real-browser-venv/bin/pip install -q --upgrade pip
+          .plan-real-browser-venv/bin/pip install -q playwright
+          .plan-real-browser-venv/bin/python -m playwright install --with-deps chromium
+
+      - name: Run real mouse interaction regression
+        id: real-plan-test
+        shell: bash
+        env:
+          PLAN_BASE_URL: https://panel.kimiagarkhoone.com
+          PLAN_USERNAME: ${{ secrets.DJANGO_ADMIN_USERNAME }}
+          PLAN_PASSWORD: ${{ secrets.DJANGO_ADMIN_PASSWORD }}
+          PLAN_STUDENT_LABEL: نمونه تجربی دوازدهم
+          PLAN_TEST_WEEK: 1499-02-01
+        run: |
+          set +e
+          export PLAN_USERNAME="${PLAN_USERNAME:-admin}"
+          .plan-real-browser-venv/bin/python deploy/plan_real_interaction_e2e.py \
+            > plan-real-interaction-output.txt 2>&1
+          status=$?
+          cat plan-real-interaction-output.txt
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Upload real interaction output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: plan-real-interaction-output
+          path: plan-real-interaction-output.txt
+          retention-days: 3
+
+      - name: Publish real interaction status
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TEST_STATUS: ${{ steps.real-plan-test.outputs.status }}
+        run: |
+          set -euo pipefail
+          if [ "${TEST_STATUS:-1}" = "0" ]; then
+            STATE='success'
+            DESCRIPTION='Real Plan drag, move, resize and compact controls passed.'
+          else
+            STATE='failure'
+            DESCRIPTION='Real Plan mouse interaction regression failed.'
+          fi
+
+          jq -n \
+            --arg state "$STATE" \
+            --arg target_url "$RUN_URL" \
+            --arg description "$DESCRIPTION" \
+            --arg context 'plan/real-interactions' \
+            '{state: $state, target_url: $target_url, description: $description, context: $context}' \
+            > /tmp/plan-real-status.json
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${REPOSITORY}/statuses/${HEAD_SHA}" \
+            --data-binary @/tmp/plan-real-status.json

@@ -14,9 +14,11 @@
   }
 
   function addTestOptions($select, selectedValue) {
-    $select.append($('<option></option>').attr('value', '').text('-'));
-    for (let value = 5; value <= 100; value += 5) {
-      $select.append($('<option></option>').attr('value', value).text(value));
+    if (!$select.children().length) {
+      $select.append($('<option></option>').attr('value', '').text('-'));
+      for (let value = 5; value <= 100; value += 5) {
+        $select.append($('<option></option>').attr('value', value).text(value));
+      }
     }
     if (selectedValue) {
       $select.val(String(selectedValue));
@@ -41,20 +43,11 @@
   function initChapterSelect($task, taskData) {
     const $chapter = $task.find('.task-chapter');
     if (taskData.chapter_id && taskData.chapter_text) {
-      $chapter.append(
-        new Option(
-          taskData.chapter_text,
-          taskData.chapter_id,
-          true,
-          true
-        )
-      );
+      $chapter.append(new Option(taskData.chapter_text, taskData.chapter_id, true, true));
     }
-
-    if (!$.fn.select2) {
+    if (!$.fn.select2 || $chapter.hasClass('select2-hidden-accessible')) {
       return;
     }
-
     $chapter.select2({
       placeholder: 'شماره فصل',
       dropdownParent: $task,
@@ -83,7 +76,7 @@
   function initTestSelect($task, taskData) {
     const $extra = $task.find('.task-extra');
     addTestOptions($extra, taskData.optional_tests_count || 0);
-    if ($.fn.select2) {
+    if ($.fn.select2 && !$extra.hasClass('select2-hidden-accessible')) {
       $extra.select2({
         placeholder: 'تعداد تست',
         dropdownParent: $task,
@@ -94,73 +87,49 @@
     }
   }
 
-  function buildOtherPlanTask($source, $container, dropTop) {
+  function buildOtherPlanTask(source, container, dropTop) {
+    const $source = $(source);
+    const $container = $(container);
     const taskData = $source.data() || {};
     const lessonId = taskData.lesson_id || $source.attr('data-lesson-id');
     if (!lessonId) {
       window.alert('اطلاعات درس این باکس کامل نیست.');
-      return;
+      return null;
     }
 
     const lessonName = String(
       taskData.lesson_name || $source.attr('data-lesson-name') || 'مطالعه'
     ).trim();
-    const duration = Math.max(
-      15,
-      Number(taskData.duration_minutes) || DEFAULT_DURATION
-    );
+    const duration = Math.max(15, Number(taskData.duration_minutes) || DEFAULT_DURATION);
     const height = duration * PIXELS_PER_MINUTE;
     const maximumTop = Math.max(0, $container.innerHeight() - height);
     const top = Math.max(0, Math.min(snap(dropTop), maximumTop));
 
     if (overlaps($container, top, height)) {
       window.alert('این بازه زمانی با یک باکس دیگر تداخل دارد.');
-      return;
+      return null;
     }
 
     const $task = $('<div class="calendar-task extended-task"></div>')
       .attr('data-box-type', 'مطالعه')
       .attr('data-lesson-id', lessonId)
       .attr('data-lesson-name', lessonName)
-      .attr(
-        'data-lesson-type',
-        taskData.lesson_type || $source.attr('data-lesson-type') || 'عمومی'
-      )
-      .attr(
-        'data-grade',
-        taskData.grade_id || taskData.grade || $source.attr('data-grade') || ''
-      )
+      .attr('data-lesson-type', taskData.lesson_type || $source.attr('data-lesson-type') || 'عمومی')
+      .attr('data-grade', taskData.grade_id || taskData.grade || $source.attr('data-grade') || '')
       .css({
         top: top + 'px',
         height: height + 'px',
         left: '5%'
       });
 
-    $task.append(
-      $('<button type="button" class="remove-btn" title="حذف">✖</button>')
-    );
-    $task.append(
-      $('<button type="button" class="repeat-btn" title="تکرار شونده">تکرار</button>')
-    );
+    $task.append($('<button type="button" class="remove-btn" title="حذف">✖</button>'));
+    $task.append($('<button type="button" class="repeat-btn" title="تکرار شونده">تکرار</button>'));
     $task.append($('<div class="task-title"></div>').text(lessonName));
 
-    const $info = $('<div class="task-info"></div>').css({
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      maxWidth: '80%'
-    });
-    $info.append(
-      $('<select class="task-chapter p-1 text-sm leading-tight"></select>')
-    );
-    $info.append(
-      $('<select class="task-extra p-1 text-sm leading-tight"></select>')
-    );
-    $info.append(
-      $('<div class="hidden extra-info"></div>').text(
-        'تعداد تست: ' + (taskData.optional_tests_count || 0)
-      )
-    );
+    const $info = $('<div class="task-info"></div>');
+    $info.append($('<select class="task-chapter p-1 text-sm leading-tight"></select>'));
+    $info.append($('<select class="task-extra p-1 text-sm leading-tight"></select>'));
+    $info.append($('<div class="hidden extra-info"></div>').text('تعداد تست: ' + (taskData.optional_tests_count || 0)));
     $info.append($('<div class="time-label"></div>'));
     $task.append($info);
 
@@ -178,58 +147,7 @@
     if (typeof window.updateTimeLabel === 'function') {
       window.updateTimeLabel($task);
     }
-    if (typeof window.setupEditableSelects === 'function') {
-      window.setupEditableSelects($task, 1);
-    }
-  }
-
-  function droppableInstance($container) {
-    // jQuery UI temporarily removes the widget instance while the core runtime
-    // rebuilds a week. Reading the widget through `.droppable('option', ...)`
-    // during that tiny window throws an uncaught error even when the CSS class
-    // has not yet been removed. Read the instance directly instead.
-    return (
-      $container.data('ui-droppable') ||
-      $container.data('uiDroppable') ||
-      null
-    );
-  }
-
-  function wrapDroppable($container) {
-    const instance = droppableInstance($container);
-    if (!instance || !instance.options) {
-      return;
-    }
-
-    const currentDrop = instance.options.drop;
-    if (!currentDrop || currentDrop.planSecondaryWrapped) {
-      return;
-    }
-
-    const wrapped = function (event, ui) {
-      const $source = ui && ui.draggable ? $(ui.draggable) : $();
-      if (!$source.hasClass('other-plan-task')) {
-        return currentDrop.call(this, event, ui);
-      }
-
-      const $target = $(this);
-      const $day = $target.closest('.day-column');
-      if ($day.hasClass('disabled-day')) {
-        return;
-      }
-      const offset = $target.offset();
-      const sourceTop = ui.offset ? ui.offset.top : event.pageY;
-      buildOtherPlanTask($source, $target, sourceTop - offset.top);
-    };
-    wrapped.planSecondaryWrapped = true;
-    wrapped.planSecondaryOriginal = currentDrop;
-    instance.options.drop = wrapped;
-  }
-
-  function synchronizeDroppables() {
-    $('.task-container').each(function () {
-      wrapDroppable($(this));
-    });
+    return $task;
   }
 
   function exposeOtherPlanData() {
@@ -239,33 +157,23 @@
       if (data.lesson_id) $task.attr('data-lesson-id', data.lesson_id);
       if (data.lesson_name) $task.attr('data-lesson-name', data.lesson_name);
       if (data.lesson_type) $task.attr('data-lesson-type', data.lesson_type);
-      if (data.grade_id || data.grade) {
-        $task.attr('data-grade', data.grade_id || data.grade);
-      }
-      if (data.duration_minutes) {
-        $task.attr('data-duration-minutes', data.duration_minutes);
-      }
+      if (data.grade_id || data.grade) $task.attr('data-grade', data.grade_id || data.grade);
+      if (data.duration_minutes) $task.attr('data-duration-minutes', data.duration_minutes);
     });
   }
 
-  function initialize() {
-    // Remove the legacy delegated drop handler. The wrapped jQuery UI callback
-    // below is the only owner of drops from the other-student tab, preventing
-    // duplicate calendar boxes.
-    $(document).off('drop', '.task-container');
+  window.planSecondaryBuildOtherPlanTask = buildOtherPlanTask;
 
-    const observer = new MutationObserver(function () {
-      exposeOtherPlanData();
-      synchronizeDroppables();
-    });
+  function initialize() {
+    $(document).off('drop', '.task-container');
     const otherTasks = document.getElementById('otherStudentTasks');
     if (otherTasks) {
-      observer.observe(otherTasks, { childList: true, subtree: true });
+      new MutationObserver(exposeOtherPlanData).observe(otherTasks, {
+        childList: true,
+        subtree: true
+      });
     }
-
-    synchronizeDroppables();
     exposeOtherPlanData();
-    window.setInterval(synchronizeDroppables, 250);
     window.dispatchEvent(new CustomEvent('plan:secondary-ready'));
   }
 

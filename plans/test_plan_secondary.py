@@ -16,14 +16,22 @@ class PlanSecondaryScriptTests(TestCase):
         seed_plan_defaults(advisor=advisor)
         self.client.force_login(self.admin)
 
-    def test_secondary_script_loads_after_core_runtime_and_before_real_body_end(self):
+    def test_plan_assets_load_once_in_authoritative_order(self):
         response = self.client.get("/plan/")
         self.assertEqual(response.status_code, 200)
         content = response.content
 
-        runtime = b'/static/plans/plan-runtime.js'
-        secondary = b'/static/plans/plan-secondary.js'
-        self.assertEqual(content.count(runtime), 1)
-        self.assertEqual(content.count(secondary), 1)
+        style = b'/static/plans/plan-interactions.css?v='
+        runtime = b'/static/plans/plan-runtime.js?v='
+        secondary = b'/static/plans/plan-secondary.js?v='
+        interactions = b'/static/plans/plan-interactions.js?v='
+
+        for marker in (style, runtime, secondary, interactions):
+            self.assertEqual(content.count(marker), 1)
+
+        self.assertLess(content.index(style), content.index(runtime))
         self.assertLess(content.index(runtime), content.index(secondary))
-        self.assertLess(content.index(secondary), content.rfind(b"</body>"))
+        self.assertLess(content.index(secondary), content.index(interactions))
+        self.assertLess(content.index(interactions), content.rfind(b"</body>"))
+        self.assertIn(b'data-plan-interactions="true"', content)
+        self.assertIn(b'data-plan-interactions-style="true"', content)
