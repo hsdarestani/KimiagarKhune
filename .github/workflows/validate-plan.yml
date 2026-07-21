@@ -31,6 +31,7 @@ jobs:
           node --check plans/static/plans/plan-runtime.js
           node --check plans/static/plans/plan-secondary.js
           node --check plans/static/plans/plan-interactions.js
+          node --check plans/static/plans/plan-manual-resize.js
           python3 -m py_compile \
             deploy/plan_e2e.py \
             deploy/plan_e2e_runner.py \
