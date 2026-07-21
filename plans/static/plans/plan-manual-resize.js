@@ -9,7 +9,7 @@
   const GRID_MINUTES = 15;
   const GRID_PIXELS = GRID_MINUTES * PIXELS_PER_MINUTE;
   const MIN_HEIGHT = GRID_PIXELS;
-  const VERSION = '2026.07.21.1';
+  const VERSION = '2026.07.21.2';
 
   function snap(value) {
     return Math.round(Number(value || 0) / GRID_PIXELS) * GRID_PIXELS;
@@ -151,6 +151,42 @@
     $task.attr('data-plan-manual-resize-version', VERSION);
   }
 
+  function openStudyEditor($task) {
+    $task.addClass('plan-study-editor-pinned plan-study-editing');
+    $task.find('.plan-study-compact').hide();
+    $task.find('.task-chapter, .task-extra').each(function () {
+      const $select = $(this);
+      if ($select.hasClass('select2-hidden-accessible')) {
+        $select.next('.select2-container').css('display', 'block');
+      } else {
+        $select.show();
+      }
+    });
+  }
+
+  function bindPersistentStudyEditor() {
+    $(document)
+      .off('click.planPersistentStudyEditor', '.plan-study-edit')
+      .on('click.planPersistentStudyEditor', '.plan-study-edit', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        openStudyEditor($(this).closest('.calendar-task'));
+      })
+      .off('.planPersistentStudyEditorSelection', '.task-chapter, .task-extra')
+      .on(
+        'change.planPersistentStudyEditorSelection select2:select.planPersistentStudyEditorSelection',
+        '.task-chapter, .task-extra',
+        function () {
+          const $task = $(this).closest('.calendar-task');
+          const chapter = String($task.find('.task-chapter').val() || '').trim();
+          const tests = String($task.find('.task-extra').val() || '').trim();
+          if (chapter && tests) {
+            $task.removeClass('plan-study-editor-pinned');
+          }
+        }
+      );
+  }
+
   function synchronize() {
     $('.calendar .calendar-task').each(function () {
       const $task = $(this);
@@ -161,6 +197,10 @@
         configureResizableCompatibility($task);
       } else {
         bindPointerResize($task);
+      }
+
+      if ($task.hasClass('plan-study-editor-pinned')) {
+        openStudyEditor($task);
       }
     });
   }
@@ -178,6 +218,8 @@
       wrappedInit.planManualResizeWrapped = true;
       window.initCalendarTask = wrappedInit;
     }
+
+    bindPersistentStudyEditor();
 
     const calendar = document.querySelector('.calendar');
     if (calendar) {
