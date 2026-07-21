@@ -9,7 +9,7 @@
   const GRID_MINUTES = 15;
   const GRID_PIXELS = GRID_MINUTES * PIXELS_PER_MINUTE;
   const MIN_HEIGHT = GRID_PIXELS;
-  const VERSION = '2026.07.21.2';
+  const VERSION = '2026.07.21.3';
 
   function snap(value) {
     return Math.round(Number(value || 0) / GRID_PIXELS) * GRID_PIXELS;
@@ -164,24 +164,24 @@
     });
   }
 
-  function bindPersistentStudyEditor() {
-    $(document)
-      .off('click.planPersistentStudyEditor', '.plan-study-edit')
-      .on('click.planPersistentStudyEditor', '.plan-study-edit', function (event) {
+  function bindPersistentStudyEditor($task) {
+    $task.find('.plan-study-edit')
+      .off('.planPersistentStudyEditor')
+      .on('click.planPersistentStudyEditor', function (event) {
         event.preventDefault();
-        event.stopPropagation();
         openStudyEditor($(this).closest('.calendar-task'));
-      })
-      .off('.planPersistentStudyEditorSelection', '.task-chapter, .task-extra')
+      });
+
+    $task.find('.task-chapter, .task-extra')
+      .off('.planPersistentStudyEditorSelection')
       .on(
         'change.planPersistentStudyEditorSelection select2:select.planPersistentStudyEditorSelection',
-        '.task-chapter, .task-extra',
         function () {
-          const $task = $(this).closest('.calendar-task');
-          const chapter = String($task.find('.task-chapter').val() || '').trim();
-          const tests = String($task.find('.task-extra').val() || '').trim();
+          const $currentTask = $(this).closest('.calendar-task');
+          const chapter = String($currentTask.find('.task-chapter').val() || '').trim();
+          const tests = String($currentTask.find('.task-extra').val() || '').trim();
           if (chapter && tests) {
-            $task.removeClass('plan-study-editor-pinned');
+            $currentTask.removeClass('plan-study-editor-pinned');
           }
         }
       );
@@ -199,6 +199,7 @@
         bindPointerResize($task);
       }
 
+      bindPersistentStudyEditor($task);
       if ($task.hasClass('plan-study-editor-pinned')) {
         openStudyEditor($task);
       }
@@ -212,14 +213,13 @@
         const result = previousInit($task);
         window.setTimeout(function () {
           configureResizableCompatibility($($task));
+          bindPersistentStudyEditor($($task));
         }, 0);
         return result;
       };
       wrappedInit.planManualResizeWrapped = true;
       window.initCalendarTask = wrappedInit;
     }
-
-    bindPersistentStudyEditor();
 
     const calendar = document.querySelector('.calendar');
     if (calendar) {
