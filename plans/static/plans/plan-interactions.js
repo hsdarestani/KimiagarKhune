@@ -10,7 +10,7 @@
   const GRID_MINUTES = 15;
   const GRID_PIXELS = GRID_MINUTES * PIXELS_PER_MINUTE;
   const MIN_HEIGHT = GRID_PIXELS;
-  const VERSION = '2026.07.21.1';
+  const VERSION = '2026.07.21.2';
 
   function snap(value) {
     return Math.round(Number(value || 0) / GRID_PIXELS) * GRID_PIXELS;
@@ -197,8 +197,13 @@
       start: function (event, ui) {
         const $current = $(this);
         const offset = $current.offset();
-        $current.data('planOriginalParent', $current.parent());
-        $current.data('planOriginalTop', Number.parseFloat($current.css('top')) || 0);
+        const originalParent = $current.parent();
+        const originalTop = Number.parseFloat($current.css('top')) || 0;
+
+        $current.data('planOriginalParent', originalParent);
+        $current.data('planOriginalTop', originalTop);
+        $current.data('runtimeOriginalParent', originalParent);
+        $current.data('runtimeOriginalTop', originalTop);
         $current.data('planGrabOffsetY', Math.max(0, event.pageY - offset.top));
         $current.data('planDropAccepted', false);
         $current.addClass('plan-dragging-source');
@@ -369,7 +374,14 @@
     $(document)
       .off('mousedown.planInteraction', '.calendar-task')
       .on('mousedown.planInteraction', '.calendar-task', function () {
-        initializeTask($(this));
+        const $task = $(this);
+        if (
+          $task.attr('data-plan-interaction-version') !== VERSION ||
+          !safeInstance($task, 'draggable') ||
+          !safeInstance($task, 'resizable')
+        ) {
+          initializeTask($task);
+        }
       });
 
     synchronize();
