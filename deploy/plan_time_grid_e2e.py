@@ -150,13 +150,21 @@ def main() -> int:
             "timeline hour marks are exactly 35 pixels apart",
         )
 
-        school_tasks = page.locator(".calendar .calendar-task").filter(
-            has=page.locator('.task-title[value="مدرسه"], .task-title:text-is("مدرسه")')
+        page.evaluate(
+            """
+            () => {
+              document.querySelectorAll('.calendar .calendar-task').forEach(task => {
+                task.classList.remove('plan-e2e-school-task');
+                const title = task.querySelector('.task-title');
+                const text = title ? String(title.value || title.textContent || '').trim() : '';
+                if (text === 'مدرسه') {
+                  task.classList.add('plan-e2e-school-task');
+                }
+              });
+            }
+            """
         )
-        if school_tasks.count() == 0:
-            school_tasks = page.locator(".calendar .calendar-task").filter(
-                has_text="مدرسه"
-            )
+        school_tasks = page.locator(".calendar .calendar-task.plan-e2e-school-task")
         require(school_tasks.count() >= 5, "default school blocks are loaded")
 
         school = school_tasks.first
@@ -171,30 +179,29 @@ def main() -> int:
             abs(school_box["height"] - 227.5) <= 2.0,
             "07:30–14:00 school duration uses the same time scale",
         )
+        school_label = school.locator(".time-label").inner_text()
         require(
-            "07:30" in school.locator(".time-label").inner_text()
-            and "14:00" in school.locator(".time-label").inner_text(),
+            "07:30" in school_label and "14:00" in school_label,
             "school time label matches its visual position and height",
         )
 
         toolbar = page.evaluate(
             """
-            () => ({
-              studentGrade: window.planLessonToolbarState.studentGrade,
-              majorCode: window.planLessonToolbarState.majorCode,
-              allowedIds: window.planLessonToolbarState.allowedGradeIds,
-              options: window.planLessonToolbarState.gradeOptions,
-              visibleGrades: Array.from(document.querySelectorAll(
-                '#specialized-task-list .task:visible, #general-task-list .task:visible'
-              )).map(item => String(item.dataset.grade || '')),
-              allGrades: Array.from(document.querySelectorAll(
+            () => {
+              const cards = Array.from(document.querySelectorAll(
                 '#specialized-task-list .task, #general-task-list .task'
-              )).map(item => String(item.dataset.grade || '')),
-              visibleText: Array.from(document.querySelectorAll(
-                '#specialized-task-list .task, #general-task-list .task'
-              )).filter(item => getComputedStyle(item).display !== 'none')
-                .map(item => item.textContent.trim())
-            })
+              ));
+              const visible = cards.filter(item => getComputedStyle(item).display !== 'none');
+              return {
+                studentGrade: window.planLessonToolbarState.studentGrade,
+                majorCode: window.planLessonToolbarState.majorCode,
+                allowedIds: window.planLessonToolbarState.allowedGradeIds,
+                options: window.planLessonToolbarState.gradeOptions,
+                visibleGrades: visible.map(item => String(item.dataset.grade || '')),
+                allGrades: cards.map(item => String(item.dataset.grade || '')),
+                visibleText: visible.map(item => item.textContent.trim())
+              };
+            }
             """
         )
         allowed_ids = {str(value) for value in toolbar["allowedIds"]}
@@ -230,10 +237,7 @@ def main() -> int:
         free_container = None
         for index in range(containers.count()):
             candidate = containers.nth(index)
-            school_count = candidate.locator(".calendar-task").filter(
-                has_text="مدرسه"
-            ).count()
-            if school_count == 0:
+            if candidate.locator(".plan-e2e-school-task").count() == 0:
                 free_container = candidate
                 break
         require(free_container is not None, "a non-school day is available for drop testing")
