@@ -1,0 +1,68 @@
+name: Validate Dashboard behavior
+
+on:
+  pull_request:
+    paths:
+      - 'accounts/**'
+      - 'management/**'
+      - 'plans/dashboard_admin.py'
+      - 'plans/views.py'
+      - 'plans/urls.py'
+      - 'plans/templates/plans/management.html'
+      - 'config/test_settings.py'
+      - 'deploy/dashboard_e2e.py'
+      - '.github/workflows/validate-dashboard.yml'
+      - '.github/workflows/verify-dashboard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate dashboard source syntax
+        run: |
+          python3 -m py_compile \
+            management/dashboard_security.py \
+            management/test_dashboard.py \
+            plans/dashboard_admin.py
+          if [ -f deploy/dashboard_e2e.py ]; then
+            python3 -m py_compile deploy/dashboard_e2e.py
+          fi
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq default-libmysqlclient-dev pkg-config >/dev/null
+          python3 -m venv .venv
+          .venv/bin/pip install -q --upgrade pip setuptools wheel
+          .venv/bin/pip install -q -r requirements.txt
+
+      - name: Run dashboard regression tests
+        env:
+          DJANGO_SETTINGS_MODULE: config.test_settings
+        shell: bash
+        run: |
+          set +e
+          .venv/bin/python manage.py test management.test_dashboard --verbosity 2 \
+            > dashboard-test-output.txt 2>&1
+          status=$?
+          cat dashboard-test-output.txt
+          exit "$status"
+
+      - name: Upload dashboard test output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dashboard-test-output
+          path: dashboard-test-output.txt
+          retention-days: 3
