@@ -4,7 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render
 
-from accounts.models import Advisor, Profile, Student
+from accounts.models import Advisor, Grade, Profile, Student
 from plans.default_plan_data import DEFAULT_BOXES
 from plans.models import Box, DefaultEvent, Lesson, WeeklyReportDetail
 
@@ -42,11 +42,48 @@ GENERAL_SUBJECTS = [
     "جغرافیا",
     "زمین",
 ]
+GRADE_SEQUENCE = ("دهم", "یازدهم", "دوازدهم")
 GRADE_ORDER = {
     "دوازدهم": 0,
     "یازدهم": 1,
     "دهم": 2,
 }
+
+
+def _normalized_name(value: object) -> str:
+    return (
+        str(value or "")
+        .strip()
+        .replace("\u200c", "")
+        .replace("\u200e", "")
+        .replace("\u200f", "")
+        .replace(" ", "")
+        .replace("ي", "ی")
+        .replace("ى", "ی")
+        .replace("ك", "ک")
+    )
+
+
+GRADE_BY_KEY = {_normalized_name(name): name for name in GRADE_SEQUENCE}
+
+
+def canonical_grade_name(value: object) -> str | None:
+    return GRADE_BY_KEY.get(_normalized_name(value))
+
+
+def allowed_grade_names(student: Student) -> set[str]:
+    """Return the student's current grade and all completed lower grades.
+
+    A tenth-grade student sees only tenth-grade lessons. An eleventh-grade
+    student sees tenth and eleventh grade. A twelfth-grade student sees all
+    three grades. Lessons from a future grade are never returned by the API.
+    """
+
+    current = canonical_grade_name(student.grade.name)
+    if current is None:
+        return {student.grade.name}
+    current_index = GRADE_SEQUENCE.index(current)
+    return set(GRADE_SEQUENCE[: current_index + 1])
 
 
 def _track_codes(lesson: Lesson) -> set[str]:
@@ -68,7 +105,7 @@ def _subject_order(subjects: list[str], lesson: Lesson) -> tuple[int, int, str, 
         subject_index = 999
     return (
         subject_index,
-        GRADE_ORDER.get(lesson.grade.name, 999),
+        GRADE_ORDER.get(canonical_grade_name(lesson.grade.name) or lesson.grade.name, 999),
         lesson.name,
         lesson.pk,
     )
@@ -95,6 +132,7 @@ def sort_lessons_for_student(student: Student) -> dict[str, list[Lesson]]:
     if not major_code:
         return {"specialized_lessons": [], "general_lessons": []}
 
+    allowed_grades = allowed_grade_names(student)
     lessons = (
         Lesson.objects.select_related("grade", "lesson_type")
         .prefetch_related("chapter_set")
@@ -104,6 +142,9 @@ def sort_lessons_for_student(student: Student) -> dict[str, list[Lesson]]:
     general_lessons: list[Lesson] = []
 
     for lesson in lessons:
+        lesson_grade = canonical_grade_name(lesson.grade.name) or lesson.grade.name
+        if lesson_grade not in allowed_grades:
+            continue
         if major_code not in _track_codes(lesson):
             continue
         if lesson.lesson_type.name == "اختصاصی":
@@ -132,6 +173,39 @@ def _serialize_lessons(lessons: list[Lesson]) -> list[dict[str, object]]:
         }
         for lesson in lessons
     ]
+
+
+def _grade_filter_payload(student: Student) -> dict[str, object]:
+    allowed_names = allowed_grade_names(student)
+    grade_objects = list(Grade.objects.all())
+    grade_by_name = {
+        canonical_grade_name(grade.name) or grade.name: grade for grade in grade_objects
+    }
+    grade_options = []
+    allowed_grade_ids = []
+    for grade_name in GRADE_SEQUENCE:
+        grade = grade_by_name.get(grade_name)
+        if grade is None:
+            continue
+        allowed = grade_name in allowed_names
+        grade_options.append(
+            {
+                "id": grade.pk,
+                "name": grade_name,
+                "allowed": allowed,
+                "current": grade.pk == student.grade_id,
+            }
+        )
+        if allowed:
+            allowed_grade_ids.append(grade.pk)
+
+    return {
+        "student_id": student.pk,
+        "student_grade_id": student.grade_id,
+        "student_grade": canonical_grade_name(student.grade.name) or student.grade.name,
+        "allowed_grade_ids": allowed_grade_ids,
+        "grade_options": grade_options,
+    }
 
 
 @login_required
@@ -164,10 +238,6 @@ def plan_view(request):
             request.user.get_full_name().strip() or request.user.get_username()
         )
 
-    # Important: return the template unmodified.  plan.html contains literal
-    # </body> and </script> strings inside JavaScript-generated report HTML.
-    # Post-processing response.content can inject markup inside those scripts
-    # and stop every calendar handler from being parsed by the browser.
     return render(
         request,
         "plans/plan.html",
@@ -207,6 +277,7 @@ def get_lessons_for_student(request):
                 lessons["specialized_lessons"]
             ),
             "general_lessons": _serialize_lessons(lessons["general_lessons"]),
+            **_grade_filter_payload(student),
         }
     )
 
@@ -282,7 +353,6 @@ def get_default_events(request):
             safe=False,
         )
 
-    # Backward-compatible fallback for events saved by the old implementation.
     legacy_details = (
         WeeklyReportDetail.objects.select_related("report", "box")
         .filter(

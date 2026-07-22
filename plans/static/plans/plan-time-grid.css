@@ -1,0 +1,149 @@
+:root {
+  --plan-hour-height: 35px;
+  --plan-quarter-height: 8.75px;
+  --plan-grid-hours: 18;
+  --plan-grid-height: 630px;
+  --plan-day-header-height: 58px;
+}
+
+.calendar-container {
+  align-items: flex-start !important;
+}
+
+.calendar {
+  align-items: flex-start !important;
+  overflow-y: visible !important;
+}
+
+.calendar .day-column {
+  display: grid !important;
+  grid-template-rows: var(--plan-day-header-height) var(--plan-grid-height) !important;
+  align-content: start !important;
+  height: calc(var(--plan-day-header-height) + var(--plan-grid-height) + 12px) !important;
+  min-height: calc(var(--plan-day-header-height) + var(--plan-grid-height) + 12px) !important;
+  padding: 0 5px 5px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.calendar .plan-day-header {
+  height: var(--plan-day-header-height) !important;
+  min-height: var(--plan-day-header-height) !important;
+  display: grid !important;
+  grid-template-rows: minmax(18px, auto) minmax(22px, auto) !important;
+  align-content: center !important;
+  gap: 2px !important;
+  margin: 0 !important;
+  padding: 1px 2px 3px !important;
+  box-sizing: border-box !important;
+}
+
+.calendar .plan-day-header > h4 {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 18px !important;
+  line-height: 18px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.calendar .plan-day-options {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  min-height: 22px !important;
+  line-height: 20px !important;
+  white-space: nowrap !important;
+}
+
+.calendar .plan-day-options > label {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 20px !important;
+}
+
+.calendar .task-container {
+  position: relative !important;
+  grid-row: 2 !important;
+  width: 100% !important;
+  height: var(--plan-grid-height) !important;
+  min-height: var(--plan-grid-height) !important;
+  max-height: var(--plan-grid-height) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  background-color: #fff !important;
+  background-image:
+    linear-gradient(to bottom, rgba(100, 116, 139, 0.42) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(203, 213, 225, 0.42) 1px, transparent 1px) !important;
+  background-size:
+    100% var(--plan-hour-height),
+    100% var(--plan-quarter-height) !important;
+  background-position: 0 0, 0 0 !important;
+  background-repeat: repeat-y, repeat-y !important;
+}
+
+.calendar-container > .timeline {
+  position: relative !important;
+  display: block !important;
+  flex: 0 0 46px !important;
+  width: 46px !important;
+  height: var(--plan-grid-height) !important;
+  min-height: var(--plan-grid-height) !important;
+  margin: var(--plan-day-header-height) 0 0 0 !important;
+  padding: 0 3px 0 0 !important;
+  border: 0 !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+.calendar-container > .timeline .time-slot {
+  position: absolute !important;
+  right: 0 !important;
+  width: 42px !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 0 0 4px !important;
+  border: 0 !important;
+  line-height: 1 !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+  transform: translateY(-50%) !important;
+  color: #64748b !important;
+  font-size: 12px !important;
+  font-variant-numeric: tabular-nums !important;
+  box-sizing: border-box !important;
+}
+
+.calendar-container > .timeline .time-slot::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 5px;
+  border-top: 1px solid rgba(100, 116, 139, 0.55);
+}
+
+.subjects-box .grade-filter:disabled + span,
+.subjects-box label.plan-grade-disabled {
+  opacity: 0.38;
+}
+
+.subjects-box .plan-grade-current {
+  font-weight: 700;
+}
+
+@media (max-width: 1100px) {
+  .calendar .plan-day-options {
+    gap: 4px !important;
+    font-size: 10px !important;
+  }
+}
