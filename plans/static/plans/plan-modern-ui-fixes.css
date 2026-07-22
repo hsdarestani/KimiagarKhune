@@ -1,0 +1,23 @@
+.plan-ui-modern .nav-bar {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.plan-ui-modern .nav-bar > .top-header,
+.plan-ui-modern .nav-bar > .plan-palette-row {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.plan-ui-modern .nav-bar > .plan-palette-row {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 760px) {
+  .plan-ui-modern .nav-bar {
+    overflow: visible !important;
+  }
+}
