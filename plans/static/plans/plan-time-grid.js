@@ -12,7 +12,8 @@
   const QUARTER_HEIGHT = HOUR_HEIGHT / 4;
   const GRID_HEIGHT = HOURS * HOUR_HEIGHT;
   const HEADER_HEIGHT = 58;
-  const VERSION = '2026.07.22.1';
+  const VERSION = '2026.07.22.2';
+  let synchronizeQueued = false;
 
   function pad(value) {
     return String(value).padStart(2, '0');
@@ -46,22 +47,29 @@
     let $slots = $timeline.children('.time-slot');
     const expectedSlots = HOURS + 1;
     if ($slots.length !== expectedSlots) {
-      $timeline.empty();
+      const fragment = document.createDocumentFragment();
       for (let index = 0; index < expectedSlots; index += 1) {
-        const hour = (START_HOUR + index) % 24;
-        $timeline.append(
-          $('<div class="time-slot"></div>').text(pad(hour) + ':00')
-        );
+        const slot = document.createElement('div');
+        slot.className = 'time-slot';
+        fragment.appendChild(slot);
       }
+      $timeline.empty().append(fragment);
       $slots = $timeline.children('.time-slot');
     }
 
     $slots.each(function (index) {
-      const hour = (START_HOUR + index) % 24;
-      $(this)
-        .text(pad(hour) + ':00')
-        .attr('data-plan-minute', index * 60)
-        .css('top', index * HOUR_HEIGHT + 'px');
+      const label = pad((START_HOUR + index) % 24) + ':00';
+      const minute = String(index * 60);
+      const top = index * HOUR_HEIGHT + 'px';
+      if (this.textContent !== label) {
+        this.textContent = label;
+      }
+      if (this.getAttribute('data-plan-minute') !== minute) {
+        this.setAttribute('data-plan-minute', minute);
+      }
+      if (this.style.top !== top) {
+        this.style.top = top;
+      }
     });
   }
 
@@ -76,16 +84,26 @@
 
   function normalizeTaskGeometry() {
     $('.calendar .task-container').each(function () {
-      this.style.height = GRID_HEIGHT + 'px';
-      this.style.minHeight = GRID_HEIGHT + 'px';
-      this.style.maxHeight = GRID_HEIGHT + 'px';
+      const height = GRID_HEIGHT + 'px';
+      if (this.style.height !== height) {
+        this.style.height = height;
+      }
+      if (this.style.minHeight !== height) {
+        this.style.minHeight = height;
+      }
+      if (this.style.maxHeight !== height) {
+        this.style.maxHeight = height;
+      }
     });
 
     $('.calendar .calendar-task').each(function () {
       const $task = $(this);
       const top = Number.parseFloat($task.css('top')) || 0;
       const height = Number.parseFloat($task.css('height')) || QUARTER_HEIGHT;
-      const clampedTop = Math.max(0, Math.min(top, GRID_HEIGHT - Math.max(QUARTER_HEIGHT, height)));
+      const clampedTop = Math.max(
+        0,
+        Math.min(top, GRID_HEIGHT - Math.max(QUARTER_HEIGHT, height))
+      );
       if (Math.abs(clampedTop - top) > 0.1) {
         $task.css('top', clampedTop + 'px');
         if (typeof window.updateTimeLabel === 'function') {
@@ -96,11 +114,22 @@
   }
 
   function synchronize() {
+    synchronizeQueued = false;
     applyGeometryVariables();
     ensureDayHeaders();
     layoutTimeline();
     normalizeTaskGeometry();
-    document.body.setAttribute('data-plan-time-grid-version', VERSION);
+    if (document.body) {
+      document.body.setAttribute('data-plan-time-grid-version', VERSION);
+    }
+  }
+
+  function queueSynchronize() {
+    if (synchronizeQueued) {
+      return;
+    }
+    synchronizeQueued = true;
+    window.requestAnimationFrame(synchronize);
   }
 
   function topForClock(hours, minutes) {
@@ -132,7 +161,9 @@
       gridHeight: containerRect.height,
       sixCenter: sixRect.top + sixRect.height / 2,
       sevenCenter: sevenRect.top + sevenRect.height / 2,
-      hourDistance: sevenRect.top - sixRect.top
+      hourDistance:
+        sevenRect.top + sevenRect.height / 2 -
+        (sixRect.top + sixRect.height / 2)
     };
   }
 
@@ -154,16 +185,15 @@
 
     const calendar = document.querySelector('.calendar');
     if (calendar) {
-      new MutationObserver(function () {
-        window.requestAnimationFrame(synchronize);
-      }).observe(calendar, { childList: true, subtree: true });
+      new MutationObserver(queueSynchronize).observe(calendar, {
+        childList: true,
+        subtree: true
+      });
     }
 
-    window.addEventListener('resize', function () {
-      window.requestAnimationFrame(synchronize);
-    });
-    window.addEventListener('plan:interactions-ready', synchronize);
-    window.addEventListener('plan:drag-surface-ready', synchronize);
+    window.addEventListener('resize', queueSynchronize);
+    window.addEventListener('plan:interactions-ready', queueSynchronize);
+    window.addEventListener('plan:drag-surface-ready', queueSynchronize);
     window.dispatchEvent(new CustomEvent('plan:time-grid-ready'));
   }
 
