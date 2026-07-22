@@ -8,6 +8,7 @@ on:
       - 'deploy/plan_e2e.py'
       - 'deploy/plan_e2e_runner.py'
       - 'deploy/plan_real_interaction_e2e.py'
+      - 'deploy/plan_school_drag_e2e.py'
       - 'config/test_settings.py'
       - '.github/workflows/deploy.yml'
       - '.github/workflows/validate-plan.yml'
@@ -32,10 +33,13 @@ jobs:
           node --check plans/static/plans/plan-secondary.js
           node --check plans/static/plans/plan-interactions.js
           node --check plans/static/plans/plan-manual-resize.js
+          node --check plans/static/plans/plan-drag-surface.js
           python3 -m py_compile \
             deploy/plan_e2e.py \
             deploy/plan_e2e_runner.py \
             deploy/plan_real_interaction_e2e.py \
+            deploy/plan_school_drag_e2e.py \
+            plans/management/commands/cleanup_plan_demo_reports.py \
             plans/plan_page.py \
             plans/weekly_plans.py \
             plans/weekly_plans_v2.py
