@@ -25,6 +25,7 @@ class PlanSecondaryScriptTests(TestCase):
         grid_style = b'/static/plans/plan-time-grid.css?v='
         geometry_style = b'/static/plans/plan-task-geometry.css?v='
         modern_style = b'/static/plans/plan-modern-ui.css?v='
+        modern_fixes_style = b'/static/plans/plan-modern-ui-fixes.css?v='
         runtime = b'/static/plans/plan-runtime.js?v='
         secondary = b'/static/plans/plan-secondary.js?v='
         grid = b'/static/plans/plan-time-grid.js?v='
@@ -40,6 +41,7 @@ class PlanSecondaryScriptTests(TestCase):
             grid_style,
             geometry_style,
             modern_style,
+            modern_fixes_style,
             runtime,
             secondary,
             grid,
@@ -68,3 +70,4 @@ class PlanSecondaryScriptTests(TestCase):
         self.assertIn(b'data-plan-time-grid-style="true"', content)
         self.assertIn(b'data-plan-task-geometry-style="true"', content)
         self.assertIn(b'data-plan-modern-ui-style="true"', content)
+        self.assertIn(b'data-plan-modern-ui-fixes-style="true"', content)
