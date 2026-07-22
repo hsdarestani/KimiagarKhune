@@ -1,0 +1,950 @@
+:root {
+  --plan-ui-primary: #2563eb;
+  --plan-ui-primary-dark: #1d4ed8;
+  --plan-ui-primary-soft: #eff6ff;
+  --plan-ui-accent: #14b8a6;
+  --plan-ui-success: #16a34a;
+  --plan-ui-danger: #ef4444;
+  --plan-ui-ink: #172033;
+  --plan-ui-muted: #64748b;
+  --plan-ui-line: #dce5f0;
+  --plan-ui-surface: rgba(255, 255, 255, 0.94);
+  --plan-ui-surface-solid: #ffffff;
+  --plan-ui-bg: #f4f7fb;
+  --plan-ui-radius-sm: 10px;
+  --plan-ui-radius: 16px;
+  --plan-ui-radius-lg: 22px;
+  --plan-ui-shadow-sm: 0 4px 14px rgba(30, 64, 175, 0.07);
+  --plan-ui-shadow: 0 12px 32px rgba(30, 64, 175, 0.11);
+  --plan-ui-shadow-lg: 0 24px 65px rgba(15, 23, 42, 0.18);
+  --plan-ui-transition: 180ms cubic-bezier(.2, .8, .2, 1);
+}
+
+html {
+  min-width: 0;
+  background: var(--plan-ui-bg);
+}
+
+body.plan-ui-modern {
+  min-width: 0;
+  min-height: 100vh;
+  margin: 0 !important;
+  padding: 14px !important;
+  overflow-x: hidden;
+  color: var(--plan-ui-ink);
+  background:
+    radial-gradient(circle at 8% 10%, rgba(99, 102, 241, 0.11), transparent 28%),
+    radial-gradient(circle at 92% 6%, rgba(20, 184, 166, 0.10), transparent 27%),
+    linear-gradient(145deg, #f5f8ff 0%, #f2fbf8 100%) !important;
+}
+
+body.plan-ui-modern::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  pointer-events: none;
+  opacity: .34;
+  background-image: radial-gradient(rgba(37, 99, 235, .16) .7px, transparent .7px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(to bottom, #000, transparent 78%);
+}
+
+.plan-ui-modern .floating-circle {
+  opacity: .12 !important;
+  filter: blur(1px);
+}
+
+.plan-ui-modern *,
+.plan-ui-modern *::before,
+.plan-ui-modern *::after {
+  box-sizing: border-box;
+}
+
+/* ---------- Page heading and command center ---------- */
+.plan-ui-modern .top-header {
+  position: relative;
+  display: block !important;
+  width: 100%;
+  margin: 0 0 12px !important;
+  padding: 14px 16px !important;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: var(--plan-ui-radius-lg) !important;
+  background: var(--plan-ui-surface) !important;
+  box-shadow: var(--plan-ui-shadow) !important;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.plan-ui-modern .top-header::after {
+  content: "";
+  position: absolute;
+  top: -70px;
+  left: -55px;
+  width: 190px;
+  height: 190px;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37, 99, 235, .15), transparent 68%);
+}
+
+.plan-ui-modern .plan-page-heading {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--plan-ui-line);
+}
+
+.plan-ui-modern .plan-page-heading-main {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.plan-ui-modern .plan-page-mark {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  color: #fff;
+  border-radius: 13px;
+  background: linear-gradient(135deg, var(--plan-ui-primary), #7c3aed);
+  box-shadow: 0 9px 20px rgba(37, 99, 235, .24);
+}
+
+.plan-ui-modern .plan-page-mark svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.plan-ui-modern .plan-page-title {
+  margin: 0;
+  color: var(--plan-ui-ink);
+  font-size: clamp(17px, 1.6vw, 23px);
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.plan-ui-modern .plan-page-subtitle {
+  margin: 2px 0 0;
+  color: var(--plan-ui-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.plan-ui-modern .plan-page-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  color: #0f766e;
+  font-size: 10px;
+  font-weight: 800;
+  border: 1px solid #b7eee4;
+  border-radius: 999px;
+  background: #ecfdf8;
+}
+
+.plan-ui-modern .plan-page-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, .12);
+}
+
+.plan-ui-modern .top-header > div:not(.plan-page-heading),
+.plan-ui-modern .top-header > div:not(.plan-page-heading) > div {
+  min-width: 0;
+}
+
+.plan-ui-modern .top-header > div:not(.plan-page-heading) {
+  position: relative;
+  z-index: 1;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap;
+  gap: 8px 10px !important;
+}
+
+.plan-ui-modern .consultant-name,
+.plan-ui-modern .top-header label {
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.plan-ui-modern #student-select,
+.plan-ui-modern #weekSelector,
+.plan-ui-modern .top-header .select2-container .select2-selection {
+  min-height: 38px;
+  border: 1px solid #d4dfec !important;
+  border-radius: 11px !important;
+  background: #fff !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .02) !important;
+  transition: border-color var(--plan-ui-transition), box-shadow var(--plan-ui-transition);
+}
+
+.plan-ui-modern #student-select {
+  min-width: 190px;
+  padding: 5px 10px;
+  color: var(--plan-ui-ink);
+  font-size: 12px;
+}
+
+.plan-ui-modern #weekSelector {
+  width: 126px !important;
+  padding: 0 11px !important;
+  color: var(--plan-ui-ink);
+  text-align: center;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-ui-modern #student-select:focus,
+.plan-ui-modern #weekSelector:focus,
+.plan-ui-modern .top-header .select2-container--focus .select2-selection {
+  outline: none;
+  border-color: #8db2ff !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .10) !important;
+}
+
+.plan-ui-modern .week-selector {
+  display: flex;
+  align-items: center;
+  flex: 1 1 680px;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 !important;
+}
+
+.plan-ui-modern .download-btn {
+  min-height: 34px;
+  margin: 0 !important;
+  padding: 6px 11px !important;
+  color: #fff !important;
+  font-size: 9.5px !important;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: linear-gradient(135deg, #16a34a, #15803d) !important;
+  box-shadow: 0 5px 12px rgba(22, 163, 74, .17) !important;
+  transition: transform var(--plan-ui-transition), box-shadow var(--plan-ui-transition), filter var(--plan-ui-transition) !important;
+}
+
+.plan-ui-modern #loadWeek {
+  background: linear-gradient(135deg, var(--plan-ui-primary), var(--plan-ui-primary-dark)) !important;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, .20) !important;
+}
+
+.plan-ui-modern .download-btn:hover {
+  transform: translateY(-1px) !important;
+  filter: saturate(1.08);
+  box-shadow: 0 8px 18px rgba(22, 163, 74, .22) !important;
+}
+
+.plan-ui-modern .download-btn:active {
+  transform: translateY(0) scale(.98) !important;
+}
+
+/* ---------- Palette cards ---------- */
+.plan-ui-modern .plan-palette-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.plan-ui-modern .assignments-box,
+.plan-ui-modern .events-box {
+  position: relative;
+  min-width: 0;
+  margin: 0 !important;
+  padding: 12px 14px !important;
+  border: 1px solid rgba(203, 213, 225, .72);
+  border-radius: var(--plan-ui-radius) !important;
+  background: var(--plan-ui-surface) !important;
+  box-shadow: var(--plan-ui-shadow-sm) !important;
+  backdrop-filter: blur(14px);
+}
+
+.plan-ui-modern .assignments-box::before,
+.plan-ui-modern .events-box::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 14px;
+  left: 14px;
+  height: 3px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+}
+
+.plan-ui-modern .events-box::before {
+  background: linear-gradient(90deg, transparent, #2dd4bf, transparent);
+}
+
+.plan-ui-modern .assignments-box h4,
+.plan-ui-modern .events-box h4 {
+  margin: 0 0 8px !important;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: right !important;
+}
+
+.plan-ui-modern .events-box > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px !important;
+  color: #475569;
+}
+
+.plan-ui-modern .assignments-box .task-list,
+.plan-ui-modern .events-box .task-list {
+  display: flex;
+  align-items: center;
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.plan-ui-modern .assignments-box .task,
+.plan-ui-modern .events-box .task {
+  min-width: 82px;
+  padding: 7px 11px !important;
+  color: #334155;
+  font-size: 10px;
+  font-weight: 800;
+  border: 1px solid #c7d8ee !important;
+  border-radius: 10px !important;
+  background: #f8fbff !important;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, .04);
+  transition: transform var(--plan-ui-transition), box-shadow var(--plan-ui-transition), border-color var(--plan-ui-transition);
+}
+
+.plan-ui-modern .events-box .task {
+  border-color: #bfe7df !important;
+  background: #f0fdfa !important;
+}
+
+.plan-ui-modern .events-box .task.floating-box {
+  border-color: #fde68a !important;
+  background: #fffbeb !important;
+}
+
+.plan-ui-modern .assignments-box .task:hover,
+.plan-ui-modern .events-box .task:hover {
+  z-index: 2;
+  transform: translateY(-2px);
+  border-color: #93b8ee !important;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, .10);
+}
+
+/* ---------- Main workspace ---------- */
+.plan-ui-modern .main-content {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 12px !important;
+  min-width: 0;
+}
+
+.plan-ui-modern .calendar-wrapper {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid rgba(203, 213, 225, .68);
+  border-radius: var(--plan-ui-radius-lg);
+  background: rgba(255, 255, 255, .54);
+  box-shadow: var(--plan-ui-shadow-sm);
+  scrollbar-color: #a9bad1 transparent;
+  scrollbar-width: thin;
+}
+
+.plan-ui-modern .calendar-wrapper::-webkit-scrollbar,
+.plan-ui-modern .subjects-box::-webkit-scrollbar,
+.plan-ui-modern .week-selector::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.plan-ui-modern .calendar-wrapper::-webkit-scrollbar-thumb,
+.plan-ui-modern .subjects-box::-webkit-scrollbar-thumb,
+.plan-ui-modern .week-selector::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #b9c7d9;
+}
+
+.plan-ui-modern .calendar-wrapper::-webkit-scrollbar-track,
+.plan-ui-modern .subjects-box::-webkit-scrollbar-track,
+.plan-ui-modern .week-selector::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.plan-ui-modern .calendar-container {
+  min-width: 1140px;
+  padding: 8px 8px 9px;
+  border-radius: inherit;
+}
+
+.plan-ui-modern .calendar {
+  gap: 8px !important;
+}
+
+.plan-ui-modern .day-column {
+  min-width: 135px;
+  border: 1px solid #dce5ef !important;
+  border-radius: 15px !important;
+  background: #fff !important;
+  box-shadow: 0 5px 15px rgba(30, 64, 175, .055) !important;
+  transition: border-color var(--plan-ui-transition), box-shadow var(--plan-ui-transition), transform var(--plan-ui-transition);
+}
+
+.plan-ui-modern .day-column:hover {
+  border-color: #bfd2eb !important;
+  box-shadow: 0 9px 22px rgba(30, 64, 175, .09) !important;
+}
+
+.plan-ui-modern .plan-day-header {
+  border-bottom: 1px solid #e7edf5;
+  background: linear-gradient(to bottom, #fff, #fbfdff);
+}
+
+.plan-ui-modern .plan-day-header h4,
+.plan-ui-modern .day-column > h4 {
+  color: #334155;
+  font-weight: 900;
+}
+
+.plan-ui-modern .plan-day-options label {
+  color: #64748b;
+  font-size: 9px !important;
+  cursor: pointer;
+}
+
+.plan-ui-modern input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--plan-ui-primary);
+  cursor: pointer;
+}
+
+.plan-ui-modern .task-container {
+  border-radius: 0 0 11px 11px;
+}
+
+.plan-ui-modern .timeline .time-slot {
+  color: #7b8ba1 !important;
+  font-size: 10px !important;
+  font-weight: 700;
+}
+
+/* Visual polish only: never alter task position, top, height or width here. */
+.plan-ui-modern .calendar-task {
+  border-top: 1px solid rgba(255, 255, 255, .68);
+  box-shadow: 0 5px 11px rgba(15, 23, 42, .14);
+  transition: box-shadow var(--plan-ui-transition), filter var(--plan-ui-transition), opacity var(--plan-ui-transition) !important;
+}
+
+.plan-ui-modern .calendar-task:hover {
+  z-index: 70 !important;
+  filter: saturate(1.04);
+  box-shadow: 0 9px 18px rgba(15, 23, 42, .19);
+}
+
+.plan-ui-modern .calendar-task .task-title {
+  color: #172033;
+  font-weight: 900 !important;
+  text-shadow: 0 1px rgba(255, 255, 255, .38);
+}
+
+.plan-ui-modern .calendar-task .remove-btn {
+  display: grid;
+  width: 21px;
+  height: 21px;
+  place-items: center;
+  padding: 0 !important;
+  color: #0f5132;
+  font-size: 13px !important;
+  line-height: 1;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .42) !important;
+  transition: color var(--plan-ui-transition), background var(--plan-ui-transition), transform var(--plan-ui-transition);
+}
+
+.plan-ui-modern .calendar-task .remove-btn:hover {
+  color: #dc2626 !important;
+  background: rgba(254, 226, 226, .92) !important;
+  transform: scale(1.06);
+}
+
+.plan-ui-modern .calendar-task .repeat-btn,
+.plan-ui-modern .calendar-task .tick-btn {
+  min-height: 20px;
+  padding: 2px 6px;
+  color: #0f766e;
+  font-size: 8px !important;
+  font-weight: 800;
+  border: 1px solid rgba(13, 148, 136, .18);
+  border-radius: 7px;
+  background: rgba(240, 253, 250, .82);
+}
+
+.plan-ui-modern .calendar-task .time-label {
+  color: #334155 !important;
+  font-size: 8px !important;
+  font-weight: 800;
+  background: rgba(255, 255, 255, .76) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, .07);
+}
+
+.plan-ui-modern .plan-resize-handle span {
+  height: 3px;
+  background: rgba(51, 65, 85, .34);
+}
+
+/* ---------- Lesson sidebar ---------- */
+.plan-ui-modern .subjects-box {
+  position: sticky;
+  top: 14px;
+  flex: 0 0 218px;
+  width: 218px !important;
+  max-height: calc(100vh - 28px) !important;
+  margin: 0 !important;
+  padding: 13px 11px 15px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  border: 1px solid rgba(203, 213, 225, .74);
+  border-radius: var(--plan-ui-radius-lg) !important;
+  background: var(--plan-ui-surface) !important;
+  box-shadow: var(--plan-ui-shadow) !important;
+  scrollbar-width: thin;
+  z-index: 80;
+}
+
+.plan-ui-modern .subjects-box h4 {
+  margin: 0 0 11px !important;
+  color: var(--plan-ui-ink);
+  font-size: 15px;
+  font-weight: 900;
+  text-align: right !important;
+}
+
+.plan-ui-modern .subjects-box .grade-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 11px !important;
+  padding: 9px;
+  border: 1px solid #e1e9f3;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.plan-ui-modern .subjects-box .grade-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 !important;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.plan-ui-modern #subjectTabs {
+  gap: 6px;
+  margin: 0 0 11px !important;
+  padding: 4px;
+  border-radius: 12px;
+  background: #eef3f9;
+}
+
+.plan-ui-modern #subjectTabs .nav-link {
+  padding: 7px 6px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  border: 0 !important;
+  border-radius: 9px !important;
+  background: transparent;
+  transition: color var(--plan-ui-transition), background var(--plan-ui-transition), box-shadow var(--plan-ui-transition);
+}
+
+.plan-ui-modern #subjectTabs .nav-link.active {
+  color: var(--plan-ui-primary);
+  background: #fff;
+  box-shadow: 0 3px 9px rgba(37, 99, 235, .10);
+}
+
+.plan-ui-modern .subjects-box .task-list {
+  gap: 6px !important;
+}
+
+.plan-ui-modern .subjects-box .task {
+  position: relative;
+  min-height: 38px;
+  padding: 9px 10px !important;
+  overflow: hidden;
+  color: #253047;
+  font-size: 11px;
+  font-weight: 850;
+  border: 1px solid #bed7f5 !important;
+  border-radius: 11px !important;
+  background: linear-gradient(135deg, #f4f9ff, #eaf4ff) !important;
+  box-shadow: 0 3px 8px rgba(37, 99, 235, .055);
+  transition: transform var(--plan-ui-transition), box-shadow var(--plan-ui-transition), border-color var(--plan-ui-transition);
+}
+
+.plan-ui-modern .subjects-box .task::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(115deg, transparent 15%, rgba(255, 255, 255, .55) 45%, transparent 75%);
+  transform: translateX(120%);
+  transition: transform 420ms ease, opacity 180ms ease;
+}
+
+.plan-ui-modern .subjects-box .task:hover {
+  transform: translateY(-1px) scale(1.01);
+  border-color: #7eb1ef !important;
+  box-shadow: 0 7px 15px rgba(37, 99, 235, .11);
+}
+
+.plan-ui-modern .subjects-box .task:hover::after {
+  opacity: 1;
+  transform: translateX(-120%);
+}
+
+.plan-ui-modern .subjects-box .tab-pane > h5,
+.plan-ui-modern .subjects-box h5 {
+  position: sticky;
+  top: -13px;
+  z-index: 2;
+  margin: 4px 0 7px;
+  padding: 8px 3px 6px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 900;
+  background: linear-gradient(to bottom, #fff 80%, rgba(255, 255, 255, 0));
+}
+
+.plan-ui-modern .plan-subjects-close,
+.plan-ui-modern .plan-subjects-toggle,
+.plan-ui-modern .plan-mobile-backdrop {
+  display: none;
+}
+
+/* ---------- Footer controls ---------- */
+.plan-ui-modern textarea,
+.plan-ui-modern #importantEvents {
+  width: 100% !important;
+  min-height: 74px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  color: #334155;
+  font-size: 11px;
+  border: 1px solid #d7e1ed;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .88);
+  box-shadow: var(--plan-ui-shadow-sm);
+  resize: vertical;
+}
+
+.plan-ui-modern textarea:focus,
+.plan-ui-modern #importantEvents:focus {
+  outline: none;
+  border-color: #8db2ff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .09);
+}
+
+.plan-ui-modern .save-btn {
+  min-height: 42px;
+  padding: 9px 19px !important;
+  color: #fff;
+  font-size: 12px !important;
+  font-weight: 900;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #16a34a, #0f766e) !important;
+  box-shadow: 0 8px 18px rgba(15, 118, 110, .20);
+}
+
+/* ---------- Tablet ---------- */
+@media (max-width: 1180px) {
+  body.plan-ui-modern {
+    padding: 10px !important;
+  }
+
+  .plan-ui-modern .plan-palette-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .plan-ui-modern .subjects-box {
+    flex-basis: 198px;
+    width: 198px !important;
+  }
+
+  .plan-ui-modern .calendar-container {
+    min-width: 1080px;
+  }
+}
+
+@media (max-width: 900px) {
+  .plan-ui-modern .top-header > div:not(.plan-page-heading) {
+    align-items: flex-start !important;
+  }
+
+  .plan-ui-modern .week-selector {
+    flex-basis: 100%;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .plan-ui-modern .week-selector > * {
+    flex: 0 0 auto;
+  }
+
+  .plan-ui-modern .plan-palette-row {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-ui-modern .assignments-box .task-list,
+  .plan-ui-modern .events-box .task-list {
+    flex-wrap: nowrap;
+    padding-bottom: 3px;
+    overflow-x: auto;
+  }
+}
+
+/* ---------- Mobile drawer and horizontal calendar ---------- */
+@media (max-width: 760px) {
+  body.plan-ui-modern {
+    padding: 7px !important;
+  }
+
+  body.plan-ui-modern.plan-subjects-open {
+    overflow: hidden;
+  }
+
+  .plan-ui-modern .floating-circle {
+    display: none !important;
+  }
+
+  .plan-ui-modern .top-header {
+    padding: 11px !important;
+    border-radius: 17px !important;
+  }
+
+  .plan-ui-modern .plan-page-heading {
+    align-items: flex-start;
+    margin-bottom: 9px;
+    padding-bottom: 9px;
+  }
+
+  .plan-ui-modern .plan-page-mark {
+    flex-basis: 37px;
+    width: 37px;
+    height: 37px;
+    border-radius: 11px;
+  }
+
+  .plan-ui-modern .plan-page-title {
+    font-size: 16px;
+  }
+
+  .plan-ui-modern .plan-page-subtitle {
+    font-size: 9px;
+  }
+
+  .plan-ui-modern .plan-page-badge {
+    display: none;
+  }
+
+  .plan-ui-modern .top-header > div:not(.plan-page-heading) {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 7px !important;
+  }
+
+  .plan-ui-modern .consultant-name {
+    grid-column: 1 / -1;
+  }
+
+  .plan-ui-modern #student-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .plan-ui-modern .week-selector {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .plan-ui-modern .plan-palette-row {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .plan-ui-modern .assignments-box,
+  .plan-ui-modern .events-box {
+    padding: 10px 11px !important;
+    border-radius: 14px !important;
+  }
+
+  .plan-ui-modern .main-content {
+    display: block !important;
+  }
+
+  .plan-ui-modern .calendar-wrapper {
+    width: 100%;
+    border-radius: 16px;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .plan-ui-modern .calendar-container {
+    min-width: 1040px;
+    padding: 6px;
+  }
+
+  .plan-ui-modern .subjects-box {
+    position: fixed !important;
+    top: 8px !important;
+    right: 8px !important;
+    bottom: 8px !important;
+    left: auto !important;
+    z-index: 10020 !important;
+    width: min(86vw, 330px) !important;
+    max-height: none !important;
+    padding: 14px 12px 18px !important;
+    border-radius: 20px !important;
+    box-shadow: var(--plan-ui-shadow-lg) !important;
+    transform: translateX(calc(100% + 24px));
+    visibility: hidden;
+    transition: transform 240ms cubic-bezier(.2, .8, .2, 1), visibility 240ms;
+  }
+
+  .plan-ui-modern.plan-subjects-open .subjects-box {
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  .plan-ui-modern .plan-subjects-close {
+    position: sticky;
+    top: -14px;
+    z-index: 8;
+    display: grid;
+    width: 34px;
+    height: 34px;
+    margin: -5px 0 5px auto;
+    place-items: center;
+    color: #475569;
+    border: 1px solid #d8e2ee;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .96);
+    box-shadow: 0 5px 12px rgba(15, 23, 42, .09);
+  }
+
+  .plan-ui-modern .plan-subjects-close svg,
+  .plan-ui-modern .plan-subjects-toggle svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .plan-ui-modern .plan-subjects-toggle {
+    position: fixed;
+    right: 14px;
+    bottom: 14px;
+    z-index: 10005;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 9px 13px;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 900;
+    border: 0;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--plan-ui-primary), #6d28d9);
+    box-shadow: 0 14px 30px rgba(37, 99, 235, .33);
+  }
+
+  .plan-ui-modern .plan-mobile-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 10010;
+    display: block;
+    pointer-events: none;
+    opacity: 0;
+    background: rgba(15, 23, 42, .38);
+    backdrop-filter: blur(3px);
+    transition: opacity 220ms ease;
+  }
+
+  .plan-ui-modern.plan-subjects-open .plan-mobile-backdrop {
+    pointer-events: auto;
+    opacity: 1;
+  }
+
+  .plan-ui-modern textarea,
+  .plan-ui-modern #importantEvents {
+    margin-bottom: 66px;
+  }
+}
+
+@media (max-width: 420px) {
+  .plan-ui-modern #weekSelector {
+    width: 112px !important;
+  }
+
+  .plan-ui-modern .download-btn {
+    min-height: 32px;
+    padding-inline: 9px !important;
+    font-size: 8.5px !important;
+  }
+
+  .plan-ui-modern .calendar-container {
+    min-width: 980px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-ui-modern *,
+  .plan-ui-modern *::before,
+  .plan-ui-modern *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

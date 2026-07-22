@@ -15,7 +15,7 @@ jobs:
   verify-real-interactions:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
       - name: Checkout deployed commit
@@ -31,7 +31,7 @@ jobs:
           .plan-real-browser-venv/bin/pip install -q playwright
           .plan-real-browser-venv/bin/python -m playwright install --with-deps chromium
 
-      - name: Run real mouse interaction regressions
+      - name: Run real mouse and responsive regressions
         id: real-plan-test
         shell: bash
         env:
@@ -65,6 +65,10 @@ jobs:
             > plan-task-independence-output.txt 2>&1
           independence_status=$?
 
+          .plan-real-browser-venv/bin/python deploy/plan_responsive_ui_e2e.py \
+            > plan-responsive-ui-output.txt 2>&1
+          responsive_status=$?
+
           echo '===== Core real interactions ====='
           cat plan-real-interaction-output.txt
           echo '===== School-block drag interactions ====='
@@ -73,9 +77,11 @@ jobs:
           cat plan-time-grid-output.txt
           echo '===== Same-day task independence ====='
           cat plan-task-independence-output.txt
+          echo '===== Responsive visual interface ====='
+          cat plan-responsive-ui-output.txt
 
           status=0
-          if [ "$core_status" -ne 0 ] || [ "$school_status" -ne 0 ] || [ "$grid_status" -ne 0 ] || [ "$independence_status" -ne 0 ]; then
+          if [ "$core_status" -ne 0 ] || [ "$school_status" -ne 0 ] || [ "$grid_status" -ne 0 ] || [ "$independence_status" -ne 0 ] || [ "$responsive_status" -ne 0 ]; then
             status=1
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
@@ -91,6 +97,7 @@ jobs:
             plan-school-drag-output.txt
             plan-time-grid-output.txt
             plan-task-independence-output.txt
+            plan-responsive-ui-output.txt
           retention-days: 3
 
       - name: Publish real interaction status
@@ -106,10 +113,10 @@ jobs:
           set -euo pipefail
           if [ "${TEST_STATUS:-1}" = "0" ]; then
             STATE='success'
-            DESCRIPTION='Plan interactions, time grid and independent same-day tasks passed.'
+            DESCRIPTION='Plan interactions, time grid, task independence and responsive UI passed.'
           else
             STATE='failure'
-            DESCRIPTION='Plan interaction, time-grid or task-independence regression failed.'
+            DESCRIPTION='Plan interaction, geometry or responsive UI regression failed.'
           fi
 
           jq -n \
