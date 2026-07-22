@@ -139,25 +139,14 @@ def main() -> int:
         ).first
         require(first.count() == 1 and second.count() == 1, "two study tasks were added to one day")
 
-        positions = page.evaluate(
-            """
-            ([first, second]) => ({
-              first: getComputedStyle(first).position,
-              second: getComputedStyle(second).position,
-              firstTop: first.getBoundingClientRect().top,
-              secondTop: second.getBoundingClientRect().top,
-              firstHeight: first.getBoundingClientRect().height,
-              secondCssTop: parseFloat(second.style.top || '0')
-            })
-            """,
-            [first.element_handle(), second.element_handle()],
-        )
-        require(positions["first"] == "absolute", "first new task is absolutely positioned")
-        require(positions["second"] == "absolute", "second new task is absolutely positioned")
+        first_position = first.evaluate("element => getComputedStyle(element).position")
+        second_position = second.evaluate("element => getComputedStyle(element).position")
+        require(first_position == "absolute", "first new task is absolutely positioned")
+        require(second_position == "absolute", "second new task is absolutely positioned")
 
         second_before_resize = box(second)["y"]
-        second_css_top_before = page.evaluate(
-            "element => parseFloat(element.style.top || '0')", second.element_handle()
+        second_css_top_before = second.evaluate(
+            "element => parseFloat(element.style.top || '0')"
         )
         first_height_before = box(first)["height"]
 
@@ -179,8 +168,8 @@ def main() -> int:
 
         first_height_after = box(first)["height"]
         second_after_resize = box(second)["y"]
-        second_css_top_after = page.evaluate(
-            "element => parseFloat(element.style.top || '0')", second.element_handle()
+        second_css_top_after = second.evaluate(
+            "element => parseFloat(element.style.top || '0')"
         )
         require(
             first_height_after >= first_height_before + 50,
@@ -205,10 +194,7 @@ def main() -> int:
             "deleting the first task does not move the second task",
         )
         require(
-            page.evaluate(
-                "element => getComputedStyle(element).position", second.element_handle()
-            )
-            == "absolute",
+            second.evaluate("element => getComputedStyle(element).position") == "absolute",
             "remaining task stays absolutely positioned after sibling deletion",
         )
 
