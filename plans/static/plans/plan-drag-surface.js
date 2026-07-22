@@ -41,6 +41,59 @@
     return !$(event.target).closest(CANCEL_SELECTOR).length;
   }
 
+  function draggableInstance($element) {
+    try {
+      return $element.draggable('instance') || null;
+    } catch (_error) {
+      return $element.data('ui-draggable') || $element.data('uiDraggable') || null;
+    }
+  }
+
+  function wrapDraggable($element) {
+    const instance = draggableInstance($element);
+    if (!instance || !instance.options) {
+      return;
+    }
+
+    const currentStart = instance.options.start;
+    if (currentStart && currentStart.planDragSurfaceWrapped) {
+      return;
+    }
+    const currentStop = instance.options.stop;
+
+    const wrappedStart = function (event, ui) {
+      beginDrag(this);
+      if (typeof currentStart === 'function') {
+        return currentStart.call(this, event, ui);
+      }
+      return undefined;
+    };
+    wrappedStart.planDragSurfaceWrapped = true;
+    wrappedStart.planDragSurfaceOriginal = currentStart;
+
+    const wrappedStop = function (event, ui) {
+      try {
+        if (typeof currentStop === 'function') {
+          return currentStop.call(this, event, ui);
+        }
+        return undefined;
+      } finally {
+        endDrag(this);
+      }
+    };
+    wrappedStop.planDragSurfaceWrapped = true;
+    wrappedStop.planDragSurfaceOriginal = currentStop;
+
+    instance.options.start = wrappedStart;
+    instance.options.stop = wrappedStop;
+  }
+
+  function synchronize() {
+    $(DRAGGABLE_SELECTOR).each(function () {
+      wrapDraggable($(this));
+    });
+  }
+
   function initialize() {
     $(document)
       .off('pointerdown.planDragSurface mousedown.planDragSurface touchstart.planDragSurface', DRAGGABLE_SELECTOR)
@@ -53,14 +106,6 @@
           }
         }
       )
-      .off('dragstart.planDragSurface', DRAGGABLE_SELECTOR)
-      .on('dragstart.planDragSurface', DRAGGABLE_SELECTOR, function () {
-        beginDrag(this);
-      })
-      .off('dragstop.planDragSurface', DRAGGABLE_SELECTOR)
-      .on('dragstop.planDragSurface', DRAGGABLE_SELECTOR, function () {
-        endDrag(this);
-      })
       .off('mouseup.planDragSurface pointerup.planDragSurface pointercancel.planDragSurface touchend.planDragSurface touchcancel.planDragSurface')
       .on(
         'mouseup.planDragSurface pointerup.planDragSurface pointercancel.planDragSurface touchend.planDragSurface touchcancel.planDragSurface',
@@ -71,10 +116,19 @@
         }
       );
 
+    const calendar = document.querySelector('.calendar');
+    if (calendar) {
+      new MutationObserver(function () {
+        window.requestAnimationFrame(synchronize);
+      }).observe(calendar, { childList: true, subtree: true });
+    }
+
     window.addEventListener('blur', function () {
       endDrag();
     });
 
+    synchronize();
+    window.setInterval(synchronize, 250);
     window.dispatchEvent(new CustomEvent('plan:drag-surface-ready'));
   }
 
