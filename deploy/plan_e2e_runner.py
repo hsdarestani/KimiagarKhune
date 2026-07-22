@@ -125,6 +125,11 @@ def verify_initial_controls() -> None:
             state="attached",
             timeout=20_000,
         )
+        page.wait_for_selector(
+            "#student-select + .select2-container .select2-selection",
+            state="visible",
+            timeout=20_000,
+        )
 
         state = page.evaluate(
             """
@@ -132,16 +137,20 @@ def verify_initial_controls() -> None:
               const overlay = document.querySelector('#pageOverlay');
               const wrapper = document.querySelector('.calendar-wrapper');
               const student = document.querySelector('#student-select');
+              const visibleStudent =
+                student?.nextElementSibling?.querySelector('.select2-selection') || student;
               const dateInput = document.querySelector('#weekSelector');
               const overlayRect = overlay.getBoundingClientRect();
               const wrapperRect = wrapper.getBoundingClientRect();
-              const studentRect = student.getBoundingClientRect();
+              const studentRect = visibleStudent.getBoundingClientRect();
               const dateRect = dateInput.getBoundingClientRect();
               const overlaps = (a, b) => !(
                 a.right <= b.left || a.left >= b.right ||
                 a.bottom <= b.top || a.top >= b.bottom
               );
               const style = getComputedStyle(overlay);
+              const studentStyle = getComputedStyle(visibleStudent);
+              const dateStyle = getComputedStyle(dateInput);
               return {
                 pointerEvents: style.pointerEvents,
                 overlayInsideCalendar:
@@ -150,8 +159,16 @@ def verify_initial_controls() -> None:
                   overlayRect.left >= wrapperRect.left - 1,
                 blocksStudent: overlaps(overlayRect, studentRect),
                 blocksDate: overlaps(overlayRect, dateRect),
-                studentVisible: studentRect.width > 0 && studentRect.height > 0,
-                dateVisible: dateRect.width > 0 && dateRect.height > 0,
+                studentVisible:
+                  studentRect.width > 0 &&
+                  studentRect.height > 0 &&
+                  studentStyle.visibility !== 'hidden' &&
+                  studentStyle.display !== 'none',
+                dateVisible:
+                  dateRect.width > 0 &&
+                  dateRect.height > 0 &&
+                  dateStyle.visibility !== 'hidden' &&
+                  dateStyle.display !== 'none',
               };
             }
             """
@@ -166,8 +183,10 @@ def verify_initial_controls() -> None:
         if not state["studentVisible"] or not state["dateVisible"]:
             raise AssertionError("Student/date controls are not visible initially.")
 
-        page.click("#student-select")
+        page.click("#student-select + .select2-container .select2-selection")
+        page.keyboard.press("Escape")
         page.click("#weekSelector")
+        page.keyboard.press("Escape")
         print("PASS: initial Plan guide does not block student or date selection")
 
         context.close()
