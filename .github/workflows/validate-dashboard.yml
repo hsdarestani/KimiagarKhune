@@ -32,6 +32,7 @@ jobs:
           python3 -m py_compile \
             management/dashboard_security.py \
             management/test_dashboard.py \
+            management/test_dashboard_export_diagnostic.py \
             plans/dashboard_admin.py
           if [ -f deploy/dashboard_e2e.py ]; then
             python3 -m py_compile deploy/dashboard_e2e.py
@@ -53,8 +54,10 @@ jobs:
         shell: bash
         run: |
           set +e
-          .venv/bin/python manage.py test management.test_dashboard --verbosity 2 \
-            > dashboard-test-output.txt 2>&1
+          .venv/bin/python manage.py test \
+            management.test_dashboard_export_diagnostic \
+            management.test_dashboard \
+            --verbosity 2 > dashboard-test-output.txt 2>&1
           status=$?
           cat dashboard-test-output.txt
           exit "$status"
