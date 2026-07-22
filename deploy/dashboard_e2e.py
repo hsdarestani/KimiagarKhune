@@ -193,11 +193,22 @@ def main() -> int:
             () => {
               const container = document.querySelector('.calendar-container');
               const chat = document.querySelector('#chat-toggle-btn');
+              const chatStyle = getComputedStyle(chat);
+              const chatRect = chat.getBoundingClientRect();
               return {
                 bodyOverflow: document.documentElement.scrollWidth - window.innerWidth,
                 calendarScrollable: container.scrollWidth > container.clientWidth,
                 calendarWidth: container.getBoundingClientRect().width,
-                chatVisible: chat.offsetParent !== null
+                chatVisible:
+                  chatStyle.display !== 'none' &&
+                  chatStyle.visibility !== 'hidden' &&
+                  Number.parseFloat(chatStyle.opacity || '1') > 0 &&
+                  chatRect.width >= 44 &&
+                  chatRect.height >= 44 &&
+                  chatRect.left >= 0 &&
+                  chatRect.top >= 0 &&
+                  chatRect.right <= window.innerWidth &&
+                  chatRect.bottom <= window.innerHeight
               };
             }
             """
@@ -205,7 +216,22 @@ def main() -> int:
         require(mobile["bodyOverflow"] <= 8, "mobile dashboard avoids severe global overflow")
         require(mobile["calendarScrollable"], "mobile weekly calendar scrolls horizontally")
         require(mobile["calendarWidth"] <= 391, "mobile calendar shell fits the viewport")
-        require(mobile["chatVisible"], "mobile chat entry remains accessible")
+        require(mobile["chatVisible"], "mobile chat entry remains visible inside the viewport")
+
+        page.click("#chat-toggle-btn")
+        page.wait_for_selector("#chat-window:not(.hidden)", timeout=10_000)
+        mobile_chat = page.locator("#chat-window").bounding_box()
+        require(
+            bool(
+                mobile_chat
+                and mobile_chat["x"] >= 0
+                and mobile_chat["y"] >= 0
+                and mobile_chat["x"] + mobile_chat["width"] <= 391
+                and mobile_chat["y"] + mobile_chat["height"] <= 845
+            ),
+            "mobile chat window opens fully inside the viewport",
+        )
+        page.click("#chat-toggle-btn")
 
         require(not first_party_failures, "dashboard generated no failing first-party requests: " + " | ".join(first_party_failures))
         require(not page_errors, "dashboard generated no uncaught JavaScript errors: " + " | ".join(page_errors))
