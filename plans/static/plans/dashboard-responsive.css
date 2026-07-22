@@ -1,0 +1,46 @@
+/* Dashboard-only responsive safety layer. */
+
+@media (max-width: 640px) {
+  html,
+  body {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  #chat-toggle-btn {
+    display: flex !important;
+    position: fixed !important;
+    left: max(14px, env(safe-area-inset-left)) !important;
+    right: auto !important;
+    bottom: max(14px, env(safe-area-inset-bottom)) !important;
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+    z-index: 70 !important;
+  }
+
+  #chat-window {
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: calc(82px + env(safe-area-inset-bottom)) !important;
+    width: auto !important;
+    max-width: none !important;
+    height: min(520px, calc(100dvh - 108px)) !important;
+    max-height: calc(100dvh - 108px) !important;
+    z-index: 69 !important;
+  }
+
+  #chat-window.hidden {
+    display: none !important;
+  }
+
+  #chat-window:not(.hidden) {
+    display: flex !important;
+  }
+}
