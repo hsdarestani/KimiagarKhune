@@ -1,0 +1,92 @@
+name: Verify production Dashboard
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy production
+    types:
+      - completed
+
+permissions:
+  contents: read
+  statuses: write
+
+jobs:
+  verify-dashboard:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout deployed commit
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Install Playwright
+        run: |
+          set -euo pipefail
+          python3 -m venv .dashboard-browser-venv
+          .dashboard-browser-venv/bin/pip install -q --upgrade pip
+          .dashboard-browser-venv/bin/pip install -q playwright
+          .dashboard-browser-venv/bin/python -m playwright install --with-deps chromium
+
+      - name: Run production Dashboard regression
+        id: dashboard-test
+        shell: bash
+        env:
+          DASHBOARD_BASE_URL: https://panel.kimiagarkhoone.com
+          DASHBOARD_USERNAME: ${{ secrets.DJANGO_ADMIN_USERNAME }}
+          DASHBOARD_PASSWORD: ${{ secrets.DJANGO_ADMIN_PASSWORD }}
+        run: |
+          set +e
+          export DASHBOARD_USERNAME="${DASHBOARD_USERNAME:-admin}"
+          .dashboard-browser-venv/bin/python deploy/dashboard_e2e.py \
+            > dashboard-production-output.txt 2>&1
+          status=$?
+          cat dashboard-production-output.txt
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Upload Dashboard output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dashboard-production-output
+          path: dashboard-production-output.txt
+          retention-days: 3
+
+      - name: Publish Dashboard status
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          TEST_STATUS: ${{ steps.dashboard-test.outputs.status }}
+        run: |
+          set -euo pipefail
+          if [ "${TEST_STATUS:-1}" = "0" ]; then
+            STATE='success'
+            DESCRIPTION='Dashboard APIs, admin views, chat, reports and responsive UI passed.'
+          else
+            STATE='failure'
+            DESCRIPTION='Dashboard production regression failed.'
+          fi
+
+          jq -n \
+            --arg state "$STATE" \
+            --arg target_url "$RUN_URL" \
+            --arg description "$DESCRIPTION" \
+            --arg context 'dashboard/production' \
+            '{state: $state, target_url: $target_url, description: $description, context: $context}' \
+            > /tmp/dashboard-status.json
+
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${REPOSITORY}/statuses/${HEAD_SHA}" \
+            --data-binary @/tmp/dashboard-status.json
