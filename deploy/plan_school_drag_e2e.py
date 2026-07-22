@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 import sys
 from urllib.parse import urljoin
@@ -18,16 +17,14 @@ STUDENT_LABEL = os.environ.get(
     "PLAN_STUDENT_LABEL", "نمونه تجربی دوازدهم"
 )
 GRID_PIXELS = 8.75
+SOURCE_FREE_TOP = 315.0
+TARGET_FREE_TOP = 350.0
 
 
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise AssertionError(message)
     print(f"PASS: {message}")
-
-
-def info(label: str, value) -> None:
-    print(f"INFO: {label}={json.dumps(value, ensure_ascii=False, default=str)}")
 
 
 def relative_top(task: Locator, container: Locator) -> float:
@@ -63,34 +60,9 @@ def load_test_week(page: Page) -> None:
         timeout=15_000,
     )
     page.wait_for_function(
-        "document.querySelector('script[data-plan-drag-surface=true]')",
+        "window.__planDragSurfaceCaptureBound === true",
         timeout=15_000,
     )
-
-    asset_info = page.evaluate(
-        """
-        async () => {
-          const script = document.querySelector('script[data-plan-drag-surface=true]');
-          let source = '';
-          let fetchError = '';
-          try {
-            source = await fetch(script.src, {cache: 'no-store'}).then(response => response.text());
-          } catch (error) {
-            fetchError = String(error);
-          }
-          return {
-            src: script ? script.src : '',
-            captureBound: window.__planDragSurfaceCaptureBound === true,
-            hasNativeCaptureSource: source.includes('__planDragSurfaceCaptureBound'),
-            hasLifecycleWrapperSource: source.includes('planDragSurfaceWrapped'),
-            fetchError,
-            readyState: document.readyState,
-            jqueryUi: Boolean(window.jQuery && window.jQuery.ui)
-          };
-        }
-        """
-    )
-    info("drag_surface_asset", asset_info)
 
 
 def drag_palette_to(
@@ -132,8 +104,7 @@ def drag_task_via_school(
     school_waypoint_top: float = 140,
 ) -> None:
     task_box = task.bounding_box()
-    title = task.locator(".task-title").first
-    title_box = title.bounding_box()
+    title_box = task.locator(".task-title").first.bounding_box()
     target_box = target.bounding_box()
     if not task_box or not title_box or not target_box:
         raise AssertionError("Task title or target is not visible")
@@ -143,82 +114,26 @@ def drag_task_via_school(
     grab_offset = start_y - task_box["y"]
     target_x = target_box["x"] + target_box["width"] / 2
 
-    hit_info = page.evaluate(
+    hit_type = page.evaluate(
         """
         ({x, y}) => {
           const hit = document.elementFromPoint(x, y);
-          const task = hit ? hit.closest('.calendar-task') : null;
-          const cancel = hit ? hit.closest(
-            'button, input, textarea, select, option, .select2-container, .plan-resize-handle, .plan-study-compact'
-          ) : null;
-          return {
-            x,
-            y,
-            hitTag: hit ? hit.tagName : null,
-            hitClass: hit ? hit.className : null,
-            hitText: hit ? String(hit.textContent || '').trim().slice(0, 80) : null,
-            closestTaskType: task ? task.dataset.boxType : null,
-            closestTaskClass: task ? task.className : null,
-            cancelTag: cancel ? cancel.tagName : null,
-            cancelClass: cancel ? cancel.className : null
-          };
+          const calendarTask = hit ? hit.closest('.calendar-task') : null;
+          return calendarTask ? calendarTask.dataset.boxType : null;
         }
         """,
         {"x": start_x, "y": start_y},
     )
-    info("study_drag_hit", hit_info)
-
-    widget_info = task.evaluate(
-        """
-        element => {
-          const $element = window.jQuery(element);
-          let instance = null;
-          try { instance = $element.draggable('instance'); } catch (_) {}
-          const start = instance && instance.options ? instance.options.start : null;
-          const stop = instance && instance.options ? instance.options.stop : null;
-          const title = element.querySelector('.task-title');
-          return {
-            taskClass: element.className,
-            taskVersion: element.dataset.planInteractionVersion || '',
-            uiDraggable: Boolean(instance),
-            disabled: Boolean(instance && instance.options && instance.options.disabled),
-            cancel: instance && instance.options ? instance.options.cancel : null,
-            distance: instance && instance.options ? instance.options.distance : null,
-            startWrapped: Boolean(start && start.planDragSurfaceWrapped),
-            stopWrapped: Boolean(stop && stop.planDragSurfaceWrapped),
-            titlePointerEvents: title ? getComputedStyle(title).pointerEvents : null,
-            titlePosition: title ? getComputedStyle(title).position : null
-          };
-        }
-        """
+    require(
+        hit_type == "مطالعه",
+        "study title is visible and hit-testable before dragging",
     )
-    info("study_drag_widget", widget_info)
 
     page.mouse.move(start_x, start_y)
     page.mouse.down()
-    down_state = page.evaluate(
-        """
-        () => ({
-          active: document.body.classList.contains('plan-calendar-drag-active'),
-          activeSources: document.querySelectorAll('.plan-active-drag-source').length
-        })
-        """
-    )
-    info("after_mouse_down", down_state)
-
     page.mouse.move(start_x + 6, start_y + 6, steps=3)
-    move_state = page.evaluate(
-        """
-        () => ({
-          active: document.body.classList.contains('plan-calendar-drag-active'),
-          activeSources: document.querySelectorAll('.plan-active-drag-source').length,
-          ghosts: document.querySelectorAll('.plan-drag-ghost').length,
-          draggingSources: document.querySelectorAll('.plan-dragging-source').length
-        })
-        """
-    )
-    info("after_initial_move", move_state)
 
+    # Deliberately pass through the large school event before ending below it.
     page.mouse.move(
         start_x,
         target_box["y"] + school_waypoint_top + grab_offset,
@@ -293,13 +208,13 @@ def main() -> int:
             ".subjects-box .plan-lesson-palette"
         ).first
 
-        drag_palette_to(page, lesson_palette, first, 525)
+        drag_palette_to(page, lesson_palette, first, SOURCE_FREE_TOP)
         study = first.locator(
             '.calendar-task[data-box-type="مطالعه"]'
         ).first
         require(study.count() == 1, "study box is created below school hours")
 
-        drag_task_via_school(page, study, second, 560)
+        drag_task_via_school(page, study, second, TARGET_FREE_TOP)
         moved_study = second.locator(
             '.calendar-task[data-box-type="مطالعه"]'
         ).first
@@ -308,8 +223,9 @@ def main() -> int:
             "study box moves to another day while school blocks exist",
         )
         require(
-            abs(relative_top(moved_study, second) - 560) <= GRID_PIXELS + 2,
-            "school blocks do not corrupt the intended evening drop time",
+            abs(relative_top(moved_study, second) - TARGET_FREE_TOP)
+            <= GRID_PIXELS + 2,
+            "school blocks do not corrupt the intended free-time drop slot",
         )
         require(
             not page.locator("body").evaluate(
