@@ -41,7 +41,7 @@ jobs:
         run: |
           set +e
           export DASHBOARD_USERNAME="${DASHBOARD_USERNAME:-admin}"
-          .dashboard-browser-venv/bin/python deploy/dashboard_e2e.py \
+          .dashboard-browser-venv/bin/python deploy/dashboard_e2e_runner.py \
             > dashboard-production-output.txt 2>&1
           status=$?
           cat dashboard-production-output.txt
