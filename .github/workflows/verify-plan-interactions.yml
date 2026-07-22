@@ -15,7 +15,7 @@ jobs:
   verify-real-interactions:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout deployed commit
@@ -31,7 +31,7 @@ jobs:
           .plan-real-browser-venv/bin/pip install -q playwright
           .plan-real-browser-venv/bin/python -m playwright install --with-deps chromium
 
-      - name: Run real mouse interaction regression
+      - name: Run real mouse interaction regressions
         id: real-plan-test
         shell: bash
         env:
@@ -40,13 +40,28 @@ jobs:
           PLAN_PASSWORD: ${{ secrets.DJANGO_ADMIN_PASSWORD }}
           PLAN_STUDENT_LABEL: نمونه تجربی دوازدهم
           PLAN_TEST_WEEK: 1499-02-01
+          PLAN_SCHOOL_TEST_WEEK: 1499-03-01
         run: |
           set +e
           export PLAN_USERNAME="${PLAN_USERNAME:-admin}"
+
           .plan-real-browser-venv/bin/python deploy/plan_real_interaction_e2e.py \
             > plan-real-interaction-output.txt 2>&1
-          status=$?
+          core_status=$?
+
+          .plan-real-browser-venv/bin/python deploy/plan_school_drag_e2e.py \
+            > plan-school-drag-output.txt 2>&1
+          school_status=$?
+
+          echo '===== Core real interactions ====='
           cat plan-real-interaction-output.txt
+          echo '===== School-block drag interactions ====='
+          cat plan-school-drag-output.txt
+
+          status=0
+          if [ "$core_status" -ne 0 ] || [ "$school_status" -ne 0 ]; then
+            status=1
+          fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit "$status"
 
@@ -55,7 +70,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: plan-real-interaction-output
-          path: plan-real-interaction-output.txt
+          path: |
+            plan-real-interaction-output.txt
+            plan-school-drag-output.txt
           retention-days: 3
 
       - name: Publish real interaction status
@@ -71,10 +88,10 @@ jobs:
           set -euo pipefail
           if [ "${TEST_STATUS:-1}" = "0" ]; then
             STATE='success'
-            DESCRIPTION='Real Plan drag, move, resize and compact controls passed.'
+            DESCRIPTION='Real Plan drag, resize, compact controls and school-block movement passed.'
           else
             STATE='failure'
-            DESCRIPTION='Real Plan mouse interaction regression failed.'
+            DESCRIPTION='Real Plan interaction or school-block drag regression failed.'
           fi
 
           jq -n \
