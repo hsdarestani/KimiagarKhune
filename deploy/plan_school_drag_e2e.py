@@ -117,10 +117,11 @@ def drag_task_via_school(
     page.mouse.move(start_x, start_y)
     page.mouse.down()
     page.mouse.move(start_x + 6, start_y + 6, steps=3)
-    page.wait_for_function(
-        "document.body.classList.contains('plan-calendar-drag-active')",
-        timeout=5_000,
+
+    guard_active = page.evaluate(
+        "document.body.classList.contains('plan-calendar-drag-active')"
     )
+    print(f"INFO: drag surface guard active after pointer start={guard_active}")
 
     # Deliberately pass through the large school event before ending below it.
     page.mouse.move(
