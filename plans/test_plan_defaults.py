@@ -1,10 +1,13 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
+from django.utils import timezone
 
 from accounts.models import Student
 from plans.default_plan_data import ensure_advisor_for_user, seed_plan_defaults
-from plans.models import Box, BoxType, DefaultEvent
+from plans.models import Box, BoxType, DefaultEvent, WeeklyReport
 
 
 class PlanDefaultSeedTests(TestCase):
@@ -109,3 +112,33 @@ class PlanDefaultSeedTests(TestCase):
         events = events_response.json()
         self.assertEqual(len(events), 5)
         self.assertTrue(all(event["name"] == "مدرسه" for event in events))
+
+    def test_far_future_reports_are_cleaned_only_for_demo_students(self):
+        User = get_user_model()
+        admin = User.objects.create_superuser(
+            username="cleanup-admin",
+            email="cleanup@example.com",
+            password="test-password",
+        )
+        advisor = ensure_advisor_for_user(admin)
+        seed_plan_defaults(advisor=advisor)
+        demo_student = Student.objects.get(
+            profile__user__username="demo_plan_student_t"
+        )
+
+        now = timezone.now()
+        near_report = WeeklyReport.objects.create(
+            student=demo_student,
+            week_start=now + timedelta(days=30),
+            week_end=now + timedelta(days=36),
+        )
+        far_report = WeeklyReport.objects.create(
+            student=demo_student,
+            week_start=now + timedelta(days=4000),
+            week_end=now + timedelta(days=4006),
+        )
+
+        call_command("cleanup_plan_demo_reports", verbosity=0)
+
+        self.assertTrue(WeeklyReport.objects.filter(pk=near_report.pk).exists())
+        self.assertFalse(WeeklyReport.objects.filter(pk=far_report.pk).exists())
