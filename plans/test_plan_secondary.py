@@ -24,6 +24,7 @@ class PlanSecondaryScriptTests(TestCase):
         interaction_style = b'/static/plans/plan-interactions.css?v='
         grid_style = b'/static/plans/plan-time-grid.css?v='
         geometry_style = b'/static/plans/plan-task-geometry.css?v='
+        modern_style = b'/static/plans/plan-modern-ui.css?v='
         runtime = b'/static/plans/plan-runtime.js?v='
         secondary = b'/static/plans/plan-secondary.js?v='
         grid = b'/static/plans/plan-time-grid.js?v='
@@ -32,11 +33,13 @@ class PlanSecondaryScriptTests(TestCase):
         drag_surface = b'/static/plans/plan-drag-surface.js?v='
         lesson_toolbar = b'/static/plans/plan-lesson-toolbar.js?v='
         task_geometry = b'/static/plans/plan-task-geometry.js?v='
+        modern_ui = b'/static/plans/plan-modern-ui.js?v='
 
         markers = (
             interaction_style,
             grid_style,
             geometry_style,
+            modern_style,
             runtime,
             secondary,
             grid,
@@ -45,13 +48,14 @@ class PlanSecondaryScriptTests(TestCase):
             drag_surface,
             lesson_toolbar,
             task_geometry,
+            modern_ui,
         )
         for marker in markers:
             self.assertEqual(content.count(marker), 1)
 
         for earlier, later in zip(markers, markers[1:]):
             self.assertLess(content.index(earlier), content.index(later))
-        self.assertLess(content.index(task_geometry), content.rfind(b"</body>"))
+        self.assertLess(content.index(modern_ui), content.rfind(b"</body>"))
 
         self.assertIn(b'data-plan-interactions="true"', content)
         self.assertIn(b'data-plan-manual-resize="true"', content)
@@ -59,6 +63,8 @@ class PlanSecondaryScriptTests(TestCase):
         self.assertIn(b'data-plan-time-grid="true"', content)
         self.assertIn(b'data-plan-lesson-toolbar="true"', content)
         self.assertIn(b'data-plan-task-geometry="true"', content)
+        self.assertIn(b'data-plan-modern-ui="true"', content)
         self.assertIn(b'data-plan-interactions-style="true"', content)
         self.assertIn(b'data-plan-time-grid-style="true"', content)
         self.assertIn(b'data-plan-task-geometry-style="true"', content)
+        self.assertIn(b'data-plan-modern-ui-style="true"', content)
