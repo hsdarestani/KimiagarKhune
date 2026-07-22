@@ -6,12 +6,13 @@ from django.contrib.auth.decorators import login_required
 from plans import lesson_catalog
 
 
-ASSET_VERSION = "20260722-7"
+ASSET_VERSION = "20260722-8"
 STYLE_PATHS = (
     ("plans/plan-interactions.css", "data-plan-interactions-style"),
     ("plans/plan-time-grid.css", "data-plan-time-grid-style"),
     ("plans/plan-task-geometry.css", "data-plan-task-geometry-style"),
     ("plans/plan-modern-ui.css", "data-plan-modern-ui-style"),
+    ("plans/plan-modern-ui-fixes.css", "data-plan-modern-ui-fixes-style"),
 )
 RUNTIME_PATHS = (
     ("plans/plan-runtime.js", "data-plan-runtime"),
