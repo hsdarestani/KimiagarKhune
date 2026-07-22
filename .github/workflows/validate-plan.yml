@@ -11,6 +11,7 @@ on:
       - 'deploy/plan_school_drag_e2e.py'
       - 'deploy/plan_time_grid_e2e.py'
       - 'deploy/plan_task_independence_e2e.py'
+      - 'deploy/plan_responsive_ui_e2e.py'
       - 'config/test_settings.py'
       - '.github/workflows/deploy.yml'
       - '.github/workflows/validate-plan.yml'
@@ -39,6 +40,7 @@ jobs:
           node --check plans/static/plans/plan-drag-surface.js
           node --check plans/static/plans/plan-lesson-toolbar.js
           node --check plans/static/plans/plan-task-geometry.js
+          node --check plans/static/plans/plan-modern-ui.js
           python3 -m py_compile \
             deploy/plan_e2e.py \
             deploy/plan_e2e_runner.py \
@@ -46,6 +48,7 @@ jobs:
             deploy/plan_school_drag_e2e.py \
             deploy/plan_time_grid_e2e.py \
             deploy/plan_task_independence_e2e.py \
+            deploy/plan_responsive_ui_e2e.py \
             plans/management/commands/cleanup_plan_demo_reports.py \
             plans/lesson_catalog.py \
             plans/plan_page.py \
