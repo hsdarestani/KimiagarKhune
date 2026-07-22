@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from typing import Any
+from urllib.parse import urljoin
 
-from playwright.sync_api import Locator, Page
+from playwright.sync_api import Locator, Page, sync_playwright
 
 
 _ORIGINAL_CHECK = Locator.check
@@ -91,8 +93,90 @@ def install_playwright_helpers() -> None:
     Page.wait_for_function = _patched_wait_for_function
 
 
+def verify_initial_controls() -> None:
+    """Ensure the pre-load guide never blocks student/date selection."""
+
+    base_url = os.environ.get(
+        "PLAN_BASE_URL", "https://panel.kimiagarkhoone.com"
+    ).rstrip("/") + "/"
+    username = os.environ.get("PLAN_USERNAME", "").strip()
+    password = os.environ.get("PLAN_PASSWORD", "")
+    if not username or not password:
+        raise RuntimeError("PLAN_USERNAME and PLAN_PASSWORD are required.")
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(headless=True)
+        context = browser.new_context(
+            locale="fa-IR",
+            viewport={"width": 1600, "height": 1000},
+        )
+        page = context.new_page()
+        page.goto(
+            urljoin(base_url, "login/"),
+            wait_until="domcontentloaded",
+            timeout=30_000,
+        )
+        page.fill("#username", username)
+        page.fill("#password", password)
+        page.click('form button[type="submit"]')
+        page.wait_for_url("**/plan/", timeout=30_000)
+        page.wait_for_selector(
+            "#pageOverlay.plan-start-notice",
+            state="attached",
+            timeout=20_000,
+        )
+
+        state = page.evaluate(
+            """
+            () => {
+              const overlay = document.querySelector('#pageOverlay');
+              const wrapper = document.querySelector('.calendar-wrapper');
+              const student = document.querySelector('#student-select');
+              const dateInput = document.querySelector('#weekSelector');
+              const overlayRect = overlay.getBoundingClientRect();
+              const wrapperRect = wrapper.getBoundingClientRect();
+              const studentRect = student.getBoundingClientRect();
+              const dateRect = dateInput.getBoundingClientRect();
+              const overlaps = (a, b) => !(
+                a.right <= b.left || a.left >= b.right ||
+                a.bottom <= b.top || a.top >= b.bottom
+              );
+              const style = getComputedStyle(overlay);
+              return {
+                pointerEvents: style.pointerEvents,
+                overlayInsideCalendar:
+                  overlay.parentElement === wrapper &&
+                  overlayRect.top >= wrapperRect.top - 1 &&
+                  overlayRect.left >= wrapperRect.left - 1,
+                blocksStudent: overlaps(overlayRect, studentRect),
+                blocksDate: overlaps(overlayRect, dateRect),
+                studentVisible: studentRect.width > 0 && studentRect.height > 0,
+                dateVisible: dateRect.width > 0 && dateRect.height > 0,
+              };
+            }
+            """
+        )
+
+        if state["pointerEvents"] != "none":
+            raise AssertionError("Plan start guide captures pointer events.")
+        if not state["overlayInsideCalendar"]:
+            raise AssertionError("Plan start guide is not scoped to the calendar.")
+        if state["blocksStudent"] or state["blocksDate"]:
+            raise AssertionError("Plan start guide overlaps student/date controls.")
+        if not state["studentVisible"] or not state["dateVisible"]:
+            raise AssertionError("Student/date controls are not visible initially.")
+
+        page.click("#student-select")
+        page.click("#weekSelector")
+        print("PASS: initial Plan guide does not block student or date selection")
+
+        context.close()
+        browser.close()
+
+
 def main() -> int:
     install_playwright_helpers()
+    verify_initial_controls()
 
     # This module sits next to plan_e2e.py, so importing it after installing
     # the helpers makes the existing end-to-end scenarios use the corrected
