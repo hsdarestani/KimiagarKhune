@@ -20,6 +20,9 @@
   ].join(', ');
 
   function beginDrag(element) {
+    if (!element) {
+      return;
+    }
     const $source = $(element);
     $('body').addClass(ACTIVE_BODY_CLASS);
     $source.addClass(ACTIVE_SOURCE_CLASS);
@@ -33,12 +36,60 @@
     $('body').removeClass(ACTIVE_BODY_CLASS);
   }
 
+  function eventElement(event) {
+    const target = event && event.target;
+    if (!target) {
+      return null;
+    }
+    if (target.nodeType === 1) {
+      return target;
+    }
+    return target.parentElement || null;
+  }
+
+  function sourceForEvent(event) {
+    const target = eventElement(event);
+    if (!target) {
+      return null;
+    }
+    if (target.closest(CANCEL_SELECTOR)) {
+      return null;
+    }
+    return target.closest(DRAGGABLE_SELECTOR);
+  }
+
   function canBegin(event) {
-    const original = event.originalEvent || event;
-    if (original.button !== undefined && original.button !== 0) {
+    if (event.button !== undefined && event.button !== 0) {
       return false;
     }
-    return !$(event.target).closest(CANCEL_SELECTOR).length;
+    return Boolean(sourceForEvent(event));
+  }
+
+  function captureStart(event) {
+    if (!canBegin(event)) {
+      return;
+    }
+    beginDrag(sourceForEvent(event));
+  }
+
+  function captureEnd() {
+    window.setTimeout(function () {
+      endDrag();
+    }, 0);
+  }
+
+  function bindCaptureListeners() {
+    if (window.__planDragSurfaceCaptureBound) {
+      return;
+    }
+    window.__planDragSurfaceCaptureBound = true;
+
+    ['pointerdown', 'mousedown', 'touchstart'].forEach(function (eventName) {
+      document.addEventListener(eventName, captureStart, true);
+    });
+    ['pointerup', 'mouseup', 'pointercancel', 'touchend', 'touchcancel'].forEach(function (eventName) {
+      document.addEventListener(eventName, captureEnd, true);
+    });
   }
 
   function draggableInstance($element) {
@@ -95,26 +146,7 @@
   }
 
   function initialize() {
-    $(document)
-      .off('pointerdown.planDragSurface mousedown.planDragSurface touchstart.planDragSurface', DRAGGABLE_SELECTOR)
-      .on(
-        'pointerdown.planDragSurface mousedown.planDragSurface touchstart.planDragSurface',
-        DRAGGABLE_SELECTOR,
-        function (event) {
-          if (canBegin(event)) {
-            beginDrag(this);
-          }
-        }
-      )
-      .off('mouseup.planDragSurface pointerup.planDragSurface pointercancel.planDragSurface touchend.planDragSurface touchcancel.planDragSurface')
-      .on(
-        'mouseup.planDragSurface pointerup.planDragSurface pointercancel.planDragSurface touchend.planDragSurface touchcancel.planDragSurface',
-        function () {
-          window.setTimeout(function () {
-            endDrag();
-          }, 0);
-        }
-      );
+    bindCaptureListeners();
 
     const calendar = document.querySelector('.calendar');
     if (calendar) {
