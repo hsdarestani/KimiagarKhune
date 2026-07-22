@@ -1,0 +1,50 @@
+.plan-ui-modern .calendar-wrapper {
+  position: relative;
+}
+
+.plan-ui-modern #pageOverlay.plan-start-notice {
+  position: absolute !important;
+  inset: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 24px !important;
+  display: grid !important;
+  place-items: center !important;
+  pointer-events: none !important;
+  z-index: 35 !important;
+  color: #334155 !important;
+  font-size: 15px !important;
+  line-height: 1.8 !important;
+  text-align: center !important;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.52), rgba(248, 250, 252, 0.72)) !important;
+  border-radius: 18px;
+}
+
+.plan-ui-modern .plan-start-notice-card {
+  width: min(520px, calc(100% - 32px));
+  padding: 18px 22px;
+  color: #334155;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.plan-ui-modern .plan-start-notice-card strong {
+  color: #2563eb;
+}
+
+@media (max-width: 760px) {
+  .plan-ui-modern #pageOverlay.plan-start-notice {
+    padding: 14px !important;
+    font-size: 13px !important;
+  }
+
+  .plan-ui-modern .plan-start-notice-card {
+    width: min(420px, calc(100% - 16px));
+    padding: 15px 16px;
+  }
+}
