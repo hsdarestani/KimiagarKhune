@@ -1,0 +1,15 @@
+.calendar .task-container > .calendar-task {
+  position: absolute !important;
+  display: block !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  flex: none !important;
+  float: none !important;
+}
+
+.calendar .task-container > .calendar-task.ui-draggable,
+.calendar .task-container > .calendar-task.ui-resizable,
+.calendar .task-container > .calendar-task.plan-study-editing,
+.calendar .task-container > .calendar-task.plan-study-editor-pinned {
+  position: absolute !important;
+}
