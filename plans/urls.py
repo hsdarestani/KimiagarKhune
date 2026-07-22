@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from . import dashboard_admin, lesson_catalog, plan_page, weekly_plans_v2
+from . import dashboard_admin, dashboard_page, lesson_catalog, plan_page, weekly_plans_v2
 from .views import *
 
 
@@ -22,7 +22,7 @@ urlpatterns = [
     path("get_default_events/", lesson_catalog.get_default_events, name="get_default_events"),
     path("get-lessons-for-student/", lesson_catalog.get_lessons_for_student, name="get_lessons_for_student"),
     path("get-last-weekly-report/", get_last_weekly_report, name="get_last_weekly_report"),
-    path("dashboard/", dashboard_view, name="dashboard"),
+    path("dashboard/", dashboard_page.dashboard_view, name="dashboard"),
     path("api/admin-panel-data/", get_admin_panel_data, name="api_admin_panel_data"),
     path("api/add-student/", dashboard_admin.add_student_view, name="api_add_student"),
     path("api/admin/advisors/", dashboard_admin.admin_advisors_view, name="api_admin_advisors"),
