@@ -15,7 +15,7 @@ jobs:
   verify-real-interactions:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Checkout deployed commit
@@ -43,6 +43,8 @@ jobs:
           PLAN_SCHOOL_TEST_WEEK: 1499-03-01
           PLAN_GRID_STUDENT_LABEL: نمونه ریاضی یازدهم
           PLAN_GRID_TEST_WEEK: 1405-09-01
+          PLAN_GEOMETRY_STUDENT_LABEL: نمونه ریاضی یازدهم
+          PLAN_GEOMETRY_TEST_WEEK: 1405-09-01
         run: |
           set +e
           export PLAN_USERNAME="${PLAN_USERNAME:-admin}"
@@ -59,15 +61,21 @@ jobs:
             > plan-time-grid-output.txt 2>&1
           grid_status=$?
 
+          .plan-real-browser-venv/bin/python deploy/plan_task_independence_e2e.py \
+            > plan-task-independence-output.txt 2>&1
+          independence_status=$?
+
           echo '===== Core real interactions ====='
           cat plan-real-interaction-output.txt
           echo '===== School-block drag interactions ====='
           cat plan-school-drag-output.txt
           echo '===== Time grid and lesson toolbar ====='
           cat plan-time-grid-output.txt
+          echo '===== Same-day task independence ====='
+          cat plan-task-independence-output.txt
 
           status=0
-          if [ "$core_status" -ne 0 ] || [ "$school_status" -ne 0 ] || [ "$grid_status" -ne 0 ]; then
+          if [ "$core_status" -ne 0 ] || [ "$school_status" -ne 0 ] || [ "$grid_status" -ne 0 ] || [ "$independence_status" -ne 0 ]; then
             status=1
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
@@ -82,6 +90,7 @@ jobs:
             plan-real-interaction-output.txt
             plan-school-drag-output.txt
             plan-time-grid-output.txt
+            plan-task-independence-output.txt
           retention-days: 3
 
       - name: Publish real interaction status
@@ -97,10 +106,10 @@ jobs:
           set -euo pipefail
           if [ "${TEST_STATUS:-1}" = "0" ]; then
             STATE='success'
-            DESCRIPTION='Plan drag, resize, school blocks, time grid and lesson rules passed.'
+            DESCRIPTION='Plan interactions, time grid and independent same-day tasks passed.'
           else
             STATE='failure'
-            DESCRIPTION='Plan interaction, time-grid or lesson-toolbar regression failed.'
+            DESCRIPTION='Plan interaction, time-grid or task-independence regression failed.'
           fi
 
           jq -n \
