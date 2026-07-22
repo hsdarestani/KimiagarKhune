@@ -112,7 +112,20 @@ def main() -> int:
         require(mobile["wrapperWidth"] <= mobile["viewport"] + 1, "mobile calendar shell fits the viewport")
 
         page.click(".plan-subjects-toggle")
-        page.wait_for_function("document.body.classList.contains('plan-subjects-open')")
+        page.wait_for_function(
+            """
+            () => {
+              if (!document.body.classList.contains('plan-subjects-open')) return false;
+              const sidebar = document.querySelector('.subjects-box');
+              const backdrop = document.querySelector('.plan-mobile-backdrop');
+              if (!sidebar || !backdrop) return false;
+              const rect = sidebar.getBoundingClientRect();
+              const opacity = Number.parseFloat(getComputedStyle(backdrop).opacity);
+              return rect.left >= -0.5 && rect.right <= window.innerWidth + 0.5 && opacity > 0.5;
+            }
+            """,
+            timeout=3_000,
+        )
         opened = page.evaluate(
             """
             () => {
@@ -125,14 +138,18 @@ def main() -> int:
                 left: rect.left,
                 right: rect.right,
                 width: rect.width,
-                backdropOpacity: Number.parseFloat(getComputedStyle(backdrop).opacity)
+                backdropOpacity: Number.parseFloat(getComputedStyle(backdrop).opacity),
+                viewport: window.innerWidth
               };
             }
             """
         )
         require(opened["expanded"] == "true", "lesson drawer exposes its open state")
         require(opened["hidden"] == "false", "open lesson drawer is available to assistive technology")
-        require(opened["left"] >= 0 and opened["right"] <= 391, "lesson drawer stays inside the mobile viewport")
+        require(
+            opened["left"] >= -0.5 and opened["right"] <= opened["viewport"] + 0.5,
+            "lesson drawer stays inside the mobile viewport",
+        )
         require(opened["width"] >= 280, "lesson drawer keeps a comfortable touch width")
         require(opened["backdropOpacity"] > 0.5, "mobile lesson drawer has a visible backdrop")
 
