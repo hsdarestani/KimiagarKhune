@@ -6,6 +6,9 @@ on:
       - 'accounts/**'
       - 'management/**'
       - 'plans/dashboard_admin.py'
+      - 'plans/dashboard_page.py'
+      - 'plans/static/plans/dashboard-responsive.css'
+      - 'plans/test_dashboard_page.py'
       - 'plans/views.py'
       - 'plans/urls.py'
       - 'plans/templates/plans/management.html'
@@ -35,6 +38,8 @@ jobs:
             management/dashboard_security.py \
             management/test_dashboard.py \
             plans/dashboard_admin.py \
+            plans/dashboard_page.py \
+            plans/test_dashboard_page.py \
             deploy/dashboard_e2e.py \
             deploy/dashboard_e2e_runner.py
 
@@ -54,8 +59,10 @@ jobs:
         shell: bash
         run: |
           set +e
-          .venv/bin/python manage.py test management.test_dashboard --verbosity 2 \
-            > dashboard-test-output.txt 2>&1
+          .venv/bin/python manage.py test \
+            management.test_dashboard \
+            plans.test_dashboard_page \
+            --verbosity 2 > dashboard-test-output.txt 2>&1
           status=$?
           cat dashboard-test-output.txt
           exit "$status"
