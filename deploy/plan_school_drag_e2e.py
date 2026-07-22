@@ -100,15 +100,18 @@ def drag_task_via_school(
     desired_top: float,
     *,
     school_waypoint_top: float = 140,
-    grab_offset: float = 14,
 ) -> None:
     task_box = task.bounding_box()
+    title_box = task.locator(".task-title").first.bounding_box()
     target_box = target.bounding_box()
-    if not task_box or not target_box:
-        raise AssertionError("Task or target is not visible")
+    if not task_box or not title_box or not target_box:
+        raise AssertionError("Task title or target is not visible")
 
-    start_x = task_box["x"] + task_box["width"] / 2
-    start_y = task_box["y"] + grab_offset
+    # Study boxes contain Select2 controls that intentionally cancel dragging.
+    # Grab the title, which is the actual calendar drag surface for the box.
+    start_x = title_box["x"] + title_box["width"] / 2
+    start_y = title_box["y"] + title_box["height"] / 2
+    grab_offset = start_y - task_box["y"]
     target_x = target_box["x"] + target_box["width"] / 2
 
     page.mouse.move(start_x, start_y)
