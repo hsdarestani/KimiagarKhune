@@ -9,6 +9,19 @@
   opacity: 0.28;
 }
 
+body.plan-calendar-drag-active {
+  cursor: grabbing;
+  user-select: none;
+}
+
+body.plan-calendar-drag-active .calendar .calendar-task:not(.plan-dragging-source):not(.plan-active-drag-source) {
+  pointer-events: none !important;
+}
+
+body.plan-calendar-drag-active .calendar .task-container {
+  pointer-events: auto !important;
+}
+
 .plan-drag-ghost {
   opacity: 0.88 !important;
   pointer-events: none !important;
