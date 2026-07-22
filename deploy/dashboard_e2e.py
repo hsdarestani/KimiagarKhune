@@ -32,7 +32,7 @@ def wait_for_content(page: Page, selector: str, minimum: int = 12) -> None:
           );
         }
         """,
-        {"selector": selector, "minimum": minimum},
+        arg={"selector": selector, "minimum": minimum},
         timeout=20_000,
     )
 
