@@ -9,7 +9,7 @@
   const PIXELS_PER_MINUTE = 35 / 60;
   const GRID_MINUTES = 15;
   const GRID_PIXELS = GRID_MINUTES * PIXELS_PER_MINUTE;
-  const VERSION = '2026.08.02.1';
+  const VERSION = '2026.08.02.2';
   let synchronizeQueued = false;
 
   function pad(value) {
@@ -134,11 +134,18 @@
     if (!instance || !instance.options) {
       return;
     }
-    if ($task.attr('data-plan-quarter-snap-version') === VERSION) {
+
+    const options = instance.options;
+
+    // Interaction runtimes are allowed to destroy and recreate Draggable.
+    // Track the actual jQuery UI instance, not only the DOM node, so every new
+    // instance receives the authoritative 15-minute grid and feedback hooks.
+    if (options.planQuarterSnapVersion === VERSION) {
+      options.grid = [1, GRID_PIXELS];
+      $task.attr('data-plan-quarter-snap-version', VERSION);
       return;
     }
 
-    const options = instance.options;
     const previousStart = options.start;
     const previousDrag = options.drag;
     const previousStop = options.stop;
@@ -169,6 +176,7 @@
         hideFeedback();
       }
     };
+    options.planQuarterSnapVersion = VERSION;
 
     $task.attr('data-plan-quarter-snap-version', VERSION);
   }
@@ -212,6 +220,14 @@
     window.initCalendarTask = wrapped;
   }
 
+  function patchFromPointer(event) {
+    const target = event.target;
+    const task = target && target.closest ? target.closest('.calendar-task') : null;
+    if (task) {
+      patchTask(task);
+    }
+  }
+
   function initialize() {
     ensureFeedback();
     wrapTaskInitializer();
@@ -229,9 +245,21 @@
       wrapTaskInitializer();
       queueSynchronize();
     });
+    window.addEventListener('plan:task-geometry-ready', queueSynchronize);
+    window.addEventListener('plan:drag-surface-ready', queueSynchronize);
     window.addEventListener('blur', hideFeedback);
+
+    // Capture before jQuery UI starts the drag. This closes the final timing
+    // gap if another runtime recreated the instance immediately before input.
+    document.addEventListener('pointerdown', patchFromPointer, true);
+    document.addEventListener('mousedown', patchFromPointer, true);
+    document.addEventListener('touchstart', patchFromPointer, true);
     document.addEventListener('mouseup', hideFeedback, true);
     document.addEventListener('pointerup', hideFeedback, true);
+
+    // Reassert against the current instances. This is cheap and prevents a
+    // later periodic synchronizer from silently removing the quarter-hour grid.
+    window.setInterval(synchronize, 350);
 
     window.planQuarterSnapFeedback = {
       version: VERSION,
