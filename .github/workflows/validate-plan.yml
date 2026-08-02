@@ -41,6 +41,8 @@ jobs:
           node --check plans/static/plans/plan-lesson-toolbar.js
           node --check plans/static/plans/plan-task-geometry.js
           node --check plans/static/plans/plan-modern-ui.js
+          node --check plans/static/plans/plan-chapter-loader.js
+          node --check plans/static/plans/plan-quarter-snap-feedback.js
           python3 -m py_compile \
             deploy/plan_e2e.py \
             deploy/plan_e2e_runner.py \
@@ -50,6 +52,7 @@ jobs:
             deploy/plan_task_independence_e2e.py \
             deploy/plan_responsive_ui_e2e.py \
             plans/management/commands/cleanup_plan_demo_reports.py \
+            plans/chapter_catalog.py \
             plans/lesson_catalog.py \
             plans/plan_page.py \
             plans/weekly_plans.py \
