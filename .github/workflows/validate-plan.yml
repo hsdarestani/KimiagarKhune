@@ -12,6 +12,7 @@ on:
       - 'deploy/plan_time_grid_e2e.py'
       - 'deploy/plan_task_independence_e2e.py'
       - 'deploy/plan_responsive_ui_e2e.py'
+      - 'deploy/plan_chapter_snap_e2e.py'
       - 'config/test_settings.py'
       - '.github/workflows/deploy.yml'
       - '.github/workflows/validate-plan.yml'
@@ -51,6 +52,7 @@ jobs:
             deploy/plan_time_grid_e2e.py \
             deploy/plan_task_independence_e2e.py \
             deploy/plan_responsive_ui_e2e.py \
+            deploy/plan_chapter_snap_e2e.py \
             plans/management/commands/cleanup_plan_demo_reports.py \
             plans/chapter_catalog.py \
             plans/lesson_catalog.py \
