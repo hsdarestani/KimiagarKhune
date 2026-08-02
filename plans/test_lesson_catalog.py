@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from accounts.models import Student
+from accounts.models import Advisor, Profile, Student
 from plans.default_plan_data import ensure_advisor_for_user, seed_plan_defaults
 from plans.lesson_catalog import allowed_grade_names, sort_lessons_for_student
 from plans.models import Chapter, Lesson, LessonType
@@ -52,7 +52,7 @@ class PlanLessonCatalogRulesTests(TestCase):
             lesson_type=specialized,
             grade=grades["یازدهم"],
         )
-        Chapter.objects.create(
+        self.math_eleventh_chapter = Chapter.objects.create(
             chapter_number=1,
             name="فصل ریاضی یازدهم",
             lesson=self.math_eleventh,
@@ -97,6 +97,18 @@ class PlanLessonCatalogRulesTests(TestCase):
             lesson=self.math_general,
             track="R",
         )
+
+    def make_advisor(self, username: str) -> tuple[object, Advisor]:
+        User = get_user_model()
+        user = User.objects.create_user(username=username, password="test-password")
+        profile = Profile.objects.create(
+            user=user,
+            role="advisor",
+            first_name="مشاور",
+            last_name=username,
+            phone_number=f"09{user.pk:09d}"[-11:],
+        )
+        return user, Advisor.objects.create(profile=profile)
 
     def test_allowed_grades_include_current_and_completed_lower_grades(self):
         self.assertEqual(
@@ -148,3 +160,57 @@ class PlanLessonCatalogRulesTests(TestCase):
         self.assertIn(self.math_general.pk, returned_ids)
         self.assertNotIn(self.math_twelfth.pk, returned_ids)
         self.assertNotIn(self.experimental_eleventh.pk, returned_ids)
+
+    def test_assigned_advisor_loads_chapters_from_student_context(self):
+        advisor_user, advisor = self.make_advisor("chapter-advisor")
+        self.math_student.advisor = advisor
+        self.math_student.save(update_fields=["advisor"])
+        self.client.force_login(advisor_user)
+
+        response = self.client.get(
+            "/get-chapters/",
+            {
+                "student_id": self.math_student.pk,
+                "lesson_id": self.math_eleventh.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(
+            response.json(),
+            [
+                {
+                    "id": self.math_eleventh_chapter.pk,
+                    "text": "1 - فصل ریاضی یازدهم",
+                }
+            ],
+        )
+
+    def test_unassigned_advisor_cannot_load_student_chapters(self):
+        assigned_user, assigned_advisor = self.make_advisor("assigned-advisor")
+        other_user, _other_advisor = self.make_advisor("other-advisor")
+        self.math_student.advisor = assigned_advisor
+        self.math_student.save(update_fields=["advisor"])
+        self.client.force_login(other_user)
+
+        response = self.client.get(
+            "/get-chapters/",
+            {
+                "student_id": self.math_student.pk,
+                "lesson_id": self.math_eleventh.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "دسترسی به این دانش‌آموز مجاز نیست.")
+
+    def test_chapter_endpoint_rejects_other_major_and_future_grade_lessons(self):
+        for lesson in (self.experimental_eleventh, self.math_twelfth):
+            response = self.client.get(
+                "/get-chapters/",
+                {
+                    "student_id": self.math_student.pk,
+                    "lesson_id": lesson.pk,
+                },
+            )
+            self.assertEqual(response.status_code, 403, response.content)

@@ -1,0 +1,117 @@
+.calendar .task-container {
+  background-image:
+    linear-gradient(to bottom, rgba(71, 85, 105, 0.52) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(100, 116, 139, 0.28) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(203, 213, 225, 0.46) 1px, transparent 1px) !important;
+  background-size:
+    100% var(--plan-hour-height),
+    100% calc(var(--plan-hour-height) / 2),
+    100% var(--plan-quarter-height) !important;
+  background-position: 0 0, 0 0, 0 0 !important;
+  background-repeat: repeat-y, repeat-y, repeat-y !important;
+}
+
+.plan-quarter-feedback {
+  position: fixed;
+  z-index: 30050;
+  display: grid;
+  min-width: 160px;
+  padding: 8px 11px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(5px) scale(0.97);
+  color: #fff;
+  text-align: right;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(10px);
+  transition: opacity 90ms ease, transform 90ms ease;
+}
+
+.plan-quarter-feedback.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.plan-quarter-feedback strong {
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.45;
+  direction: rtl;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-quarter-feedback span {
+  margin-top: 1px;
+  color: #bfdbfe;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.plan-quarter-guide-line {
+  position: fixed;
+  z-index: 30040;
+  display: block;
+  height: 2px;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.88),
+    0 0 12px rgba(37, 99, 235, 0.7);
+  transition: opacity 70ms ease;
+}
+
+.plan-quarter-guide-line::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+  transform: translateY(-50%);
+}
+
+.plan-quarter-guide-line.is-visible {
+  opacity: 1;
+}
+
+.calendar .calendar-task.plan-quarter-snapping,
+.plan-drag-ghost {
+  transition: none !important;
+}
+
+.calendar .calendar-task.plan-chapter-load-error {
+  outline: 2px solid rgba(220, 38, 38, 0.58);
+  outline-offset: 1px;
+}
+
+.calendar .calendar-task.plan-chapter-load-error::after {
+  content: attr(data-plan-chapter-error);
+  position: absolute;
+  right: 4px;
+  bottom: calc(100% + 5px);
+  z-index: 120;
+  max-width: 210px;
+  padding: 6px 8px;
+  color: #991b1b;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.5;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fff1f2;
+  box-shadow: 0 8px 18px rgba(127, 29, 29, 0.14);
+}
+
+@media (max-width: 760px) {
+  .plan-quarter-feedback {
+    min-width: 148px;
+    padding: 7px 9px;
+  }
+}

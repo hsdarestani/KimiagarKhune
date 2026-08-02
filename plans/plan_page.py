@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from plans import lesson_catalog
 
 
-ASSET_VERSION = "20260722-9"
+ASSET_VERSION = "20260802-1"
 STYLE_PATHS = (
     ("plans/plan-interactions.css", "data-plan-interactions-style"),
     ("plans/plan-time-grid.css", "data-plan-time-grid-style"),
@@ -14,6 +14,7 @@ STYLE_PATHS = (
     ("plans/plan-modern-ui.css", "data-plan-modern-ui-style"),
     ("plans/plan-modern-ui-fixes.css", "data-plan-modern-ui-fixes-style"),
     ("plans/plan-start-state.css", "data-plan-start-state-style"),
+    ("plans/plan-quarter-snap-feedback.css", "data-plan-quarter-snap-feedback-style"),
 )
 RUNTIME_PATHS = (
     ("plans/plan-runtime.js", "data-plan-runtime"),
@@ -26,6 +27,8 @@ RUNTIME_PATHS = (
     ("plans/plan-task-geometry.js", "data-plan-task-geometry"),
     ("plans/plan-modern-ui.js", "data-plan-modern-ui"),
     ("plans/plan-start-state.js", "data-plan-start-state"),
+    ("plans/plan-chapter-loader.js", "data-plan-chapter-loader"),
+    ("plans/plan-quarter-snap-feedback.js", "data-plan-quarter-snap-feedback"),
 )
 
 
