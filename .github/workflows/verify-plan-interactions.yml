@@ -15,7 +15,7 @@ jobs:
   verify-real-interactions:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
 
     steps:
       - name: Checkout deployed commit
@@ -69,6 +69,10 @@ jobs:
             > plan-responsive-ui-output.txt 2>&1
           responsive_status=$?
 
+          .plan-real-browser-venv/bin/python deploy/plan_chapter_snap_e2e.py \
+            > plan-chapter-snap-output.txt 2>&1
+          chapter_snap_status=$?
+
           echo '===== Core real interactions ====='
           cat plan-real-interaction-output.txt
           echo '===== School-block drag interactions ====='
@@ -79,9 +83,11 @@ jobs:
           cat plan-task-independence-output.txt
           echo '===== Responsive visual interface ====='
           cat plan-responsive-ui-output.txt
+          echo '===== Chapter loading and quarter-hour feedback ====='
+          cat plan-chapter-snap-output.txt
 
           status=0
-          if [ "$core_status" -ne 0 ] || [ "$school_status" -ne 0 ] || [ "$grid_status" -ne 0 ] || [ "$independence_status" -ne 0 ] || [ "$responsive_status" -ne 0 ]; then
+          if [ "$core_status" -ne 0 ] || [ "$school_status" -ne 0 ] || [ "$grid_status" -ne 0 ] || [ "$independence_status" -ne 0 ] || [ "$responsive_status" -ne 0 ] || [ "$chapter_snap_status" -ne 0 ]; then
             status=1
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
@@ -98,6 +104,7 @@ jobs:
             plan-time-grid-output.txt
             plan-task-independence-output.txt
             plan-responsive-ui-output.txt
+            plan-chapter-snap-output.txt
           retention-days: 3
 
       - name: Publish real interaction status
@@ -113,10 +120,10 @@ jobs:
           set -euo pipefail
           if [ "${TEST_STATUS:-1}" = "0" ]; then
             STATE='success'
-            DESCRIPTION='Plan interactions, time grid, task independence and responsive UI passed.'
+            DESCRIPTION='Plan interactions, chapters, 15-minute snap and responsive UI passed.'
           else
             STATE='failure'
-            DESCRIPTION='Plan interaction, geometry or responsive UI regression failed.'
+            DESCRIPTION='Plan interaction, chapter loading, snap or responsive regression failed.'
           fi
 
           jq -n \
