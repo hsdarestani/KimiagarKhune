@@ -5,7 +5,7 @@
     return;
   }
 
-  const VERSION = '2026.08.02.1';
+  const VERSION = '2026.08.07.1';
   let synchronizeQueued = false;
 
   function currentStudentId() {
@@ -16,13 +16,54 @@
   function markError($task, message) {
     $task
       .addClass('plan-chapter-load-error')
-      .attr('data-plan-chapter-error', String(message || 'بارگذاری فصل‌ها انجام نشد.'));
+      .attr('data-plan-chapter-error', String(message || 'بارگذاری سرفصل‌ها انجام نشد.'));
   }
 
   function clearError($task) {
     $task
       .removeClass('plan-chapter-load-error')
       .removeAttr('data-plan-chapter-error');
+  }
+
+  function chapterTemplate(item) {
+    if (!item || item.loading) {
+      return item && item.text ? item.text : '';
+    }
+    return $('<span class="plan-chapter-option-text"></span>').text(
+      String(item.text || '').trim()
+    );
+  }
+
+  function chapterSelection(item) {
+    const text = String((item && item.text) || '').trim();
+    return text || 'انتخاب سرفصل';
+  }
+
+  function keepDropdownInsideViewport() {
+    const $dropdown = $('.select2-dropdown.plan-chapter-dropdown:visible').last();
+    if (!$dropdown.length) {
+      return;
+    }
+
+    const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+    const comfortableWidth = Math.min(390, Math.max(260, viewportWidth - 24));
+    $dropdown.css({
+      width: comfortableWidth + 'px',
+      minWidth: comfortableWidth + 'px',
+      maxWidth: 'calc(100vw - 24px)'
+    });
+
+    const rect = $dropdown[0].getBoundingClientRect();
+    let delta = 0;
+    if (rect.left < 12) {
+      delta = 12 - rect.left;
+    } else if (rect.right > viewportWidth - 12) {
+      delta = (viewportWidth - 12) - rect.right;
+    }
+    if (delta) {
+      const currentLeft = Number.parseFloat($dropdown.css('left')) || 0;
+      $dropdown.css('left', currentLeft + delta + 'px');
+    }
   }
 
   function configureChapterSelect(task) {
@@ -53,15 +94,24 @@
     }
 
     $select.select2({
-      placeholder: 'شماره فصل',
-      dropdownParent: $task,
+      placeholder: 'انتخاب سرفصل',
+      // The calendar column is intentionally narrow. Rendering the dropdown
+      // inside the task made real chapter names look clipped/blank. Appending
+      // to body lets the result list use a readable width without changing the
+      // lesson card geometry.
+      dropdownParent: $('body'),
+      dropdownAutoWidth: true,
+      dropdownCssClass: 'plan-chapter-dropdown',
       width: '100%',
       theme: 'bootstrap-5',
       allowClear: true,
+      templateResult: chapterTemplate,
+      templateSelection: chapterSelection,
+      escapeMarkup: function (markup) { return markup; },
       language: {
-        errorLoading: function () { return 'بارگذاری فصل‌ها انجام نشد'; },
+        errorLoading: function () { return 'بارگذاری سرفصل‌ها انجام نشد'; },
         loadingMore: function () { return 'در حال بارگذاری…'; },
-        noResults: function () { return 'فصلی برای این درس پیدا نشد'; },
+        noResults: function () { return 'سرفصلی برای این درس پیدا نشد'; },
         searching: function () { return 'در حال جست‌وجو…'; }
       },
       ajax: {
@@ -83,7 +133,7 @@
           });
           request.fail(function (xhr) {
             const payload = xhr.responseJSON || {};
-            markError($task, payload.error || payload.message || 'بارگذاری فصل‌ها انجام نشد.');
+            markError($task, payload.error || payload.message || 'بارگذاری سرفصل‌ها انجام نشد.');
             failure(xhr);
           });
           return request;
@@ -97,6 +147,12 @@
     if (selectedValue) {
       $select.val(selectedValue).trigger('change.select2');
     }
+
+    $select
+      .off('.planChapterVisibility')
+      .on('select2:open.planChapterVisibility', function () {
+        window.requestAnimationFrame(keepDropdownInsideViewport);
+      });
 
     $select.attr('data-plan-chapter-loader-version', VERSION);
   }
@@ -164,6 +220,9 @@
       queueSynchronize();
     });
     window.addEventListener('plan:lesson-toolbar-updated', queueSynchronize);
+    window.addEventListener('resize', function () {
+      window.requestAnimationFrame(keepDropdownInsideViewport);
+    });
 
     window.planChapterLoader = {
       version: VERSION,
