@@ -5,7 +5,7 @@
     return;
   }
 
-  const VERSION = '2026.08.07.2';
+  const VERSION = '2026.08.07.3';
   let synchronizeQueued = false;
 
   function currentStudentId() {
@@ -45,15 +45,37 @@
       return;
     }
 
-    const viewportWidth = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+    const viewportWidth = Math.max(
+      document.documentElement.clientWidth || 0,
+      window.innerWidth || 0
+    );
     const comfortableWidth = Math.min(390, Math.max(260, viewportWidth - 24));
-    $dropdown.css({
-      width: comfortableWidth + 'px',
-      minWidth: comfortableWidth + 'px',
-      maxWidth: 'calc(100vw - 24px)'
-    });
+    const $wrapper = $dropdown.closest('.select2-container.select2-container--open');
+    const $positioned = $wrapper.length ? $wrapper : $dropdown;
 
-    const rect = $dropdown[0].getBoundingClientRect();
+    // Select2 writes the narrow lesson-card width on its outer positioned
+    // wrapper. Widening only .select2-dropdown is therefore not enough. Set the
+    // wrapper and make the dropdown fill it so long Persian headings stay readable.
+    if ($wrapper.length) {
+      $wrapper.css({
+        width: comfortableWidth + 'px',
+        minWidth: comfortableWidth + 'px',
+        maxWidth: 'calc(100vw - 24px)'
+      });
+      $dropdown.css({
+        width: '100%',
+        minWidth: '100%',
+        maxWidth: '100%'
+      });
+    } else {
+      $dropdown.css({
+        width: comfortableWidth + 'px',
+        minWidth: comfortableWidth + 'px',
+        maxWidth: 'calc(100vw - 24px)'
+      });
+    }
+
+    const rect = $positioned[0].getBoundingClientRect();
     let delta = 0;
     if (rect.left < 12) {
       delta = 12 - rect.left;
@@ -61,8 +83,8 @@
       delta = (viewportWidth - 12) - rect.right;
     }
     if (delta) {
-      const currentLeft = Number.parseFloat($dropdown.css('left')) || 0;
-      $dropdown.css('left', currentLeft + delta + 'px');
+      const currentLeft = Number.parseFloat($positioned.css('left')) || 0;
+      $positioned.css('left', currentLeft + delta + 'px');
     }
   }
 
@@ -76,6 +98,16 @@
     }
     $dropdown.addClass('plan-chapter-dropdown');
     keepDropdownInsideViewport();
+  }
+
+  function settleChapterDropdown() {
+    // Select2 performs its own final positioning around the open event. Apply the
+    // readable width after that positioning too, so its inline width cannot win.
+    window.requestAnimationFrame(function () {
+      activateChapterDropdown();
+      window.requestAnimationFrame(keepDropdownInsideViewport);
+    });
+    window.setTimeout(keepDropdownInsideViewport, 0);
   }
 
   function configureChapterSelect(task) {
@@ -101,7 +133,10 @@
       }
     }
 
-    if (selectedValue && !$select.find('option[value="' + selectedValue.replace(/"/g, '\\"') + '"]').length) {
+    if (
+      selectedValue &&
+      !$select.find('option[value="' + selectedValue.replace(/"/g, '\\"') + '"]').length
+    ) {
       $select.append(new Option(selectedText || selectedValue, selectedValue, true, true));
     }
 
@@ -144,7 +179,10 @@
           });
           request.fail(function (xhr) {
             const payload = xhr.responseJSON || {};
-            markError($task, payload.error || payload.message || 'بارگذاری سرفصل‌ها انجام نشد.');
+            markError(
+              $task,
+              payload.error || payload.message || 'بارگذاری سرفصل‌ها انجام نشد.'
+            );
             failure(xhr);
           });
           return request;
@@ -161,9 +199,7 @@
 
     $select
       .off('.planChapterVisibility')
-      .on('select2:open.planChapterVisibility', function () {
-        window.requestAnimationFrame(activateChapterDropdown);
-      });
+      .on('select2:open.planChapterVisibility', settleChapterDropdown);
 
     $select.attr('data-plan-chapter-loader-version', VERSION);
   }
