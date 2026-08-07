@@ -127,7 +127,7 @@ body.plan-resize-cursor * {
   height: 28px !important;
   border: 1px solid rgba(100, 116, 139, 0.35) !important;
   border-radius: 8px !important;
-  background: rgba(255, 255, 255, 0.94) !important;
+  background: rgba(255, 255, 255, 0.98) !important;
   box-shadow: none !important;
 }
 
@@ -136,7 +136,19 @@ body.plan-resize-cursor * {
   line-height: 26px !important;
   padding-right: 7px !important;
   padding-left: 20px !important;
+  color: #0f172a !important;
   font-size: 10px !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.extended-task.plan-study-editing .select2-selection__placeholder,
+.extended-task.plan-study-editor-pinned .select2-selection__placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
 }
 
 .extended-task.plan-study-editing .select2-selection__arrow,
@@ -161,10 +173,11 @@ body.plan-resize-cursor * {
   height: 23px;
   padding: 0 7px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  color: #334155;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  color: #1e293b;
   font-size: 9px;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -174,7 +187,7 @@ body.plan-resize-cursor * {
   flex: 0 0 auto;
   max-width: none;
   color: #0f766e;
-  background: rgba(204, 251, 241, 0.86);
+  background: rgba(204, 251, 241, 0.9);
 }
 
 .plan-study-edit {
@@ -218,6 +231,84 @@ body.plan-resize-cursor * {
   background: #2563eb !important;
 }
 
+/* Chapter dropdowns are appended to body so narrow calendar cards cannot clip them. */
+.select2-container--open {
+  z-index: 40000 !important;
+}
+
+.select2-dropdown.plan-chapter-dropdown {
+  direction: rtl !important;
+  overflow: hidden !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.22) !important;
+}
+
+.plan-chapter-dropdown .select2-search {
+  padding: 8px !important;
+  background: #f8fafc !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.plan-chapter-dropdown .select2-search__field {
+  min-height: 32px !important;
+  padding: 5px 9px !important;
+  color: #0f172a !important;
+  font-size: 11px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+}
+
+.plan-chapter-dropdown .select2-results {
+  background: #ffffff !important;
+}
+
+.plan-chapter-dropdown .select2-results__options {
+  max-height: 320px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+}
+
+.plan-chapter-dropdown .select2-results__option {
+  min-height: 38px !important;
+  padding: 9px 12px !important;
+  color: #0f172a !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.75 !important;
+  text-align: right !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  background: #ffffff !important;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.plan-chapter-dropdown .select2-results__option:last-child {
+  border-bottom: 0;
+}
+
+.plan-chapter-dropdown .select2-results__option--highlighted,
+.plan-chapter-dropdown .select2-results__option[aria-selected="true"].select2-results__option--highlighted {
+  color: #ffffff !important;
+  background: #2563eb !important;
+}
+
+.plan-chapter-dropdown .select2-results__option[aria-selected="true"]:not(.select2-results__option--highlighted) {
+  color: #1d4ed8 !important;
+  background: #eff6ff !important;
+}
+
+.plan-chapter-option-text {
+  display: block;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+}
+
 @media (max-width: 900px) {
   .plan-resize-handle {
     height: 20px !important;
@@ -226,5 +317,17 @@ body.plan-resize-cursor * {
 
   .plan-resize-handle span {
     width: 44px;
+  }
+}
+
+@media (max-width: 520px) {
+  .select2-dropdown.plan-chapter-dropdown {
+    width: calc(100vw - 24px) !important;
+    min-width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  .plan-chapter-dropdown .select2-results__option {
+    font-size: 12px !important;
   }
 }
