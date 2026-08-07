@@ -236,6 +236,23 @@ body.plan-resize-cursor * {
   z-index: 40000 !important;
 }
 
+/* Select2 writes the originating lesson-card width inline on this positioned
+   wrapper. Once this is identified as a chapter dropdown, force a readable
+   global width so long Persian headings cannot collapse back to card width. */
+.select2-container.plan-chapter-dropdown-wrapper.select2-container--open {
+  width: min(390px, calc(100vw - 24px)) !important;
+  min-width: min(260px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  box-sizing: border-box !important;
+}
+
+.select2-container.plan-chapter-dropdown-wrapper.select2-container--open .select2-dropdown.plan-chapter-dropdown {
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 .select2-dropdown.plan-chapter-dropdown {
   direction: rtl !important;
   overflow: hidden !important;
@@ -321,10 +338,16 @@ body.plan-resize-cursor * {
 }
 
 @media (max-width: 520px) {
-  .select2-dropdown.plan-chapter-dropdown {
+  .select2-container.plan-chapter-dropdown-wrapper.select2-container--open {
     width: calc(100vw - 24px) !important;
     min-width: calc(100vw - 24px) !important;
     max-width: calc(100vw - 24px) !important;
+  }
+
+  .select2-dropdown.plan-chapter-dropdown {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
   }
 
   .plan-chapter-dropdown .select2-results__option {
