@@ -70,7 +70,35 @@ class DashboardAssignmentAccessTests(TestCase):
             content_type="application/json",
         )
 
-    def test_dashboard_assignment_persists_student_advisor_and_grants_chat(self):
+    def _assert_advisor_can_use_student_across_surfaces(self):
+        self.client.force_login(self.advisor_user)
+
+        chat = self.client.get(f"/api/chat/messages/user:{self.student_user.pk}/")
+        self.assertEqual(chat.status_code, 200, chat.content)
+
+        plan_page = self.client.get("/plan/")
+        self.assertEqual(plan_page.status_code, 200, plan_page.content)
+        student_ids = {student.pk for student in plan_page.context["students"]}
+        self.assertIn(self.student.pk, student_ids)
+
+        lessons = self.client.get(
+            "/get-lessons-for-student/", {"student_id": self.student.pk}
+        )
+        self.assertEqual(lessons.status_code, 200, lessons.content)
+
+        check = self.client.get(
+            "/check-weekly-report/",
+            {"student_id": self.student.pk, "selected_date": "2026-08-10"},
+        )
+        self.assertEqual(check.status_code, 200, check.content)
+
+        report = self.client.get(
+            "/get-weekly-report-details/",
+            {"student_id": self.student.pk, "week_start": "2026-08-10"},
+        )
+        self.assertEqual(report.status_code, 200, report.content)
+
+    def test_dashboard_assignment_persists_student_advisor_and_grants_every_surface(self):
         response = self._assign()
         self.assertEqual(response.status_code, 201, response.content)
 
@@ -79,11 +107,7 @@ class DashboardAssignmentAccessTests(TestCase):
         course = Course.objects.get(student=self.student, advisor=self.advisor)
         self.assertEqual(course.sessions.count(), 4)
 
-        self.client.force_login(self.advisor_user)
-        advisor_chat = self.client.get(
-            f"/api/chat/messages/user:{self.student_user.pk}/"
-        )
-        self.assertEqual(advisor_chat.status_code, 200, advisor_chat.content)
+        self._assert_advisor_can_use_student_across_surfaces()
 
         self.client.force_login(self.student_user)
         student_chat = self.client.get(
@@ -96,7 +120,7 @@ class DashboardAssignmentAccessTests(TestCase):
         )
         self.assertEqual(denied.status_code, 403)
 
-    def test_legacy_course_assignment_is_allowed_before_repair(self):
+    def test_legacy_course_assignment_is_allowed_across_plan_and_chat_before_repair(self):
         Course.objects.create(
             student=self.student,
             advisor=self.advisor,
@@ -107,17 +131,36 @@ class DashboardAssignmentAccessTests(TestCase):
         )
         self.assertIsNone(self.student.advisor_id)
 
-        self.client.force_login(self.advisor_user)
-        response = self.client.get(
-            f"/api/chat/messages/user:{self.student_user.pk}/"
-        )
-        self.assertEqual(response.status_code, 200, response.content)
+        self._assert_advisor_can_use_student_across_surfaces()
 
         self.client.force_login(self.student_user)
         response = self.client.get(
             f"/api/chat/messages/user:{self.advisor_user.pk}/"
         )
         self.assertEqual(response.status_code, 200, response.content)
+
+    def test_unrelated_advisor_is_denied_across_plan_and_chat(self):
+        response = self._assign()
+        self.assertEqual(response.status_code, 201, response.content)
+        self.client.force_login(self.other_advisor_user)
+
+        self.assertEqual(
+            self.client.get(f"/api/chat/messages/user:{self.student_user.pk}/").status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.get(
+                "/get-lessons-for-student/", {"student_id": self.student.pk}
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.get(
+                "/check-weekly-report/",
+                {"student_id": self.student.pk, "selected_date": "2026-08-10"},
+            ).status_code,
+            403,
+        )
 
     def test_repair_command_backfills_latest_active_course_advisor(self):
         Course.objects.create(
