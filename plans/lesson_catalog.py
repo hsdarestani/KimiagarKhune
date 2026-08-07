@@ -5,6 +5,7 @@ from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render
 
 from accounts.models import Advisor, Grade, Profile, Student
+from plans.advisor_access import assigned_students_for_advisor, student_is_assigned_to_advisor
 from plans.default_plan_data import DEFAULT_BOXES
 from plans.models import Box, DefaultEvent, Lesson, WeeklyReportDetail
 
@@ -72,12 +73,7 @@ def canonical_grade_name(value: object) -> str | None:
 
 
 def allowed_grade_names(student: Student) -> set[str]:
-    """Return the student's current grade and all completed lower grades.
-
-    A tenth-grade student sees only tenth-grade lessons. An eleventh-grade
-    student sees tenth and eleventh grade. A twelfth-grade student sees all
-    three grades. Lessons from a future grade are never returned by the API.
-    """
+    """Return the student's current grade and all completed lower grades."""
 
     current = canonical_grade_name(student.grade.name)
     if current is None:
@@ -122,8 +118,14 @@ def _student_is_visible(request, student: Student) -> bool:
     if request.user.is_staff:
         return True
     profile = _request_profile(request)
-    advisor = Advisor.objects.filter(profile=profile).first() if profile else None
-    return bool(advisor and student.advisor_id == advisor.pk)
+    if not profile:
+        return False
+    if profile.role == "student":
+        return student.profile_id == profile.pk
+    if profile.role != "advisor":
+        return False
+    advisor = Advisor.objects.filter(profile=profile).first()
+    return bool(advisor and student_is_assigned_to_advisor(student, advisor))
 
 
 def sort_lessons_for_student(student: Student) -> dict[str, list[Lesson]]:
@@ -216,9 +218,7 @@ def plan_view(request):
     else:
         advisor = Advisor.objects.filter(profile=profile).first() if profile else None
         students = (
-            Student.objects.select_related("profile", "major", "grade").filter(
-                advisor=advisor
-            )
+            assigned_students_for_advisor(advisor).select_related("profile", "major", "grade")
             if advisor
             else Student.objects.none()
         )
@@ -258,7 +258,7 @@ def get_lessons_for_student(request):
         return HttpResponseBadRequest("Missing student_id parameter.")
 
     try:
-        student = Student.objects.select_related("major", "grade").get(pk=student_id)
+        student = Student.objects.select_related("profile", "advisor", "major", "grade").get(pk=student_id)
     except Student.DoesNotExist:
         return HttpResponseBadRequest("Student not found.")
 
@@ -327,7 +327,7 @@ def get_default_events(request):
         return JsonResponse({"error": "Missing student_id"}, status=400)
 
     try:
-        student = Student.objects.get(pk=student_id)
+        student = Student.objects.select_related("profile", "advisor").get(pk=student_id)
     except Student.DoesNotExist:
         return JsonResponse({"error": "Student not found"}, status=400)
 
@@ -392,7 +392,7 @@ def move_lesson_to_end(request):
 
     try:
         selected_id = int(lesson_id)
-        student = Student.objects.select_related("major", "grade").get(pk=student_id)
+        student = Student.objects.select_related("profile", "advisor", "major", "grade").get(pk=student_id)
     except (TypeError, ValueError, Student.DoesNotExist):
         return JsonResponse({"error": "Invalid lesson or student"}, status=400)
 
