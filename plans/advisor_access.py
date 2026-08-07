@@ -20,10 +20,9 @@ def latest_active_course_advisor_id(student_id: int) -> int | None:
 def effective_advisor_id(student: Student) -> int | None:
     """Resolve the student's current advisor.
 
-    `Student.advisor` is the canonical relationship. Older dashboard versions only
-    created a Course when assigning a student and left this FK empty. For those
-    legacy records we temporarily fall back to the newest active course so access
-    works immediately even before the repair command has run.
+    `Student.advisor` is canonical. Older dashboard versions created only a
+    Course, so records with a null FK temporarily fall back to the newest active
+    course until the deployment repair has backfilled them.
     """
 
     if student.advisor_id:
@@ -36,12 +35,7 @@ def student_is_assigned_to_advisor(student: Student, advisor: Advisor) -> bool:
 
 
 def assigned_students_for_advisor(advisor: Advisor) -> QuerySet[Student]:
-    """Students currently belonging to an advisor, including legacy assignments.
-
-    A Course fallback is used only when the Student.advisor FK is null. This keeps
-    a historical course from granting an old advisor access after a later explicit
-    reassignment changed Student.advisor.
-    """
+    """Students currently belonging to an advisor, including legacy assignments."""
 
     legacy_student_ids = Course.objects.filter(
         advisor=advisor,
@@ -53,6 +47,25 @@ def assigned_students_for_advisor(advisor: Advisor) -> QuerySet[Student]:
         Q(advisor=advisor)
         | Q(advisor__isnull=True, pk__in=legacy_student_ids)
     ).distinct()
+
+
+def user_can_access_student(user, student: Student) -> bool:
+    """Single access policy used by Dashboard, Chat and weekly Plan APIs."""
+
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_staff:
+        return True
+
+    profile = getattr(user, "profile", None)
+    if not profile:
+        return False
+    if profile.role == "student":
+        return student.profile_id == profile.pk
+    if profile.role == "advisor":
+        advisor = Advisor.objects.filter(profile=profile).first()
+        return bool(advisor and student_is_assigned_to_advisor(student, advisor))
+    return False
 
 
 def set_current_advisor(student: Student, advisor: Advisor) -> bool:
