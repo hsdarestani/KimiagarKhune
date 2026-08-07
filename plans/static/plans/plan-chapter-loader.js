@@ -5,7 +5,7 @@
     return;
   }
 
-  const VERSION = '2026.08.07.3';
+  const VERSION = '2026.08.07.4';
   let synchronizeQueued = false;
 
   function currentStudentId() {
@@ -39,8 +39,25 @@
     return text || 'انتخاب سرفصل';
   }
 
+  function activeChapterDropdown() {
+    return $('.select2-dropdown.plan-chapter-dropdown:visible').last();
+  }
+
+  function dropdownWrapper($dropdown) {
+    if (!$dropdown || !$dropdown.length) {
+      return $();
+    }
+    return $dropdown.parents('.select2-container').first();
+  }
+
+  function setImportant(element, property, value) {
+    if (element && element.style) {
+      element.style.setProperty(property, value, 'important');
+    }
+  }
+
   function keepDropdownInsideViewport() {
-    const $dropdown = $('.select2-dropdown.plan-chapter-dropdown:visible').last();
+    const $dropdown = activeChapterDropdown();
     if (!$dropdown.length) {
       return;
     }
@@ -50,29 +67,28 @@
       window.innerWidth || 0
     );
     const comfortableWidth = Math.min(390, Math.max(260, viewportWidth - 24));
-    const $wrapper = $dropdown.closest('.select2-container.select2-container--open');
+    const $wrapper = dropdownWrapper($dropdown);
     const $positioned = $wrapper.length ? $wrapper : $dropdown;
 
-    // Select2 writes the narrow lesson-card width on its outer positioned
-    // wrapper. Widening only .select2-dropdown is therefore not enough. Set the
-    // wrapper and make the dropdown fill it so long Persian headings stay readable.
     if ($wrapper.length) {
-      $wrapper.css({
-        width: comfortableWidth + 'px',
-        minWidth: comfortableWidth + 'px',
-        maxWidth: 'calc(100vw - 24px)'
-      });
-      $dropdown.css({
-        width: '100%',
-        minWidth: '100%',
-        maxWidth: '100%'
-      });
+      $wrapper.addClass('plan-chapter-dropdown-wrapper');
+      const wrapper = $wrapper[0];
+      setImportant(wrapper, 'width', comfortableWidth + 'px');
+      setImportant(wrapper, 'min-width', comfortableWidth + 'px');
+      setImportant(wrapper, 'max-width', 'calc(100vw - 24px)');
+      setImportant(wrapper, 'box-sizing', 'border-box');
+
+      const dropdown = $dropdown[0];
+      setImportant(dropdown, 'width', '100%');
+      setImportant(dropdown, 'min-width', '100%');
+      setImportant(dropdown, 'max-width', '100%');
+      setImportant(dropdown, 'box-sizing', 'border-box');
     } else {
-      $dropdown.css({
-        width: comfortableWidth + 'px',
-        minWidth: comfortableWidth + 'px',
-        maxWidth: 'calc(100vw - 24px)'
-      });
+      const dropdown = $dropdown[0];
+      setImportant(dropdown, 'width', comfortableWidth + 'px');
+      setImportant(dropdown, 'min-width', comfortableWidth + 'px');
+      setImportant(dropdown, 'max-width', 'calc(100vw - 24px)');
+      setImportant(dropdown, 'box-sizing', 'border-box');
     }
 
     const rect = $positioned[0].getBoundingClientRect();
@@ -84,30 +100,38 @@
     }
     if (delta) {
       const currentLeft = Number.parseFloat($positioned.css('left')) || 0;
-      $positioned.css('left', currentLeft + delta + 'px');
+      setImportant($positioned[0], 'left', currentLeft + delta + 'px');
     }
   }
 
   function activateChapterDropdown() {
-    // This project ships a Select2 build without the optional dropdownCss
-    // compatibility module. Add our styling hook after opening instead of using
-    // dropdownCssClass, which otherwise throws "No select2/compat/dropdownCss".
+    // The Select2 build used by this project does not include the optional
+    // dropdownCss compatibility module. Add styling hooks to the rendered nodes
+    // instead of relying on dropdownCssClass.
     const $dropdown = $('.select2-dropdown:visible').last();
     if (!$dropdown.length) {
       return;
     }
     $dropdown.addClass('plan-chapter-dropdown');
+    const $wrapper = dropdownWrapper($dropdown);
+    if ($wrapper.length) {
+      $wrapper.addClass('plan-chapter-dropdown-wrapper');
+    }
     keepDropdownInsideViewport();
   }
 
   function settleChapterDropdown() {
-    // Select2 performs its own final positioning around the open event. Apply the
-    // readable width after that positioning too, so its inline width cannot win.
+    // Select2 performs more positioning after the open event. Reapply after two
+    // animation frames and the current task so its inline width can never win.
     window.requestAnimationFrame(function () {
       activateChapterDropdown();
       window.requestAnimationFrame(keepDropdownInsideViewport);
     });
-    window.setTimeout(keepDropdownInsideViewport, 0);
+    window.setTimeout(function () {
+      activateChapterDropdown();
+      keepDropdownInsideViewport();
+    }, 0);
+    window.setTimeout(keepDropdownInsideViewport, 40);
   }
 
   function configureChapterSelect(task) {
@@ -142,12 +166,9 @@
 
     $select.select2({
       placeholder: 'انتخاب سرفصل',
-      // The calendar column is intentionally narrow. Rendering the dropdown
-      // inside the task made real chapter names look clipped/blank. Appending
-      // to body lets the result list use a readable width without changing the
-      // lesson card geometry.
+      // The lesson card is intentionally narrow; render the results under body
+      // and size the opened wrapper ourselves for readable Persian headings.
       dropdownParent: $('body'),
-      dropdownAutoWidth: true,
       width: '100%',
       theme: 'bootstrap-5',
       allowClear: true,
