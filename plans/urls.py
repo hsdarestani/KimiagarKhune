@@ -8,9 +8,22 @@ from . import (
     dashboard_page,
     lesson_catalog,
     plan_page,
+    weekly_plans,
     weekly_plans_v2,
 )
+from .advisor_access import user_can_access_student
 from .views import *
+
+
+# weekly_plans_v2 imports _student_or_response from the legacy weekly_plans
+# module. Keep that validator, but make its access decision use the same policy
+# as Dashboard, Chat and the Plan lesson endpoints. This compatibility hook can
+# be removed once the legacy module is retired.
+def _canonical_weekly_student_access(request, student):
+    return user_can_access_student(request.user, student)
+
+
+weekly_plans._can_access_student = _canonical_weekly_student_access
 
 
 router = DefaultRouter()
