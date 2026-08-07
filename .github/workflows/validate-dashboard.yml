@@ -5,8 +5,11 @@ on:
     paths:
       - 'accounts/**'
       - 'management/**'
+      - 'plans/advisor_access.py'
       - 'plans/dashboard_admin.py'
+      - 'plans/dashboard_assignment.py'
       - 'plans/dashboard_page.py'
+      - 'plans/management/commands/repair_student_advisor_assignments.py'
       - 'plans/static/plans/dashboard-responsive.css'
       - 'plans/test_dashboard_page.py'
       - 'plans/views.py'
@@ -14,6 +17,7 @@ on:
       - 'plans/templates/plans/management.html'
       - 'config/settings.py'
       - 'config/test_settings.py'
+      - 'deploy/deploy.sh'
       - 'deploy/dashboard_e2e.py'
       - 'deploy/dashboard_e2e_runner.py'
       - '.github/workflows/validate-dashboard.yml'
@@ -37,8 +41,12 @@ jobs:
           python3 -m py_compile \
             management/dashboard_security.py \
             management/test_dashboard.py \
+            management/test_assignment_access.py \
+            plans/advisor_access.py \
             plans/dashboard_admin.py \
+            plans/dashboard_assignment.py \
             plans/dashboard_page.py \
+            plans/management/commands/repair_student_advisor_assignments.py \
             plans/test_dashboard_page.py \
             deploy/dashboard_e2e.py \
             deploy/dashboard_e2e_runner.py
@@ -61,6 +69,7 @@ jobs:
           set +e
           .venv/bin/python manage.py test \
             management.test_dashboard \
+            management.test_assignment_access \
             plans.test_dashboard_page \
             --verbosity 2 > dashboard-test-output.txt 2>&1
           status=$?

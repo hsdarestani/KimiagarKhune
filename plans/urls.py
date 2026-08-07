@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from . import (
     chapter_catalog,
     dashboard_admin,
+    dashboard_assignment,
     dashboard_page,
     lesson_catalog,
     plan_page,
@@ -35,7 +36,7 @@ urlpatterns = [
     path("api/admin/advisors/", dashboard_admin.admin_advisors_view, name="api_admin_advisors"),
     path("api/admin/advisors/<int:advisor_id>/availability/", admin_advisor_add_availability, name="api_admin_advisor_add_availability"),
     path("api/admin/advisors/availability/<int:availability_id>/", admin_advisor_delete_availability, name="api_admin_advisor_delete_availability"),
-    path("api/assign-student/", assign_student_view, name="api_assign_student"),
+    path("api/assign-student/", dashboard_assignment.assign_student_view, name="api_assign_student"),
     path("api/log-weekly-report-action/", log_weekly_report_action, name="api_log_weekly_report_action"),
     path("", include(router.urls)),
 ]

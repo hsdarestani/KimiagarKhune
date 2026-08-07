@@ -145,6 +145,7 @@ cd "$APP_DIR"
 
 "$APP_DIR/venv/bin/python" manage.py check
 "$APP_DIR/venv/bin/python" manage.py migrate --noinput
+"$APP_DIR/venv/bin/python" manage.py repair_student_advisor_assignments
 "$APP_DIR/venv/bin/python" manage.py collectstatic --noinput
 
 chown -R www-data:www-data "$APP_DIR/media" "$APP_DIR/staticfiles"

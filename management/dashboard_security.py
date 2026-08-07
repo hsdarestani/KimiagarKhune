@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from django.contrib.auth.models import User
 from rest_framework import status
-from rest_framework.response import Response
 
 from accounts.models import Advisor, Student
 from management.views import ConversationListView, MessageListView
+from plans.advisor_access import assigned_students_for_advisor, effective_advisor_id
 
 
 def _is_admin(user) -> bool:
@@ -27,9 +27,15 @@ def _allowed_direct_user_ids(user) -> set[int]:
     role = getattr(profile, "role", None)
 
     if role == "student":
+        student = Student.objects.filter(profile=profile).first()
+        if not student:
+            return set()
+        advisor_id = effective_advisor_id(student)
+        if not advisor_id:
+            return set()
         advisor_user_id = (
-            Student.objects.filter(profile=profile)
-            .values_list("advisor__profile__user_id", flat=True)
+            Advisor.objects.filter(pk=advisor_id)
+            .values_list("profile__user_id", flat=True)
             .first()
         )
         return {advisor_user_id} if advisor_user_id else set()
@@ -39,7 +45,7 @@ def _allowed_direct_user_ids(user) -> set[int]:
         if not advisor:
             return set()
         return set(
-            Student.objects.filter(advisor=advisor)
+            assigned_students_for_advisor(advisor)
             .exclude(profile__user_id__isnull=True)
             .values_list("profile__user_id", flat=True)
         )
@@ -48,7 +54,7 @@ def _allowed_direct_user_ids(user) -> set[int]:
 
 
 class SecuredConversationListView(ConversationListView):
-    """Keep conversation discovery aligned with role relationships."""
+    """Keep conversation discovery aligned with current advisor assignments."""
 
     def get(self, request):
         response = super().get(request)
