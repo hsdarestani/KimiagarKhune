@@ -5,7 +5,7 @@
     return;
   }
 
-  const VERSION = '2026.08.07.1';
+  const VERSION = '2026.08.07.2';
   let synchronizeQueued = false;
 
   function currentStudentId() {
@@ -66,6 +66,18 @@
     }
   }
 
+  function activateChapterDropdown() {
+    // This project ships a Select2 build without the optional dropdownCss
+    // compatibility module. Add our styling hook after opening instead of using
+    // dropdownCssClass, which otherwise throws "No select2/compat/dropdownCss".
+    const $dropdown = $('.select2-dropdown:visible').last();
+    if (!$dropdown.length) {
+      return;
+    }
+    $dropdown.addClass('plan-chapter-dropdown');
+    keepDropdownInsideViewport();
+  }
+
   function configureChapterSelect(task) {
     const $task = $(task);
     const $select = $task.find('.task-chapter').first();
@@ -101,7 +113,6 @@
       // lesson card geometry.
       dropdownParent: $('body'),
       dropdownAutoWidth: true,
-      dropdownCssClass: 'plan-chapter-dropdown',
       width: '100%',
       theme: 'bootstrap-5',
       allowClear: true,
@@ -151,7 +162,7 @@
     $select
       .off('.planChapterVisibility')
       .on('select2:open.planChapterVisibility', function () {
-        window.requestAnimationFrame(keepDropdownInsideViewport);
+        window.requestAnimationFrame(activateChapterDropdown);
       });
 
     $select.attr('data-plan-chapter-loader-version', VERSION);
