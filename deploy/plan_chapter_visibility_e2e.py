@@ -220,23 +220,52 @@ def main() -> int:
         visible_option.click()
         page.wait_for_timeout(250)
 
-        display_text = task.evaluate(
+        display_state = task.evaluate(
             """
             element => {
-              const compact = element.querySelector('.plan-chapter-chip');
-              if (compact && getComputedStyle(compact).display !== 'none') {
-                return String(compact.textContent || '').trim();
+              const visible = node => {
+                if (!node) return false;
+                const style = getComputedStyle(node);
+                const rect = node.getBoundingClientRect();
+                return style.display !== 'none' &&
+                  style.visibility !== 'hidden' &&
+                  Number.parseFloat(style.opacity || '1') > 0 &&
+                  rect.width > 0 && rect.height > 0;
+              };
+
+              const compact = element.querySelector('.plan-study-compact');
+              const chip = element.querySelector('.plan-chapter-chip');
+              if (visible(compact) && visible(chip)) {
+                return {
+                  source: 'compact',
+                  text: String(chip.textContent || '').trim()
+                };
               }
-              const rendered = element.querySelector('.select2-selection__rendered');
-              return rendered ? String(rendered.textContent || '').trim() : '';
+
+              const chapter = element.querySelector('.task-chapter');
+              let container = chapter ? chapter.nextElementSibling : null;
+              while (container && !container.classList.contains('select2-container')) {
+                container = container.nextElementSibling;
+              }
+              const rendered = container
+                ? container.querySelector('.select2-selection__rendered')
+                : null;
+              return {
+                source: 'editor',
+                text: visible(rendered)
+                  ? String(rendered.textContent || '').trim()
+                  : ''
+              };
             }
             """
         )
-        require(bool(display_text), "selected chapter heading remains visible inside the lesson card")
+        display_text = display_state["text"]
+        require(bool(display_text), "selected chapter heading remains visibly rendered inside the lesson card")
         require(
             chosen_text in display_text or display_text in chosen_text,
-            "lesson card displays the chapter that was selected",
+            "lesson card visibly displays the chapter that was selected",
         )
+        print(f"PASS: selected chapter is shown through {display_state['source']} mode")
         require(not errors, "chapter visibility flow has no uncaught JavaScript errors: " + " | ".join(errors))
 
         context.close()
