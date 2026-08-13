@@ -1,0 +1,75 @@
+name: Diagnose plan access
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Diagnose named student advisor access
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          timeout: 60s
+          command_timeout: 5m
+          script: |
+            set -eu
+            set -a
+            . /etc/kimiagarkhune.env
+            set +a
+            cd /var/www/KimiagarKhune
+            ./venv/bin/python manage.py shell <<'PY'
+            from django.db.models import Q
+            from accounts.models import Advisor, Student
+            from plans.models import Course
+            from plans.advisor_access import assigned_students_for_advisor, effective_advisor_id, user_can_access_student
+
+            students = Student.objects.select_related('profile', 'advisor__profile').filter(
+                Q(profile__first_name__icontains='سها') | Q(profile__last_name__icontains='اسکندری')
+            )
+            advisors = Advisor.objects.select_related('profile__user').filter(
+                Q(profile__first_name__icontains='محمد') & Q(profile__last_name__icontains='حسینی')
+            )
+
+            print('=== PLAN ACCESS DIAGNOSTIC ===')
+            print('student_matches=', students.count())
+            print('advisor_matches=', advisors.count())
+            for student in students:
+                current_name = student.advisor.profile.get_full_name() if student.advisor_id else None
+                course_rows = list(
+                    Course.objects.filter(student=student)
+                    .order_by('-created_at', '-pk')
+                    .values('id', 'advisor_id', 'is_active', 'created_at')[:10]
+                )
+                print('STUDENT', {
+                    'id': student.pk,
+                    'name': student.profile.get_full_name(),
+                    'profile_role': student.profile.role,
+                    'advisor_id': student.advisor_id,
+                    'advisor_name': current_name,
+                    'effective_advisor_id': effective_advisor_id(student),
+                    'courses': course_rows,
+                })
+                for advisor in advisors:
+                    user = advisor.profile.user
+                    print('PAIR', {
+                        'student_id': student.pk,
+                        'advisor_id': advisor.pk,
+                        'advisor_name': advisor.profile.get_full_name(),
+                        'advisor_profile_role': advisor.profile.role,
+                        'advisor_user_id': user.pk,
+                        'advisor_is_staff': user.is_staff,
+                        'visible_in_plan_list': assigned_students_for_advisor(advisor).filter(pk=student.pk).exists(),
+                        'user_can_access_student': user_can_access_student(user, student),
+                    })
+            print('=== END PLAN ACCESS DIAGNOSTIC ===')
+            PY
