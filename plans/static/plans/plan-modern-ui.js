@@ -5,8 +5,9 @@
     return;
   }
 
-  const VERSION = '2026.08.13.1';
+  const VERSION = '2026.08.13.2';
   const MOBILE_QUERY = window.matchMedia('(max-width: 760px)');
+  const LESSON_CARD_SELECTOR = '.task[data-lesson-name]';
   let subjectPaletteObserver = null;
 
   function calendarIcon() {
@@ -92,9 +93,9 @@
   function paintSubjectPalette(root) {
     const colors = window.subjectColors || {};
     const $scope = root ? $(root) : $(document);
-    const $tasks = $scope.is('.plan-lesson-palette')
+    const $tasks = $scope.is(LESSON_CARD_SELECTOR)
       ? $scope
-      : $scope.find('.subjects-box .plan-lesson-palette');
+      : $scope.find(LESSON_CARD_SELECTOR);
 
     $tasks.each(function () {
       const $task = $(this);
@@ -109,9 +110,9 @@
         return;
       }
 
-      // plan-modern-ui.css intentionally owns the card shape with an !important
-      // background. Re-apply the canonical subject color at inline-important
-      // priority so the sidebar stays visually consistent with calendar cards.
+      // Both the initial Django cards and AJAX-rendered cards carry
+      // data-lesson-name. Apply the canonical subject color at inline-important
+      // priority so the modern UI background cannot hide it.
       this.style.setProperty(
         'background',
         'linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.08)), ' + color,
