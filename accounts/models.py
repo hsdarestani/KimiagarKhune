@@ -70,6 +70,17 @@ WEEKDAY_CHOICES = [
 class Advisor(models.Model):
     profile = models.OneToOneField(Profile, on_delete=models.CASCADE)
 
+    def save(self, *args, **kwargs):
+        """An Advisor-backed profile must never remain classified as a student."""
+        super().save(*args, **kwargs)
+        if self.profile_id:
+            changed = Profile.objects.filter(
+                pk=self.profile_id,
+                role='student',
+            ).update(role='advisor')
+            if changed and hasattr(self, 'profile'):
+                self.profile.role = 'advisor'
+
     def __str__(self):
         return f'{self.profile.first_name} {self.profile.last_name} - Advisor'
 

@@ -70,6 +70,16 @@ def _ensure_inactive_user(username: str, *, using: str):
     return user, created
 
 
+def _normalize_advisor_profile_role(profile: Profile, *, using: str) -> None:
+    """Keep the Profile role aligned with an existing Advisor relationship."""
+    if profile.role != "student":
+        return
+    Profile.objects.using(using).filter(pk=profile.pk, role="student").update(
+        role="advisor"
+    )
+    profile.role = "advisor"
+
+
 def ensure_advisor_for_user(user, *, using: str = "default") -> Advisor:
     profile, _ = Profile.objects.using(using).get_or_create(
         user=user,
@@ -80,12 +90,15 @@ def ensure_advisor_for_user(user, *, using: str = "default") -> Advisor:
             "email": user.email or None,
         },
     )
+    _normalize_advisor_profile_role(profile, using=using)
     return Advisor.objects.using(using).get_or_create(profile=profile)[0]
 
 
 def _resolve_advisor(*, using: str, advisor: Advisor | None) -> Advisor:
     if advisor is not None:
-        return Advisor.objects.using(using).get(pk=advisor.pk)
+        resolved = Advisor.objects.using(using).select_related("profile").get(pk=advisor.pk)
+        _normalize_advisor_profile_role(resolved.profile, using=using)
+        return resolved
 
     existing = (
         Advisor.objects.using(using)
@@ -94,6 +107,7 @@ def _resolve_advisor(*, using: str, advisor: Advisor | None) -> Advisor:
         .first()
     )
     if existing is not None:
+        _normalize_advisor_profile_role(existing.profile, using=using)
         return existing
 
     user, _ = _ensure_inactive_user("demo_plan_advisor", using=using)
@@ -105,6 +119,7 @@ def _resolve_advisor(*, using: str, advisor: Advisor | None) -> Advisor:
             "last_name": "نمونه",
         },
     )
+    _normalize_advisor_profile_role(profile, using=using)
     return Advisor.objects.using(using).get_or_create(profile=profile)[0]
 
 
