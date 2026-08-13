@@ -13,7 +13,7 @@
   function calendarIcon() {
     return (
       '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-        '<path d="M7 3v3M17 3v3M4.5 9h15M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 0-2 2.5v-16Z"/>' +
+        '<path d="M7 3v3M17 3v3M4.5 9h15M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z"/>' +
         '<path d="m8 14 2 2 5-5"/>' +
       '</svg>'
     );
@@ -110,9 +110,9 @@
         return;
       }
 
-      // Both the server-rendered cards and the AJAX-rendered cards carry
-      // data-lesson-name. Apply the canonical subject color with inline
-      // !important priority so the modern UI background cannot hide it.
+      // Both the initial Django cards and AJAX-rendered cards carry
+      // data-lesson-name. Apply the canonical subject color at inline-important
+      // priority so the modern UI background cannot hide it.
       this.style.setProperty(
         'background',
         'linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.08)), ' + color,
@@ -230,7 +230,7 @@
     if (typeof MOBILE_QUERY.addEventListener === 'function') {
       MOBILE_QUERY.addEventListener('change', onQueryChange);
     } else if (typeof MOBILE_QUERY.addListener === 'function') {
-      MOBILE_QUERY.addListener('change', onQueryChange);
+      MOBILE_QUERY.addListener(onQueryChange);
     }
   }
 
