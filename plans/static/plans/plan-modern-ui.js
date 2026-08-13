@@ -5,8 +5,9 @@
     return;
   }
 
-  const VERSION = '2026.07.22.1';
+  const VERSION = '2026.08.13.1';
   const MOBILE_QUERY = window.matchMedia('(max-width: 760px)');
+  let subjectPaletteObserver = null;
 
   function calendarIcon() {
     return (
@@ -66,6 +67,91 @@
     const $anchor = $assignments.add($events).first();
     $anchor.before($row);
     $row.append($assignments, $events);
+  }
+
+  function darkenHexColor(value, factor) {
+    const match = /^#([0-9a-f]{6})$/i.exec(String(value || '').trim());
+    if (!match) {
+      return value;
+    }
+
+    const number = Number.parseInt(match[1], 16);
+    const channels = [
+      (number >> 16) & 255,
+      (number >> 8) & 255,
+      number & 255
+    ].map(function (channel) {
+      return Math.max(0, Math.min(255, Math.round(channel * factor)));
+    });
+
+    return '#' + channels.map(function (channel) {
+      return channel.toString(16).padStart(2, '0');
+    }).join('');
+  }
+
+  function paintSubjectPalette(root) {
+    const colors = window.subjectColors || {};
+    const $scope = root ? $(root) : $(document);
+    const $tasks = $scope.is('.plan-lesson-palette')
+      ? $scope
+      : $scope.find('.subjects-box .plan-lesson-palette');
+
+    $tasks.each(function () {
+      const $task = $(this);
+      const lessonName = String(
+        $task.attr('data-lesson-name') ||
+        $task.data('lessonName') ||
+        $task.data('lesson-name') ||
+        ''
+      ).trim();
+      const color = colors[lessonName];
+      if (!color) {
+        return;
+      }
+
+      // plan-modern-ui.css intentionally owns the card shape with an !important
+      // background. Re-apply the canonical subject color at inline-important
+      // priority so the sidebar stays visually consistent with calendar cards.
+      this.style.setProperty(
+        'background',
+        'linear-gradient(135deg, rgba(255,255,255,.22), rgba(255,255,255,.08)), ' + color,
+        'important'
+      );
+      this.style.setProperty('border-color', darkenHexColor(color, 0.82), 'important');
+      this.setAttribute('data-plan-subject-color', color);
+    });
+  }
+
+  function startSubjectPaletteColorSync() {
+    const $subjects = $('.subjects-box').first();
+    if (!$subjects.length) {
+      return;
+    }
+
+    paintSubjectPalette($subjects[0]);
+
+    if (subjectPaletteObserver) {
+      subjectPaletteObserver.disconnect();
+    }
+    if (typeof window.MutationObserver === 'function') {
+      subjectPaletteObserver = new window.MutationObserver(function () {
+        paintSubjectPalette($subjects[0]);
+      });
+      subjectPaletteObserver.observe($subjects[0], {
+        childList: true,
+        subtree: true
+      });
+    }
+
+    $(document)
+      .off('ajaxComplete.planSubjectPalette')
+      .on('ajaxComplete.planSubjectPalette', function () {
+        paintSubjectPalette($('.subjects-box').first()[0]);
+      });
+
+    window.setTimeout(function () {
+      paintSubjectPalette($('.subjects-box').first()[0]);
+    }, 0);
   }
 
   function setDrawerState(open) {
@@ -174,12 +260,14 @@
     ensureResponsiveControls();
     bindResponsiveControls();
     markScrollableWorkspace();
+    startSubjectPaletteColorSync();
     setDrawerState(false);
 
     window.planModernUi = {
       version: VERSION,
       openSubjects: function () { setDrawerState(true); },
-      closeSubjects: function () { setDrawerState(false); }
+      closeSubjects: function () { setDrawerState(false); },
+      repaintSubjectPalette: function () { paintSubjectPalette($('.subjects-box').first()[0]); }
     };
 
     window.dispatchEvent(new CustomEvent('plan:modern-ui-ready'));
