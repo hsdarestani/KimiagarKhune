@@ -43,8 +43,10 @@ jobs:
           node --check plans/static/plans/plan-lesson-toolbar.js
           node --check plans/static/plans/plan-task-geometry.js
           node --check plans/static/plans/plan-modern-ui.js
+          node --check plans/static/plans/plan-start-state.js
           node --check plans/static/plans/plan-chapter-loader.js
           node --check plans/static/plans/plan-quarter-snap-feedback.js
+          node --check plans/static/plans/plan-stability-fixes.js
           python3 -m py_compile \
             deploy/plan_e2e.py \
             deploy/plan_e2e_runner.py \
