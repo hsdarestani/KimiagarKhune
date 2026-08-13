@@ -70,6 +70,13 @@ class DashboardAssignmentAccessTests(TestCase):
             content_type="application/json",
         )
 
+    def _assert_chat_list_contains(self, user: User, other_user: User):
+        self.client.force_login(user)
+        response = self.client.get("/api/chat/conversations/")
+        self.assertEqual(response.status_code, 200, response.content)
+        conversation_ids = {item.get("id") for item in response.json()}
+        self.assertIn(f"user:{other_user.pk}", conversation_ids)
+
     def _assert_advisor_can_use_student_across_surfaces(self):
         self.client.force_login(self.advisor_user)
 
@@ -108,19 +115,21 @@ class DashboardAssignmentAccessTests(TestCase):
         self.assertEqual(course.sessions.count(), 4)
 
         self._assert_advisor_can_use_student_across_surfaces()
+        self._assert_chat_list_contains(self.advisor_user, self.student_user)
 
         self.client.force_login(self.student_user)
         student_chat = self.client.get(
             f"/api/chat/messages/user:{self.advisor_user.pk}/"
         )
         self.assertEqual(student_chat.status_code, 200, student_chat.content)
+        self._assert_chat_list_contains(self.student_user, self.advisor_user)
 
         denied = self.client.get(
             f"/api/chat/messages/user:{self.other_advisor_user.pk}/"
         )
         self.assertEqual(denied.status_code, 403)
 
-    def test_legacy_course_assignment_is_allowed_across_plan_and_chat_before_repair(self):
+    def test_legacy_course_assignment_is_allowed_and_discoverable_before_repair(self):
         Course.objects.create(
             student=self.student,
             advisor=self.advisor,
@@ -132,6 +141,8 @@ class DashboardAssignmentAccessTests(TestCase):
         self.assertIsNone(self.student.advisor_id)
 
         self._assert_advisor_can_use_student_across_surfaces()
+        self._assert_chat_list_contains(self.advisor_user, self.student_user)
+        self._assert_chat_list_contains(self.student_user, self.advisor_user)
 
         self.client.force_login(self.student_user)
         response = self.client.get(
