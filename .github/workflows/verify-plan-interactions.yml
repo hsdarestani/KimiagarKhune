@@ -53,6 +53,10 @@ jobs:
             > plan-real-interaction-output.txt 2>&1
           core_status=$?
 
+          .plan-real-browser-venv/bin/python deploy/plan_sequential_drop_perf_e2e.py \
+            > plan-sequential-drop-perf-output.txt 2>&1
+          sequential_perf_status=$?
+
           .plan-real-browser-venv/bin/python deploy/plan_school_drag_e2e.py \
             > plan-school-drag-output.txt 2>&1
           school_status=$?
@@ -79,6 +83,8 @@ jobs:
 
           echo '===== Core real interactions ====='
           cat plan-real-interaction-output.txt
+          echo '===== Sequential lesson drop performance ====='
+          cat plan-sequential-drop-perf-output.txt
           echo '===== School-block drag interactions ====='
           cat plan-school-drag-output.txt
           echo '===== Time grid and lesson toolbar ====='
@@ -93,7 +99,7 @@ jobs:
           cat plan-chapter-visibility-output.txt
 
           status=0
-          if [ "$core_status" -ne 0 ] || [ "$school_status" -ne 0 ] || [ "$grid_status" -ne 0 ] || [ "$independence_status" -ne 0 ] || [ "$responsive_status" -ne 0 ] || [ "$chapter_snap_status" -ne 0 ] || [ "$chapter_visibility_status" -ne 0 ]; then
+          if [ "$core_status" -ne 0 ] || [ "$sequential_perf_status" -ne 0 ] || [ "$school_status" -ne 0 ] || [ "$grid_status" -ne 0 ] || [ "$independence_status" -ne 0 ] || [ "$responsive_status" -ne 0 ] || [ "$chapter_snap_status" -ne 0 ] || [ "$chapter_visibility_status" -ne 0 ]; then
             status=1
           fi
           echo "status=$status" >> "$GITHUB_OUTPUT"
@@ -106,6 +112,7 @@ jobs:
           name: plan-real-interaction-output
           path: |
             plan-real-interaction-output.txt
+            plan-sequential-drop-perf-output.txt
             plan-school-drag-output.txt
             plan-time-grid-output.txt
             plan-task-independence-output.txt
@@ -127,10 +134,10 @@ jobs:
           set -euo pipefail
           if [ "${TEST_STATUS:-1}" = "0" ]; then
             STATE='success'
-            DESCRIPTION='Plan interactions, visible chapters, 15-minute snap and responsive UI passed.'
+            DESCRIPTION='Plan interactions, sequential drop latency, visible chapters, snap and responsive UI passed.'
           else
             STATE='failure'
-            DESCRIPTION='Plan interaction, chapter visibility, snap or responsive regression failed.'
+            DESCRIPTION='Plan interaction, sequential drop latency, chapter visibility, snap or responsive regression failed.'
           fi
 
           jq -n \
