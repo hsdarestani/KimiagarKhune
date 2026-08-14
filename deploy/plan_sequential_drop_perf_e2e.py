@@ -119,6 +119,7 @@ def main() -> int:
         first_task = first_target.locator(
             f':scope > .calendar-task[data-lesson-id="{first_id}"]'
         ).first
+        first_task.wait_for(state="attached", timeout=3_000)
         page.wait_for_function(
             "element => Boolean(element && element.querySelector('.task-chapter[data-plan-chapter-loader-version]'))",
             arg=first_task.element_handle(),
@@ -149,11 +150,7 @@ def main() -> int:
         second_task = second_target.locator(
             f':scope > .calendar-task[data-lesson-id="{second_id}"]'
         ).first
-        page.wait_for_function(
-            "element => Boolean(element && element.isConnected)",
-            arg=second_task.element_handle(),
-            timeout=3_000,
-        )
+        second_task.wait_for(state="attached", timeout=3_000)
         elapsed = time.perf_counter() - started
 
         require(second_task.count() == 1, "second lesson appears after chapter selection")
