@@ -8,6 +8,7 @@ from . import (
     dashboard_page,
     lesson_catalog,
     plan_page,
+    plan_reuse,
     weekly_plans,
     weekly_plans_v2,
 )
@@ -42,7 +43,7 @@ urlpatterns = [
     path("get_default_boxes/", lesson_catalog.get_default_boxes, name="get_default_boxes"),
     path("get_default_events/", lesson_catalog.get_default_events, name="get_default_events"),
     path("get-lessons-for-student/", lesson_catalog.get_lessons_for_student, name="get_lessons_for_student"),
-    path("get-last-weekly-report/", get_last_weekly_report, name="get_last_weekly_report"),
+    path("get-last-weekly-report/", plan_reuse.get_last_weekly_report, name="get_last_weekly_report"),
     path("dashboard/", dashboard_page.dashboard_view, name="dashboard"),
     path("api/admin-panel-data/", get_admin_panel_data, name="api_admin_panel_data"),
     path("api/add-student/", dashboard_admin.add_student_view, name="api_add_student"),
