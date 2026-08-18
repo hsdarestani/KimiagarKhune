@@ -9,6 +9,7 @@ on:
       - 'deploy/plan_e2e_runner.py'
       - 'deploy/plan_real_interaction_e2e.py'
       - 'deploy/plan_sequential_drop_perf_e2e.py'
+      - 'deploy/plan_persistence_e2e.py'
       - 'deploy/plan_school_drag_e2e.py'
       - 'deploy/plan_time_grid_e2e.py'
       - 'deploy/plan_task_independence_e2e.py'
@@ -38,6 +39,7 @@ jobs:
           node --check plans/static/plans/plan-performance-guard.js
           node --check plans/static/plans/plan-runtime.js
           node --check plans/static/plans/plan-secondary.js
+          node --check plans/static/plans/plan-persistence-fixes.js
           node --check plans/static/plans/plan-time-grid.js
           node --check plans/static/plans/plan-interactions.js
           node --check plans/static/plans/plan-manual-resize.js
@@ -54,6 +56,7 @@ jobs:
             deploy/plan_e2e_runner.py \
             deploy/plan_real_interaction_e2e.py \
             deploy/plan_sequential_drop_perf_e2e.py \
+            deploy/plan_persistence_e2e.py \
             deploy/plan_school_drag_e2e.py \
             deploy/plan_time_grid_e2e.py \
             deploy/plan_task_independence_e2e.py \
@@ -64,6 +67,7 @@ jobs:
             plans/chapter_catalog.py \
             plans/lesson_catalog.py \
             plans/plan_page.py \
+            plans/plan_reuse.py \
             plans/weekly_plans.py \
             plans/weekly_plans_v2.py
           python3 - <<'PY'
@@ -71,7 +75,9 @@ jobs:
           source = Path('plans/plan_page.py').read_text(encoding='utf-8')
           guard = source.index('plans/plan-performance-guard.js')
           runtime = source.index('plans/plan-runtime.js')
+          persistence = source.index('plans/plan-persistence-fixes.js')
           assert guard < runtime, 'performance guard must load before Plan runtime scripts'
+          assert runtime < persistence, 'persistence fixes must load after canonical Plan runtime'
           PY
 
       - name: Install Python dependencies
@@ -92,6 +98,7 @@ jobs:
           set +e
           .venv/bin/python manage.py test \
             plans.test_plan_runtime \
+            plans.test_plan_persistence \
             plans.test_plan_secondary \
             plans.test_plan_defaults \
             plans.test_lesson_catalog \
