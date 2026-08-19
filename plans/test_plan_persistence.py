@@ -32,7 +32,7 @@ class PlanPersistenceRegressionTests(TestCase):
     def test_plan_page_loads_persistence_runtime(self):
         response = self.client.get("/plan/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "/static/plans/plan-persistence-fixes.js?v=20260818-1")
+        self.assertContains(response, "/static/plans/plan-persistence-fixes.js?v=20260819-1")
         self.assertContains(response, 'data-plan-persistence-fixes="true"')
 
     def test_event_and_event_assignment_titles_round_trip_exactly(self):
