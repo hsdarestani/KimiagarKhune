@@ -1,0 +1,44 @@
+.calendar .calendar-task.assignment-task,
+.calendar .calendar-task[data-box-type="تکلیف"] {
+  overflow: hidden;
+}
+
+.calendar .calendar-task.assignment-task .task-title,
+.calendar .calendar-task[data-box-type="تکلیف"] .task-title {
+  width: calc(100% - 8px) !important;
+  max-width: calc(100% - 8px) !important;
+  height: calc(100% - 20px) !important;
+  min-height: 26px !important;
+  margin: 2px 4px 0 !important;
+  padding: 2px 4px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  resize: none !important;
+  color: #172033 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  line-height: 1.25 !important;
+  text-align: right !important;
+  border: 0 !important;
+  border-radius: 5px !important;
+  outline: none !important;
+  background: rgba(255, 255, 255, .30) !important;
+  box-shadow: none !important;
+}
+
+.calendar .calendar-task.assignment-task .task-title:focus,
+.calendar .calendar-task[data-box-type="تکلیف"] .task-title:focus {
+  background: rgba(255, 255, 255, .58) !important;
+}
+
+.calendar .calendar-task.assignment-task .time-label,
+.calendar .calendar-task[data-box-type="تکلیف"] .time-label {
+  z-index: 2;
+}
+
+.calendar .calendar-task [data-plan-export-hidden="true"] {
+  display: none !important;
+}
