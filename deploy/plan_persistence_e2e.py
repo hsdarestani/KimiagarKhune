@@ -44,6 +44,10 @@ def load_week(page) -> None:
         "window.planPersistenceFixes && window.planPersistenceFixes.version === '2026.08.18.1'",
         timeout=15_000,
     )
+    page.wait_for_function(
+        "window.planOutputPolish && window.planOutputPolish.version === '2026.08.19.1'",
+        timeout=15_000,
+    )
 
 
 def main() -> int:
@@ -123,6 +127,143 @@ def main() -> int:
         require(
             export_result["containsEvent"] and export_result["containsAssignment"],
             "serialized PDF calendar clone contains both visible titles",
+        )
+
+        filename_result = page.evaluate(
+            """
+            () => ({
+              fileName: window.planOutputPolish.studentPdfFileName(''),
+              summaryName: window.planOutputPolish.studentPdfFileName('خلاصه'),
+              rewritten: window.planOutputPolish.rewritePdfMarkup(
+                '<html><head><title>خروجی هفته</title></head><body><script>pdf.save("generic.pdf");<\\/script></body></html>',
+                window.planOutputPolish.studentPdfFileName(''),
+                window.jQuery('#student-select option:selected').text().trim()
+              )
+            })
+            """
+        )
+        require(
+            filename_result["fileName"] == f"{STUDENT_LABEL}.pdf",
+            "weekly PDF filename is the selected student's name",
+        )
+        require(
+            filename_result["summaryName"] == f"{STUDENT_LABEL}-خلاصه.pdf",
+            "summary PDF filename keeps the selected student's name",
+        )
+        require(
+            filename_result["fileName"] in filename_result["rewritten"],
+            "popup PDF save markup is rewritten to the student filename",
+        )
+
+        visual_result = page.evaluate(
+            """
+            () => {
+              const $ = window.jQuery;
+              const $container = $('.calendar .task-container').first();
+
+              const $study = $('<div class="calendar-task extended-task"></div>')
+                .attr('data-box-type', 'مطالعه')
+                .attr('data-lesson-id', '999991')
+                .attr('data-lesson-name', 'زیست')
+                .css({position: 'absolute', top: '620px', height: '70px', left: '5%', backgroundColor: 'rgb(123, 190, 94)'})
+                .append('<div class="task-title">زیست دهم</div>')
+                .append('<select class="task-chapter"><option value="1" selected>فصل ۳ - تبادلات</option></select>')
+                .append('<span class="select2-container" style="display:block;width:28px;height:58px;border:1px solid #111"></span>')
+                .append('<select class="task-extra"><option value="45" selected>45</option></select>')
+                .append('<div class="ui-resizable-handle ui-resizable-s" style="display:block;width:22px;height:54px;border:1px solid #222"></div>')
+                .append('<div class="time-label"></div>');
+              $container.append($study);
+
+              const cleanup = window.planOutputPolish.prepareExportUi();
+              const $clone = $('.calendar-wrapper').clone();
+              const hiddenArtifacts = $clone.find('[data-plan-export-hidden="true"]');
+              const artifactsStillDisplayed = hiddenArtifacts.filter(function () {
+                return String($(this).attr('style') || '').indexOf('display: none') === -1;
+              }).length;
+              const mirrorText = $clone.find('.plan-export-study-meta').last().text();
+              cleanup();
+
+              const $source = $('<div class="calendar-task extended-task"></div>')
+                .attr('data-box-type', 'مطالعه')
+                .attr('data-lesson-id', '999992')
+                .attr('data-lesson-name', 'زیست')
+                .css({position: 'absolute', top: '710px', height: '52.5px', left: '5%', backgroundColor: 'rgb(154, 205, 50)'})
+                .append('<button type="button" class="repeat-btn">تکرار</button>')
+                .append('<div class="task-title">زیست دهم</div>');
+              const $repeated = $('<div class="calendar-task extended-task"></div>')
+                .attr('data-box-type', 'مطالعه')
+                .attr('data-lesson-id', '999992')
+                .css({position: 'absolute', top: '710px', height: '52.5px', left: '5%', backgroundColor: 'rgb(227, 242, 253)'})
+                .append('<div class="task-title">زیست دهم</div>');
+              $container.append($source).append($repeated);
+              window.planOutputPolish.preserveRepeatedStudyColor($source.find('.repeat-btn')[0]);
+              const sourceColor = getComputedStyle($source[0]).backgroundColor;
+              const repeatedColor = getComputedStyle($repeated[0]).backgroundColor;
+
+              const longTitle = 'آمادگی و تکلیف مشاهده کلاس شیمی و مرور نکات جلسه قبل';
+              const $assignment = $('<div class="calendar-task"></div>')
+                .attr('data-box-type', 'تکلیف')
+                .css({position: 'absolute', top: '790px', height: '52.5px', left: '5%'})
+                .append($('<input type="text" class="task-title task-inp editable">').val(longTitle))
+                .append('<div class="time-label"></div>');
+              $container.append($assignment);
+              window.planOutputPolish.upgradeAssignmentTitles(document);
+              const assignmentTitle = $assignment.find('.task-title')[0];
+              const assignmentStyles = getComputedStyle(assignmentTitle);
+
+              const result = {
+                hiddenArtifacts: hiddenArtifacts.length,
+                artifactsStillDisplayed,
+                mirrorText,
+                sourceColor,
+                repeatedColor,
+                repeatedLessonName: $repeated.attr('data-lesson-name') || '',
+                assignmentTag: assignmentTitle.tagName,
+                assignmentValue: assignmentTitle.value || assignmentTitle.textContent || '',
+                assignmentWhiteSpace: assignmentStyles.whiteSpace,
+                assignmentOverflowWrap: assignmentStyles.overflowWrap,
+                assignmentFontSize: Number.parseFloat(assignmentStyles.fontSize) || 0
+              };
+
+              $study.remove();
+              $source.remove();
+              $repeated.remove();
+              $assignment.remove();
+              return result;
+            }
+            """
+        )
+        require(
+            visual_result["hiddenArtifacts"] >= 2 and visual_result["artifactsStillDisplayed"] == 0,
+            "Select2 and resize editor rectangles are hidden in the PDF clone",
+        )
+        require(
+            "فصل ۳ - تبادلات" in visual_result["mirrorText"] and "45 تست" in visual_result["mirrorText"],
+            "PDF clone keeps chapter and test text while hiding editor controls",
+        )
+        require(
+            visual_result["sourceColor"] == visual_result["repeatedColor"],
+            "repeated study boxes preserve the exact source color",
+        )
+        require(
+            visual_result["repeatedLessonName"] == "زیست",
+            "repeated study box recovers its lesson identity",
+        )
+        require(
+            visual_result["assignmentTag"] == "TEXTAREA",
+            "event-derived assignment title uses a wrapping multiline control",
+        )
+        require(
+            visual_result["assignmentValue"].startswith("آمادگی و تکلیف"),
+            "long assignment title remains intact after wrapping upgrade",
+        )
+        require(
+            visual_result["assignmentWhiteSpace"] in ("pre-wrap", "pre-wrap-auto"),
+            "assignment title is allowed to wrap inside the box",
+        )
+        require(
+            visual_result["assignmentFontSize"] <= 9.5,
+            "assignment title uses compact readable typography",
         )
 
         recurring_result = page.evaluate(
