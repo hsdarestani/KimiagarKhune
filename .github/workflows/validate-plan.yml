@@ -40,6 +40,7 @@ jobs:
           node --check plans/static/plans/plan-runtime.js
           node --check plans/static/plans/plan-secondary.js
           node --check plans/static/plans/plan-persistence-fixes.js
+          node --check plans/static/plans/plan-output-polish.js
           node --check plans/static/plans/plan-time-grid.js
           node --check plans/static/plans/plan-interactions.js
           node --check plans/static/plans/plan-manual-resize.js
@@ -76,8 +77,10 @@ jobs:
           guard = source.index('plans/plan-performance-guard.js')
           runtime = source.index('plans/plan-runtime.js')
           persistence = source.index('plans/plan-persistence-fixes.js')
+          polish = source.index('plans/plan-output-polish.js')
           assert guard < runtime, 'performance guard must load before Plan runtime scripts'
           assert runtime < persistence, 'persistence fixes must load after canonical Plan runtime'
+          assert persistence < polish, 'output polish must load after persistence fixes'
           PY
 
       - name: Install Python dependencies
