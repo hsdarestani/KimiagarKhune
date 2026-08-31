@@ -67,11 +67,13 @@ def save_weekly_report(request: HttpRequest):
 
 @login_required
 def get_default_events(request: HttpRequest):
-    """Return recurring events, including events saved before recurrence was fixed.
+    """Return recurring events plus compatible events saved before this fix.
 
-    Current DefaultEvent rows are authoritative. If a student has none, fall
-    back to the most recent saved week containing event boxes. This repairs old
-    v2 data where events were stored only as non-default WeeklyReportDetail rows.
+    The canonical endpoint returns active DefaultEvent rows (and very old legacy
+    defaults). We additionally merge the most recent v2 week containing events,
+    because v2 stored those event boxes as ``is_default=False``. This lets
+    already-defined classes start repeating without forcing the advisor to save
+    the old week again.
     """
 
     response = lesson_catalog.get_default_events(request)
@@ -82,8 +84,8 @@ def get_default_events(request: HttpRequest):
         existing = json.loads(response.content.decode("utf-8"))
     except (TypeError, ValueError, UnicodeDecodeError):
         existing = []
-    if existing:
-        return response
+    if not isinstance(existing, list):
+        existing = []
 
     student_id = request.GET.get("student_id")
     if not student_id:
@@ -93,6 +95,7 @@ def get_default_events(request: HttpRequest):
         WeeklyReportDetail.objects.filter(
             report__student_id=student_id,
             box__box_type__name="ایونت",
+            box__is_default=False,
         )
         .order_by("-report__week_start", "-report_id", "-pk")
         .values_list("report_id", flat=True)
@@ -106,12 +109,22 @@ def get_default_events(request: HttpRequest):
         .filter(
             report_id=latest_report_id,
             box__box_type__name="ایونت",
+            box__is_default=False,
         )
         .order_by("start_time", "pk")
     )
 
-    data = []
-    seen = set()
+    data = list(existing)
+    seen = {
+        (
+            str(item.get("name") or ""),
+            str(item.get("day_of_week") or ""),
+            str(item.get("start_time") or ""),
+            str(item.get("end_time") or ""),
+        )
+        for item in data
+        if isinstance(item, dict)
+    }
     for detail in details:
         item = {
             "name": detail.box.name or "ایونت",
