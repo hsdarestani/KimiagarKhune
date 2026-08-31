@@ -7,7 +7,15 @@ from django.utils import timezone
 
 from accounts.models import Student
 from plans.default_plan_data import ensure_advisor_for_user, seed_plan_defaults
-from plans.models import Box, BoxType, Lesson, LessonType, WeeklyReport, WeeklyReportDetail
+from plans.models import (
+    Box,
+    BoxType,
+    DefaultEvent,
+    Lesson,
+    LessonType,
+    WeeklyReport,
+    WeeklyReportDetail,
+)
 
 
 class PlanPersistenceRegressionTests(TestCase):
@@ -32,8 +40,10 @@ class PlanPersistenceRegressionTests(TestCase):
     def test_plan_page_loads_persistence_runtime(self):
         response = self.client.get("/plan/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "/static/plans/plan-persistence-fixes.js?v=20260819-1")
+        self.assertContains(response, "/static/plans/plan-persistence-fixes.js?v=20260831-1")
         self.assertContains(response, 'data-plan-persistence-fixes="true"')
+        self.assertContains(response, "/static/plans/plan-filename-fix.js?v=20260831-1")
+        self.assertContains(response, 'data-plan-filename-fix="true"')
 
     def test_event_and_event_assignment_titles_round_trip_exactly(self):
         payload = {
@@ -74,6 +84,29 @@ class PlanPersistenceRegressionTests(TestCase):
             {"کلاس فیزیک دهم", "آمادگی و تکلیف کلاس فیزیک دهم"},
         )
 
+        recurring = DefaultEvent.objects.get(
+            student=self.student,
+            name="کلاس فیزیک دهم",
+            day_of_week="شنبه",
+        )
+        self.assertEqual(recurring.start_time, dt.time(10, 0))
+        self.assertEqual(recurring.end_time, dt.time(11, 30))
+        self.assertTrue(recurring.is_active)
+
+        defaults_response = self.client.get(
+            "/get_default_events/", {"student_id": self.student.pk}
+        )
+        self.assertEqual(defaults_response.status_code, 200, defaults_response.content)
+        self.assertTrue(
+            any(
+                event["name"] == "کلاس فیزیک دهم"
+                and event["day_of_week"] == "شنبه"
+                and event["start_time"] == "10:00"
+                and event["end_time"] == "11:30"
+                for event in defaults_response.json()
+            )
+        )
+
         reload_response = self.client.get(
             "/get-weekly-report-details/",
             {"student_id": self.student.pk, "week_start": "2039-01-01"},
@@ -82,6 +115,44 @@ class PlanPersistenceRegressionTests(TestCase):
         self.assertEqual(
             {task["title"] for task in reload_response.json()["tasks"]},
             {"کلاس فیزیک دهم", "آمادگی و تکلیف کلاس فیزیک دهم"},
+        )
+
+    def test_old_v2_event_is_available_as_recurring_fallback(self):
+        DefaultEvent.objects.filter(student=self.student).delete()
+        event_type = BoxType.objects.get(name="ایونت")
+        report = WeeklyReport.objects.create(
+            student=self.student,
+            week_start=self.aware(2039, 3, 5),
+            week_end=self.aware(2039, 3, 11, 23, 59),
+        )
+        old_v2_box = Box.objects.create(
+            box_type=event_type,
+            name="کلاس قدیمی ذخیره شده",
+            duration_minutes=75,
+            is_default=False,
+        )
+        WeeklyReportDetail.objects.create(
+            report=report,
+            box=old_v2_box,
+            start_time=self.aware(2039, 3, 5, 15, 0),
+            end_time=self.aware(2039, 3, 5, 16, 15),
+            day_of_week="شنبه",
+        )
+
+        response = self.client.get(
+            "/get_default_events/", {"student_id": self.student.pk}
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(
+            response.json(),
+            [
+                {
+                    "name": "کلاس قدیمی ذخیره شده",
+                    "day_of_week": "شنبه",
+                    "start_time": "15:00",
+                    "end_time": "16:15",
+                }
+            ],
         )
 
     def test_reuse_uses_latest_report_that_actually_contains_study(self):
