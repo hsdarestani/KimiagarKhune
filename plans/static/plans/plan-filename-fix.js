@@ -89,13 +89,6 @@
   function initialize() {
     installPopupInterceptor();
 
-    // Keep the public helper consistent with the actual downloaded filename.
-    // plan-output-polish keeps a private closure for its click handler; the
-    // popup interceptor above applies this final filename after that handler.
-    if (window.planOutputPolish) {
-      window.planOutputPolish.studentPdfFileName = studentPdfFileName;
-    }
-
     window.planFilenameFix = {
       version: VERSION,
       studentPdfFileName: studentPdfFileName,
