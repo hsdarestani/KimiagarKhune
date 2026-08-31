@@ -41,6 +41,7 @@ jobs:
           node --check plans/static/plans/plan-secondary.js
           node --check plans/static/plans/plan-persistence-fixes.js
           node --check plans/static/plans/plan-output-polish.js
+          node --check plans/static/plans/plan-filename-fix.js
           node --check plans/static/plans/plan-time-grid.js
           node --check plans/static/plans/plan-interactions.js
           node --check plans/static/plans/plan-manual-resize.js
@@ -68,6 +69,7 @@ jobs:
             plans/chapter_catalog.py \
             plans/lesson_catalog.py \
             plans/plan_page.py \
+            plans/plan_persistence_service.py \
             plans/plan_reuse.py \
             plans/weekly_plans.py \
             plans/weekly_plans_v2.py
@@ -78,9 +80,11 @@ jobs:
           runtime = source.index('plans/plan-runtime.js')
           persistence = source.index('plans/plan-persistence-fixes.js')
           polish = source.index('plans/plan-output-polish.js')
+          filename = source.index('plans/plan-filename-fix.js')
           assert guard < runtime, 'performance guard must load before Plan runtime scripts'
           assert runtime < persistence, 'persistence fixes must load after canonical Plan runtime'
           assert persistence < polish, 'output polish must load after persistence fixes'
+          assert polish < filename, 'filename fix must load after output polish'
           PY
 
       - name: Install Python dependencies
