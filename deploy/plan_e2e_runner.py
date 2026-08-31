@@ -193,6 +193,80 @@ def verify_initial_controls() -> None:
         browser.close()
 
 
+def install_export_regression_compatibility(plan_e2e) -> None:
+    """Keep the legacy popup test aligned with the polished export contract.
+
+    Plan output polish intentionally replaces the generic popup title (for
+    example ``خروجی هفته``) with the selected student's name. The old browser
+    regression still looked for that removed generic title and has therefore
+    failed since the output-polish rollout. Validate the current student title
+    instead, and also assert the new StudentNameYYYYMMDD download-name contract.
+    """
+
+    original_assert_report_popup = plan_e2e.assert_report_popup
+
+    def assert_report_popup(
+        page: Page,
+        button_selector: str,
+        expected_text: str,
+        *,
+        reloads_page: bool = False,
+    ) -> None:
+        if button_selector in {
+            "#download-week-output",
+            "#download-week-summary",
+        }:
+            expected_text = plan_e2e.STUDENT_LABEL
+
+        if button_selector == "#download-week-output":
+            export_name = page.evaluate(
+                """
+                () => {
+                  const helper = window.planFilenameFix;
+                  if (!helper) return null;
+                  const stamp = helper.selectedWeekStamp();
+                  const filename = helper.studentPdfFileName('');
+                  const rewritten = helper.rewritePopupPdfName(
+                    '<script>pdf.save("legacy.pdf");</script>'
+                  );
+                  return {stamp, filename, rewritten};
+                }
+                """
+            )
+            plan_e2e.require(
+                bool(export_name),
+                "dated PDF filename helper is loaded",
+            )
+            if export_name:
+                stamp = str(export_name.get("stamp") or "")
+                filename = str(export_name.get("filename") or "")
+                compact_student = "".join(plan_e2e.STUDENT_LABEL.split())
+                expected_filename = f"{compact_student}{stamp}.pdf"
+                plan_e2e.require(
+                    len(stamp) == 8 and stamp.isdigit(),
+                    "Plan export uses an eight-digit Gregorian week date",
+                )
+                plan_e2e.require(
+                    filename == expected_filename,
+                    "Plan export filename is StudentNameYYYYMMDD.pdf",
+                )
+                plan_e2e.require(
+                    f'pdf.save("{expected_filename}")' in str(
+                        export_name.get("rewritten") or ""
+                    ),
+                    "Plan popup saves with the dated student filename",
+                )
+
+        original_assert_report_popup(
+            page,
+            button_selector,
+            expected_text,
+            reloads_page=reloads_page,
+        )
+
+    plan_e2e.assert_report_popup = assert_report_popup
+
+
 def main() -> int:
     install_playwright_helpers()
     verify_initial_controls()
@@ -202,6 +276,7 @@ def main() -> int:
     # Playwright integration without duplicating the scenario definitions.
     import plan_e2e
 
+    install_export_regression_compatibility(plan_e2e)
     return plan_e2e.main()
 
 
