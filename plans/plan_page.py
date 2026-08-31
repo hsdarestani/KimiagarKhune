@@ -34,6 +34,7 @@ RUNTIME_PATHS = (
     ("plans/plan-quarter-snap-feedback.js", "data-plan-quarter-snap-feedback"),
     ("plans/plan-stability-fixes.js", "data-plan-stability-fixes"),
     ("plans/plan-output-polish.js", "data-plan-output-polish"),
+    ("plans/plan-filename-fix.js", "data-plan-filename-fix"),
 )
 
 
