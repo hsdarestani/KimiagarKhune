@@ -113,9 +113,22 @@ def assert_report_download(page: Page, button_selector: str, suffix: str) -> Non
         """(suffix) => window.planPdfV2.fileName(window.planRuntimeState.start, suffix)""",
         suffix,
     )
-    with page.expect_download(timeout=90_000) as download_event:
-        page.click(button_selector)
-    download = download_event.value
+    try:
+        with page.expect_download(timeout=18_000) as download_event:
+            page.click(button_selector)
+        download = download_event.value
+    except Exception:
+        print("PDF download diagnostic:", page.evaluate(
+            """(selector) => ({
+              buttonStatus: document.querySelector(selector)?.dataset?.planExportStatus,
+              buttonText: document.querySelector(selector)?.textContent,
+              exporterReady: !!window.planPdfV2,
+              html2canvasReady: typeof window.html2canvas,
+              jsPdfReady: !!(window.jspdf && window.jspdf.jsPDF),
+              startReady: !!(window.planRuntimeState && window.planRuntimeState.start),
+            })""", button_selector
+        ), flush=True)
+        raise
     require(
         download.suggested_filename == expected_filename,
         f"{button_selector} downloads the correctly named Persian PDF",
@@ -140,7 +153,8 @@ def main() -> int:
         )
         page = context.new_page()
         page.on("pageerror", lambda error: page_errors.append(str(error)))
-        page.on("dialog", lambda dialog: dialog.accept())
+        page.on("console", lambda message: print("Browser console error:", message.text, flush=True) if message.type == "error" else None)
+        page.on("dialog", lambda dialog: (print("Browser dialog:", dialog.message, flush=True), dialog.accept()))
 
         page.goto(
             urljoin(BASE_URL, "login/"),
