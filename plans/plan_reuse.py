@@ -80,6 +80,8 @@ def get_last_weekly_report(request: HttpRequest):
                 "lesson_name": lesson.name,
                 "chapter_id": chapter.pk if chapter else None,
                 "chapter_text": chapter.name if chapter else "",
+                "study_mode": box.study_mode or "study",
+                "study_items": box.study_items or [],
                 "optional_tests_count": box.optional_tests_count or 0,
                 "duration_minutes": duration_minutes,
                 "grade_id": lesson.grade_id,
