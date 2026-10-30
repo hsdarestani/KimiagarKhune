@@ -215,6 +215,16 @@
     });
   }
 
+  $(document).on('click.planStudyTools', '.calendar .calendar-task[data-box-type="مطالعه"]', function (event) {
+    if ($(event.target).closest('button,select,input,textarea,.select2-container,.plan-study-tools').length) return;
+    $('.calendar-task').not(this).removeClass('plan-study-tools-open');
+    $(this).toggleClass('plan-study-tools-open');
+  }).on('click.planStudyToolsOutside', function (event) {
+    if (!$(event.target).closest('.calendar-task,.plan-multi-panel').length) {
+      $('.calendar-task').removeClass('plan-study-tools-open');
+    }
+  });
+
   $(document)
     .on('click', '.calendar .plan-mode-toggle', function (event) {
       event.preventDefault();
