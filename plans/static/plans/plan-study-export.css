@@ -104,3 +104,7 @@
 .calendar .calendar-task.plan-study-tools-open,
 .calendar .calendar-task:hover,
 .calendar .calendar-task:focus-within {z-index: 10041 !important;}
+
+.calendar .calendar-task.plan-study-selected {outline:2px solid #174961;outline-offset:1px}
+.calendar .plan-study-tools kbd {font:700 10px monospace;padding:1px 4px;border:1px solid currentColor;border-radius:3px;margin-inline-start:4px}
+.calendar .calendar-task[data-study-mode="review"]::after {content:"مرور";position:absolute;bottom:3px;right:4px;background:#fff;color:#174961;font:700 8px Vazir,sans-serif;padding:1px 3px;border-radius:4px}

@@ -92,11 +92,13 @@
     });
     if (!topics.length) topics.push(nameWithGrade);
     var target = topics.join(' و ');
-    var mode = $task.attr('data-study-mode') === 'test' ? 'test' : 'study';
+    var mode = ['test', 'review'].includes($task.attr('data-study-mode')) ? $task.attr('data-study-mode') : 'study';
     var description = '';
     if (type === 'مطالعه') {
-      description = mode === 'test'
-        ? persianDigits(tests) + ' تست تستی ' + target
+      description = mode === 'review'
+        ? 'مرور ' + target + (tests ? ' + ' + persianDigits(tests) + ' تست مروری' : '')
+        : mode === 'test'
+        ? (tests ? persianDigits(tests) + ' ' : '') + 'تست تستی ' + target
         : 'خواندن ' + target + (tests ? ' + ' + persianDigits(tests) + ' تست آموزشی' : '');
     } else {
       description = title;

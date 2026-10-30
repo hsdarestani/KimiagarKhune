@@ -37,7 +37,7 @@
   }
 
   function taskCaption($task) {
-    var mode = $task.attr('data-study-mode') === 'test' ? 'test' : 'study';
+    var mode = ['test', 'review'].includes($task.attr('data-study-mode')) ? $task.attr('data-study-mode') : 'study';
     var count = Number($task.find('select.task-extra').first().val()) || 0;
     var chapter = $task.find('select.task-chapter option:selected').first().text().trim();
     if (/^(شماره فصل|-)$/.test(chapter)) chapter = '';
@@ -49,14 +49,15 @@
         (item.chapter_text ? ' / ' + item.chapter_text : ''));
     });
     var target = names.length ? names.join('، ') : 'فصل موردنظر';
+    if (mode === 'review') return 'مرور ' + target + (count ? ' + ' + count + ' تست مروری' : '');
     if (mode === 'test') {
-      return count + ' تست تستی ' + target;
+      return (count ? count + ' ' : '') + 'تست تستی ' + target;
     }
     return 'خواندن ' + target + (count ? ' + ' + count + ' تست آموزشی' : '');
   }
 
   function updateControls($task) {
-    var mode = $task.attr('data-study-mode') === 'test' ? 'test' : 'study';
+    var mode = ['test', 'review'].includes($task.attr('data-study-mode')) ? $task.attr('data-study-mode') : 'study';
     $task.find('.plan-mode-choice').each(function () {
       var selected = $(this).attr('data-mode') === mode;
       $(this).attr('aria-pressed', String(selected)).toggleClass('is-selected', selected);
@@ -72,9 +73,10 @@
     if (!$task.attr('data-study-items')) $task.attr('data-study-items', '[]');
     if (!$task.children('.plan-study-tools').length) {
       var $tools = $('<div class="plan-study-tools"></div>');
-      $tools.append('<strong class="plan-mode-label">نوع فعالیت</strong>');
-      $tools.append('<button type="button" class="plan-mode-choice" data-mode="study">مطالعه + تست آموزشی</button>');
-      $tools.append('<button type="button" class="plan-mode-choice" data-mode="test">فقط تست</button>');
+      $tools.append('<strong class="plan-mode-label">نوع فعالیت · میانبر روی باکس انتخاب‌شده</strong>');
+      $tools.append('<button type="button" class="plan-mode-choice" data-mode="study">مطالعه + تست آموزشی <kbd>E</kbd></button>');
+      $tools.append('<button type="button" class="plan-mode-choice" data-mode="test">فقط تست <kbd>S</kbd></button>');
+      $tools.append('<button type="button" class="plan-mode-choice" data-mode="review">مرور <kbd>D</kbd></button>');
       $tools.append($('<button type="button" class="plan-multi-edit"></button>'));
       $tools.append($('<div class="plan-study-caption"></div>'));
       $task.append($tools);
@@ -235,6 +237,28 @@
     });
   }
 
+  function setMode($task, mode) {
+    if (window.readOnlyMode || !$task.length) return;
+    $task.attr('data-study-mode', ['test', 'review'].includes(mode) ? mode : 'study');
+    updateControls($task);
+  }
+  $(document).on('pointerdown.planStudySelection', '.calendar .calendar-task[data-box-type="مطالعه"]', function () {
+    $('.calendar-task').not(this).removeClass('plan-study-selected');
+    $(this).addClass('plan-study-selected');
+  }).on('keydown.planStudyShortcuts', function (event) {
+    var original = event.originalEvent || event;
+    if (original.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || original.repeat) return;
+    if ($(event.target).closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],.select2-container').length) return;
+    if ($('.plan-multi-backdrop').length || window.readOnlyMode) return;
+    var modes = {KeyE:'study', KeyS:'test', KeyD:'review'};
+    var mode = modes[original.code] || ({e:'study', s:'test', d:'review'})[String(event.key || '').toLowerCase()];
+    var $selected = $('.calendar .calendar-task.plan-study-selected[data-box-type="مطالعه"]').first();
+    if (!mode || !$selected.length) return;
+    event.preventDefault();
+    setMode($selected, mode);
+    $selected.addClass('plan-study-tools-open');
+  });
+
   $(document).on('click.planStudyTools', '.calendar .calendar-task[data-box-type="مطالعه"]', function (event) {
     if ($(event.target).closest('button,select,input,textarea,.select2-container,.plan-study-tools').length) return;
     $('.calendar-task').not(this).removeClass('plan-study-tools-open');
@@ -250,8 +274,7 @@
       event.preventDefault();
       event.stopPropagation();
       var $task = $(this).closest('.calendar-task');
-      $task.attr('data-study-mode', $(this).attr('data-mode') === 'test' ? 'test' : 'study');
-      updateControls($task);
+      setMode($task, $(this).attr('data-mode'));
     })
     .on('click', '.calendar .plan-multi-edit', function (event) {
       event.preventDefault();
