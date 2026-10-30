@@ -247,6 +247,34 @@ def save_weekly_report(request: HttpRequest):
                     if not title:
                         title = lesson.name if lesson else box_type_name
 
+                    study_mode = str(task.get("study_mode") or "study")
+                    if study_mode not in ("study", "test"):
+                        raise ValueError("حالت مطالعه یا تست معتبر نیست.")
+                    raw_items = task.get("study_items") or []
+                    if not isinstance(raw_items, list) or len(raw_items) > 12:
+                        raise ValueError("تعداد درس‌های ترکیبی نامعتبر است.")
+                    study_items = []
+                    if box_type_name == "مطالعه":
+                        for item in raw_items:
+                            if not isinstance(item, dict) or not item.get("lesson_id"):
+                                raise ValueError("اطلاعات درس ترکیبی ناقص است.")
+                            extra_lesson = Lesson.objects.select_related("grade").get(pk=item["lesson_id"])
+                            extra_chapter = None
+                            if item.get("chapter_id"):
+                                extra_chapter = Chapter.objects.get(pk=item["chapter_id"])
+                                if extra_chapter.lesson_id != extra_lesson.pk:
+                                    raise ValueError("فصل انتخاب‌شده متعلق به درس نیست.")
+                            study_items.append({
+                                "lesson_id": extra_lesson.pk,
+                                "lesson_name": extra_lesson.name,
+                                "grade": extra_lesson.grade.name,
+                                "grade_id": extra_lesson.grade_id,
+                                "chapter_id": extra_chapter.pk if extra_chapter else None,
+                                "chapter_text": (str(extra_chapter.chapter_number) + " - " + extra_chapter.name) if extra_chapter else "",
+                            })
+                    else:
+                        study_mode = "study"
+
                     box = Box.objects.create(
                         box_type=box_type,
                         lesson=lesson,
@@ -254,6 +282,9 @@ def save_weekly_report(request: HttpRequest):
                         optional_tests_count=optional_tests_count,
                         duration_minutes=duration_minutes,
                         name=title,
+                        study_mode=study_mode,
+                        study_items=study_items,
+                        source_detail_id=(int(task["source_detail_id"]) if task.get("source_detail_id") else None),
                         is_default=False,
                     )
                     WeeklyReportDetail.objects.create(
@@ -400,6 +431,9 @@ def copy_day_plan(request: HttpRequest):
                 optional_tests_count=source_box.optional_tests_count,
                 duration_minutes=source_box.duration_minutes,
                 name=source_box.name,
+                study_mode=source_box.study_mode,
+                study_items=source_box.study_items,
+                source_detail_id=source_box.source_detail_id,
                 is_default=False,
             )
             duration = detail.end_time - detail.start_time

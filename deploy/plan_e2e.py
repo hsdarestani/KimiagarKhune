@@ -107,55 +107,18 @@ def load_test_week(page: Page) -> None:
     )
 
 
-def install_fake_popup(page: Page) -> None:
-    page.evaluate(
-        """
-        () => {
-          window.__planPopupWrites = [];
-          window.name = '';
-          window.open = () => {
-            const documentStub = {
-              html: '',
-              open() {},
-              write(value) {
-                this.html += String(value || '');
-                window.__planPopupWrites.push(String(value || ''));
-                window.name = this.html;
-              },
-              close() {},
-              getElementById() { return null; },
-              querySelector() { return null; },
-              querySelectorAll() { return []; }
-            };
-            return {
-              document: documentStub,
-              addEventListener() {},
-              focus() {},
-              close() {}
-            };
-          };
-        }
-        """
+def assert_report_download(page: Page, button_selector: str, suffix: str) -> None:
+    """Exercise the actual PDF download, not the retired popup renderer."""
+    expected_filename = page.evaluate(
+        """(suffix) => window.planPdfV2.fileName(window.planRuntimeState.start, suffix)""",
+        suffix,
     )
-
-
-def assert_report_popup(
-    page: Page,
-    button_selector: str,
-    expected_text: str,
-    *,
-    reloads_page: bool = False,
-) -> None:
-    install_fake_popup(page)
-    page.click(button_selector)
-    if reloads_page:
-        page.wait_for_load_state("domcontentloaded", timeout=30_000)
-        content = page.evaluate("window.name")
-    else:
-        content = page.evaluate("window.__planPopupWrites.join('')")
+    with page.expect_download(timeout=90_000) as download_event:
+        page.click(button_selector)
+    download = download_event.value
     require(
-        expected_text in content,
-        f"{button_selector} builds its report window",
+        download.suggested_filename == expected_filename,
+        f"{button_selector} downloads the correctly named Persian PDF",
     )
 
 
@@ -518,27 +481,10 @@ def main() -> int:
             "another student's box keeps chapter and test controls",
         )
 
-        assert_report_popup(
-            page,
-            "#download-week-output",
-            "خروجی هفته",
-        )
-        assert_report_popup(
-            page,
-            "#download-week-summary",
-            "خلاصه هفته",
-        )
-        assert_report_popup(
-            page,
-            "#download-empty-matrix",
-            "ماتریس",
-        )
-        assert_report_popup(
-            page,
-            "#download-all-pdf",
-            "دانلود همه گزارش‌ها",
-            reloads_page=True,
-        )
+        assert_report_download(page, "#download-week-output", "")
+        assert_report_download(page, "#download-week-summary", "حجمی")
+        assert_report_download(page, "#download-empty-matrix", "ماتریس")
+        assert_report_download(page, "#download-all-pdf", "گزارش-کامل")
 
         require(
             not page_errors,
