@@ -379,6 +379,7 @@ def main() -> int:
         selected_chapter = page.evaluate("""async () => {
           const $task = window.jQuery('.calendar-task.plan-study-selected').first();
           const chapters = await window.jQuery.getJSON('/get-chapters/', {
+            student_id:window.planRuntimeState.studentId,
             lesson_id:$task.attr('data-lesson-id'), grade:$task.attr('data-grade'),
             major_code:window.currentMajorCode || ''});
           const chapter = chapters[0];

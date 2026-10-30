@@ -99,6 +99,7 @@
       url: '/get-chapters/',
       dataType: 'json',
       data: {
+        student_id: (window.planRuntimeState || {}).studentId || $('#student-select').val(),
         lesson_id: lesson.lesson_id,
         grade: lesson.grade_id,
         major_code: window.currentMajorCode || ''
