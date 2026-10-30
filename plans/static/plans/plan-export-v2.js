@@ -156,13 +156,30 @@
         cards + '</div>';
     }).join('') + '</div>';
   }
+  function estimatedCardHeight(task) {
+    // Split busy days instead of shrinking text or drawing a task over the next card.
+    var titleLines = Math.max(1, Math.ceil(String(task.title || '').length / 27));
+    var descriptionLines = Math.max(1, Math.ceil(String(task.description || '').length / 35));
+    return 32 + titleLines * 19 + descriptionLines * 16 + 15;
+  }
   function schedulePages(days, start) {
     var chunks = [];
     days.forEach(function (day) {
       var tasks = day.tasks.slice();
-      if (!tasks.length) chunks.push(day);
+      if (!tasks.length) {
+        chunks.push(day);
+        return;
+      }
       while (tasks.length) {
-        chunks.push({day:day.day, date:day.date, tasks:tasks.splice(0, PER_DAY)});
+        var part = [];
+        var height = 0;
+        while (tasks.length && part.length < PER_DAY) {
+          var size = estimatedCardHeight(tasks[0]);
+          if (part.length && height + size > 510) break;
+          part.push(tasks.shift());
+          height += size;
+        }
+        chunks.push({day: day.day, date: day.date, tasks: part});
       }
     });
     var groups = [];
