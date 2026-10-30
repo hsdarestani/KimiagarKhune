@@ -354,8 +354,8 @@ def main() -> int:
             "study box has test-count selector",
         )
 
-        require(study.locator(".task-extra").input_value() == "25",
-                "new study boxes default to 25 educational tests")
+        require(study.locator(".task-extra").input_value() == "",
+                "new study boxes leave test count blank until explicitly chosen")
         study.locator('.task-title').click()
         study.locator('.plan-mode-choice[data-mode="test"]').click()
         require(study.get_attribute('data-study-mode') == 'test',
@@ -363,6 +363,37 @@ def main() -> int:
         study.locator('.plan-mode-choice[data-mode="study"]').click()
         require(study.get_attribute('data-study-mode') == 'study',
                 'explicit Study and educational tests choice restores study mode')
+        page.keyboard.press('KeyS')
+        require(study.get_attribute('data-study-mode') == 'test', 'S shortcut selects tests only')
+        page.keyboard.press('KeyD')
+        require(study.get_attribute('data-study-mode') == 'review', 'D shortcut selects review')
+        require(study.locator('.plan-study-caption').inner_text().startswith('مرور'),
+                'review activity has a clear visible caption')
+        page.keyboard.press('KeyE')
+        require(study.get_attribute('data-study-mode') == 'study', 'E shortcut selects study')
+        study.locator('.task-extra').focus()
+        page.keyboard.press('KeyD')
+        require(study.get_attribute('data-study-mode') == 'study',
+                'typing in a select does not activate activity shortcuts')
+        study.locator('.task-title').click()
+        selected_chapter = page.evaluate("""async () => {
+          const $task = window.jQuery('.calendar-task.plan-study-selected').first();
+          const chapters = await window.jQuery.getJSON('/get-chapters/', {
+            lesson_id:$task.attr('data-lesson-id'), grade:$task.attr('data-grade'),
+            major_code:window.currentMajorCode || ''});
+          const chapter = chapters[0];
+          if (!chapter) return false;
+          $task.find('.task-chapter').append(new Option(chapter.text,chapter.id,true,true)).trigger('change');
+          return !$task.find('.task-extra').val();
+        }""")
+        require(selected_chapter, 'selecting a chapter does not automatically assign 25 tests')
+        study.locator('.task-extra').select_option('40')
+        page.keyboard.press('Tab')
+        study.locator('.task-title').click()
+        page.keyboard.press('KeyD')
+        require(study.locator('.task-extra').input_value() == '40',
+                'changing activity mode preserves the manually chosen test count')
+        page.keyboard.press('KeyE')
         report_contract = page.evaluate("""() => {
           const x = window.planPdfV2;
           const start = window.planRuntimeState.start;

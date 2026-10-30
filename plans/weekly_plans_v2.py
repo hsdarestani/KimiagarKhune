@@ -248,7 +248,7 @@ def save_weekly_report(request: HttpRequest):
                         title = lesson.name if lesson else box_type_name
 
                     study_mode = str(task.get("study_mode") or "study")
-                    if study_mode not in ("study", "test"):
+                    if study_mode not in ("study", "test", "review"):
                         raise ValueError("حالت مطالعه یا تست معتبر نیست.")
                     raw_items = task.get("study_items") or []
                     if not isinstance(raw_items, list) or len(raw_items) > 12:

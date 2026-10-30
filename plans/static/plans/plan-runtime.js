@@ -398,7 +398,7 @@
       $task.attr('data-source-detail-id', task.source_detail_id);
     }
     if (type === 'مطالعه') {
-      $task.attr('data-study-mode', task.study_mode === 'test' ? 'test' : 'study');
+      $task.attr('data-study-mode', ['test', 'review'].includes(task.study_mode) ? task.study_mode : 'study');
       $task.attr('data-study-items', JSON.stringify(Array.isArray(task.study_items) ? task.study_items : []));
     }
 
@@ -461,7 +461,7 @@
       chapter_text: $task.find('.task-chapter option:selected').text() || '',
       optional_tests_count: Number($task.find('.task-extra').val()) || 0,
       source_detail_id: $task.attr('data-source-detail-id') || null,
-      study_mode: $task.attr('data-study-mode') === 'test' ? 'test' : 'study',
+      study_mode: ['test', 'review'].includes($task.attr('data-study-mode')) ? $task.attr('data-study-mode') : 'study',
       study_items: (function () { try { return JSON.parse($task.attr('data-study-items') || '[]'); } catch (error) { return []; } })(),
       duration_minutes: duration,
       top: top
@@ -655,7 +655,7 @@
               chapter_id: $source.data('chapter_id') || null,
               chapter_text: $source.data('chapter_text') || '',
               optional_tests_count: $source.hasClass('other-plan-task')
-                ? Number($source.data('optional_tests_count')) || 0 : 25,
+                ? Number($source.data('optional_tests_count')) || 0 : 0,
               study_mode: $source.data('study_mode') || 'study',
               study_items: $source.data('study_items') || [],
               source_detail_id: $source.data('source_detail_id') || null,

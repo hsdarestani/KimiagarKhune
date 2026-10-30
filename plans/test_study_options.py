@@ -144,3 +144,19 @@ class PlanStudyOptionsTests(TestCase):
         })
         self.assertEqual(loaded.status_code, 200)
         self.assertEqual(loaded.json()["tasks"][0]["source_detail_id"], 4321)
+
+    def test_review_mode_and_zero_tests_survive_save_reload_and_reuse(self):
+        payload = self.payload(mode="review")
+        payload["days"][0]["tasks"][0]["optional_tests_count"] = 0
+        response = self.save(payload)
+        self.assertEqual(response.status_code, 200, response.content)
+        for endpoint, params in [
+            ("/get-weekly-report-details/", {"student_id": self.student.pk, "week_start": "2039-01-01"}),
+            ("/get-last-weekly-report/", {"student_id": self.student.pk}),
+        ]:
+            loaded = self.client.get(endpoint, params)
+            self.assertEqual(loaded.status_code, 200, loaded.content)
+            task = loaded.json()["tasks"][0]
+            self.assertEqual(task["study_mode"], "review")
+            self.assertEqual(task["optional_tests_count"], 0)
+            self.assertEqual(task["study_items"][0]["chapter_id"], self.reactions.pk)
