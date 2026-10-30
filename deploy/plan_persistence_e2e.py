@@ -131,28 +131,46 @@ def main() -> int:
 
         filename_result = page.evaluate(
             """
-            () => ({
-              fileName: window.planOutputPolish.studentPdfFileName(''),
-              summaryName: window.planOutputPolish.studentPdfFileName('خلاصه'),
-              rewritten: window.planOutputPolish.rewritePdfMarkup(
-                '<html><head><title>خروجی هفته</title></head><body><script>pdf.save("generic.pdf");<\\/script></body></html>',
-                window.planOutputPolish.studentPdfFileName(''),
-                window.jQuery('#student-select option:selected').text().trim()
-              )
-            })
+            () => {
+              const exporter = window.planPdfV2;
+              const start = window.planRuntimeState.start;
+              const days = exporter.collect(start);
+              return {
+                fileName: exporter.fileName(start, ''),
+                summaryName: exporter.fileName(start, 'حجمی'),
+                selectedStudent: window.jQuery('#student-select option:selected').text().trim(),
+                firstDay: days[0].day,
+                expectedDay: ['یک‌شنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه', 'شنبه'][start.day()],
+                summaryIncludesHeading: exporter.summaryPages(days, start)[0].includes('برنامه‌ریزی به سبک حجمی'),
+                includesJalaliDate: exporter.fileName(start, '').includes(
+                  String(start.format('jMMMM'))
+                )
+              };
+            }
             """
         )
         require(
-            filename_result["fileName"] == f"{STUDENT_LABEL}.pdf",
-            "weekly PDF filename is the selected student's name",
+            filename_result["fileName"].endswith(".pdf") and
+            filename_result["fileName"].startswith(
+                filename_result["selectedStudent"].replace(" ", "-") + "-"
+            ),
+            "weekly PDF filename includes student name and Jalali date",
         )
         require(
-            filename_result["summaryName"] == f"{STUDENT_LABEL}-خلاصه.pdf",
-            "summary PDF filename keeps the selected student's name",
+            filename_result["summaryName"].endswith("-حجمی.pdf"),
+            "summary filename identifies the volumetric report",
         )
         require(
-            filename_result["fileName"] in filename_result["rewritten"],
-            "popup PDF save markup is rewritten to the student filename",
+            filename_result["includesJalaliDate"],
+            "PDF filename includes Jalali month",
+        )
+        require(
+            filename_result["firstDay"] == filename_result["expectedDay"],
+            "PDF days start from the selected plan date",
+        )
+        require(
+            filename_result["summaryIncludesHeading"],
+            "volumetric PDF has the requested Persian title",
         )
 
         visual_result = page.evaluate(
