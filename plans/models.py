@@ -128,6 +128,8 @@ class Box(models.Model):
     duration_minutes = models.IntegerField(null=True, blank=True)
     name = models.CharField(max_length=100, null=True, blank=True)
     is_default = models.BooleanField(default=False)
+    study_mode = models.CharField(max_length=12, default='study')
+    study_items = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         if self.name:
