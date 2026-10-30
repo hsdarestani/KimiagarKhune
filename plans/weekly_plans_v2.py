@@ -284,6 +284,7 @@ def save_weekly_report(request: HttpRequest):
                         name=title,
                         study_mode=study_mode,
                         study_items=study_items,
+                        source_detail_id=(int(task["source_detail_id"]) if task.get("source_detail_id") else None),
                         is_default=False,
                     )
                     WeeklyReportDetail.objects.create(
@@ -432,6 +433,7 @@ def copy_day_plan(request: HttpRequest):
                 name=source_box.name,
                 study_mode=source_box.study_mode,
                 study_items=source_box.study_items,
+                source_detail_id=source_box.source_detail_id,
                 is_default=False,
             )
             duration = detail.end_time - detail.start_time
