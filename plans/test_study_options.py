@@ -132,3 +132,15 @@ class PlanStudyOptionsTests(TestCase):
         })
         self.assertEqual(loaded.json()["tasks"][0]["study_mode"], "study")
         self.assertEqual(loaded.json()["tasks"][0]["study_items"], [])
+
+    def test_reused_block_origin_survives_save_and_reload(self):
+        payload = self.payload()
+        payload["days"][0]["tasks"][0]["source_detail_id"] = 4321
+        response = self.save(payload)
+        self.assertEqual(response.status_code, 200, response.content)
+        loaded = self.client.get("/get-weekly-report-details/", {
+            "student_id": self.student.pk,
+            "week_start": "2039-01-01",
+        })
+        self.assertEqual(loaded.status_code, 200)
+        self.assertEqual(loaded.json()["tasks"][0]["source_detail_id"], 4321)
