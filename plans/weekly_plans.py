@@ -168,6 +168,8 @@ def _serialize_detail(detail: WeeklyReportDetail) -> dict[str, Any]:
         "chapter_text": (
             f"{chapter.chapter_number} - {chapter.name}" if chapter else ""
         ),
+        "study_mode": box.study_mode or "study",
+        "study_items": box.study_items or [],
         "optional_tests_count": box.optional_tests_count or 0,
         "extra": box.optional_tests_count or 0,
         "duration_minutes": box.duration_minutes or int(
