@@ -57,7 +57,10 @@
 
   function updateControls($task) {
     var mode = $task.attr('data-study-mode') === 'test' ? 'test' : 'study';
-    $task.find('.plan-mode-toggle').text(mode === 'test' ? 'تست تستی ✓' : 'مطالعه + تست');
+    $task.find('.plan-mode-choice').each(function () {
+      var selected = $(this).attr('data-mode') === mode;
+      $(this).attr('aria-pressed', String(selected)).toggleClass('is-selected', selected);
+    });
     $task.find('.plan-multi-edit').text('درس / فصل بیشتر' +
       (itemsFor($task).length ? ' (' + itemsFor($task).length + ')' : ''));
     $task.find('.plan-study-caption').text(taskCaption($task));
@@ -69,7 +72,9 @@
     if (!$task.attr('data-study-items')) $task.attr('data-study-items', '[]');
     if (!$task.children('.plan-study-tools').length) {
       var $tools = $('<div class="plan-study-tools"></div>');
-      $tools.append($('<button type="button" class="plan-mode-toggle"></button>'));
+      $tools.append('<strong class="plan-mode-label">نوع فعالیت</strong>');
+      $tools.append('<button type="button" class="plan-mode-choice" data-mode="study">مطالعه + تست آموزشی</button>');
+      $tools.append('<button type="button" class="plan-mode-choice" data-mode="test">فقط تست</button>');
       $tools.append($('<button type="button" class="plan-multi-edit"></button>'));
       $tools.append($('<div class="plan-study-caption"></div>'));
       $task.append($tools);
@@ -241,11 +246,11 @@
   });
 
   $(document)
-    .on('click', '.calendar .plan-mode-toggle', function (event) {
+    .on('click', '.calendar .plan-mode-choice', function (event) {
       event.preventDefault();
       event.stopPropagation();
       var $task = $(this).closest('.calendar-task');
-      $task.attr('data-study-mode', $task.attr('data-study-mode') === 'test' ? 'study' : 'test');
+      $task.attr('data-study-mode', $(this).attr('data-mode') === 'test' ? 'test' : 'study');
       updateControls($task);
     })
     .on('click', '.calendar .plan-multi-edit', function (event) {

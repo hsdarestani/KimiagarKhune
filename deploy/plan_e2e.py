@@ -356,6 +356,13 @@ def main() -> int:
 
         require(study.locator(".task-extra").input_value() == "25",
                 "new study boxes default to 25 educational tests")
+        study.locator('.task-title').click()
+        study.locator('.plan-mode-choice[data-mode="test"]').click()
+        require(study.get_attribute('data-study-mode') == 'test',
+                'explicit Only tests activity choice selects test-only mode')
+        study.locator('.plan-mode-choice[data-mode="study"]').click()
+        require(study.get_attribute('data-study-mode') == 'study',
+                'explicit Study and educational tests choice restores study mode')
         report_contract = page.evaluate("""() => {
           const x = window.planPdfV2;
           const start = window.planRuntimeState.start;

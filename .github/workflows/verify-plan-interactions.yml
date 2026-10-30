@@ -122,6 +122,9 @@ jobs:
             plan-persistence-output.txt
             plan-pdf-week-proof.png
             plan-pdf-volume-proof.png
+            plan-requested-week-proof.png
+            plan-requested-volume-proof.png
+            plan-requested-student.pdf
             plan-school-drag-output.txt
             plan-time-grid-output.txt
             plan-task-independence-output.txt
