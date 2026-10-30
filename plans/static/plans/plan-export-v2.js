@@ -275,6 +275,7 @@
       kind === 'all' ? 'گزارش-کامل' : '';
     var oldText = button.textContent;
     button.disabled = true;
+    button.dataset.planExportStatus = 'rendering';
     button.textContent = 'در حال آماده‌سازی PDF...';
     var $capture = $('<div class="plan-pdf-capture" aria-hidden="true"></div>').appendTo('body');
     var pdf = new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
@@ -291,8 +292,10 @@
         pdf.addImage(canvas.toDataURL('image/jpeg',.88), 'JPEG', 0, 0, 297, 210);
         $page.remove();
       }
+      button.dataset.planExportStatus = 'saving';
       pdf.save(fileName(start, suffix));
     } catch (error) {
+      button.dataset.planExportStatus = 'error: ' + String(error && error.message || error);
       console.error('Plan PDF export failed:',error);
       window.alert('ساخت PDF ناموفق بود؛ لطفاً دوباره تلاش کنید.');
     } finally {
