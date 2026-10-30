@@ -354,6 +354,19 @@ def main() -> int:
             "study box has test-count selector",
         )
 
+        require(study.locator(".task-extra").input_value() == "25",
+                "new study boxes default to 25 educational tests")
+        report_contract = page.evaluate("""() => {
+          const x = window.planPdfV2;
+          const start = window.planRuntimeState.start;
+          const days = x.collect(start);
+          const pages = x.reportPages('week', days, start);
+          return pages.length >= 2 && pages[0].includes('برنامه هفتگی') &&
+            pages[1].includes('برنامه‌ریزی به سبک حجمی') &&
+            (pages[0].match(/class="plan-pdf-day"/g) || []).length === 7;
+        }""")
+        require(report_contract, "weekly PDF starts with seven days then volumetric planning")
+
         before_repeat = page.locator(
             '.calendar-task[data-box-type="مطالعه"]'
         ).count()

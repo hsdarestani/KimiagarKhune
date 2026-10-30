@@ -4,8 +4,6 @@
 
   var DAY_NAMES = ['یک‌شنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنج‌شنبه','جمعه','شنبه'];
   var PIXELS_PER_MINUTE = 35 / 60;
-  var PER_DAY = 5;
-  var DAYS_PER_PAGE = 4;
 
   function normalize(value) {
     return String(value || '').replace(/[\u200c\u200e\u200f\s]/g, '')
@@ -157,36 +155,56 @@
     }).join('') + '</div>';
   }
   function estimatedCardHeight(task) {
-    // Split busy days instead of shrinking text or drawing a task over the next card.
-    var titleLines = Math.max(1, Math.ceil(String(task.title || '').length / 27));
-    var descriptionLines = Math.max(1, Math.ceil(String(task.description || '').length / 35));
-    return 32 + titleLines * 19 + descriptionLines * 16 + 15;
+    // Conservative narrow-column budget; long descriptions continue on later pages.
+    var titleLines = Math.max(1, Math.ceil(String(task.title || '').length / 13));
+    var descriptionLines = Math.max(1, Math.ceil(String(task.description || '').length / 18));
+    return 52 + titleLines * 17 + descriptionLines * 15;
   }
   function schedulePages(days, start) {
-    var chunks = [];
-    days.forEach(function (day) {
-      var tasks = day.tasks.slice();
-      if (!tasks.length) {
-        chunks.push(day);
-        return;
-      }
-      while (tasks.length) {
-        var part = [];
-        var height = 0;
-        while (tasks.length && part.length < PER_DAY) {
-          var size = estimatedCardHeight(tasks[0]);
-          if (part.length && height + size > 510) break;
-          part.push(tasks.shift());
-          height += size;
+    var columns = days.map(function (day) {
+      var parts = [[]];
+      var height = 0;
+      day.tasks.forEach(function (task) {
+        var description = String(task.description || '');
+        var pieces = [];
+        while (description.length > 144) {
+          var cut = description.lastIndexOf(' ', 144);
+          if (cut < 1) cut = 144;
+          pieces.push(description.slice(0, cut));
+          description = description.slice(cut).trimStart();
         }
-        chunks.push({day: day.day, date: day.date, tasks: part});
-      }
+        pieces.push(description);
+        pieces.forEach(function (text, index) {
+          var card = Object.assign({}, task, {
+            title: task.title + (index ? ' (ادامه)' : ''), description: text
+          });
+          var size = estimatedCardHeight(card);
+          if (parts[parts.length - 1].length && height + size > 490) {
+            parts.push([]);
+            height = 0;
+          }
+          parts[parts.length - 1].push(card);
+          height += size;
+        });
+      });
+      return parts;
     });
-    var groups = [];
-    while (chunks.length) groups.push(chunks.splice(0,DAYS_PER_PAGE));
-    return groups.map(function (group,index) {
-      return page('برنامه هفتگی', dayCards(group), index+1, groups.length, start);
+    var count = Math.max.apply(null, columns.map(function (parts) { return parts.length; }));
+    return Array.from({length:count}, function (_, index) {
+      var group = days.map(function (day, column) {
+        return {day:day.day, date:day.date, tasks:columns[column][index] || []};
+      });
+      return page(index ? 'ادامه برنامه هفتگی' : 'برنامه هفتگی',
+        dayCards(group), index+1, count, start);
     });
+  }
+  function reportPages(kind, days, start) {
+    if (kind === 'summary') return summaryPages(days,start);
+    if (kind === 'matrix') return matrixPages(days,start);
+    var schedule = schedulePages(days,start);
+    // The weekly overview is page one; volumetric planning always starts on page two.
+    var result = [schedule[0]].concat(summaryPages(days,start), schedule.slice(1));
+    return kind === 'all' ? result.concat(matrixPages(days,start)) : result;
   }
   function aggregate(days) {
     var result = {};
@@ -231,7 +249,13 @@
     var allTests = rows.reduce(function (sum,row) { return sum + row.tests; }, 0);
     var allMinutes = rows.reduce(function (sum,row) { return sum + row.minutes; }, 0);
     var groups = [];
-    while (rows.length) groups.push(rows.splice(0, 8));
+    var usedHeight = 0;
+    rows.forEach(function (row) {
+      var size = 38 + Math.ceil(row.title.length / 24) * 17;
+      if (!groups.length || usedHeight + size > 400) { groups.push([]); usedHeight = 0; }
+      groups[groups.length-1].push(row);
+      usedHeight += size;
+    });
     if (!groups.length) groups.push([]);
     return groups.map(function (group,index) {
       var kpis = '<div class="plan-pdf-kpis">' +
@@ -267,10 +291,7 @@
       return;
     }
     var days = collect(start);
-    var pages = [];
-    if (kind === 'week' || kind === 'all') pages = pages.concat(schedulePages(days,start));
-    if (kind === 'summary' || kind === 'all') pages = pages.concat(summaryPages(days,start));
-    if (kind === 'matrix' || kind === 'all') pages = pages.concat(matrixPages(days,start));
+    var pages = reportPages(kind, days, start);
     var suffix = kind === 'summary' ? 'حجمی' : kind === 'matrix' ? 'ماتریس' :
       kind === 'all' ? 'گزارش-کامل' : '';
     var oldText = button.textContent;
@@ -282,6 +303,7 @@
     try {
       for (var i=0; i<pages.length; i++) {
         var $page = $(pages[i]).appendTo($capture);
+        $page.find('.plan-pdf-meta span').last().text('صفحه ' + persianDigits(i+1) + ' از ' + persianDigits(pages.length));
         await document.fonts.ready;
         var canvas = await window.html2canvas($page[0], {
           scale: 1.6, useCORS: true, backgroundColor: '#ffffff',
@@ -323,6 +345,6 @@
   }, true);
   window.planPdfV2 = {
     collect:collect, aggregate:aggregate, schedulePages:schedulePages,
-    summaryPages:summaryPages, fileName:fileName, taskInfo:taskInfo
+    summaryPages:summaryPages, reportPages:reportPages, fileName:fileName, taskInfo:taskInfo
   };
 })(window, document, window.jQuery);

@@ -654,7 +654,8 @@
               duration_minutes: Number($source.data('duration_minutes')) || DEFAULT_DURATION,
               chapter_id: $source.data('chapter_id') || null,
               chapter_text: $source.data('chapter_text') || '',
-              optional_tests_count: Number($source.data('optional_tests_count')) || 0,
+              optional_tests_count: $source.hasClass('other-plan-task')
+                ? Number($source.data('optional_tests_count')) || 0 : 25,
               study_mode: $source.data('study_mode') || 'study',
               study_items: $source.data('study_items') || [],
               source_detail_id: $source.data('source_detail_id') || null,
