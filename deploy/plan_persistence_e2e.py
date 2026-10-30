@@ -190,6 +190,7 @@ def main() -> int:
               const host = document.createElement('div');
               host.id = 'plan-spec-layout-proof';
               host.className = 'plan-pdf-capture';
+              host.style.position = 'absolute';
               host.innerHTML = pages.join('');
               document.body.appendChild(host);
               const failures = [];

@@ -166,7 +166,14 @@
       var height = 0;
       day.tasks.forEach(function (task) {
         var description = String(task.description || '');
-        var pieces = description.match(/[\s\S]{1,144}/g) || [''];
+        var pieces = [];
+        while (description.length > 144) {
+          var cut = description.lastIndexOf(' ', 144);
+          if (cut < 1) cut = 144;
+          pieces.push(description.slice(0, cut));
+          description = description.slice(cut).trimStart();
+        }
+        pieces.push(description);
         pieces.forEach(function (text, index) {
           var card = Object.assign({}, task, {
             title: task.title + (index ? ' (ادامه)' : ''), description: text
