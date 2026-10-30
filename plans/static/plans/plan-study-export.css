@@ -1,8 +1,18 @@
-.calendar .calendar-task[data-box-type="مطالعه"] { overflow: hidden; }
+.calendar .calendar-task[data-box-type="مطالعه"] { overflow: visible; }
 .calendar .calendar-task .plan-study-tools {
-  position: absolute; inset-inline: 4px; bottom: 3px; display: flex;
-  gap: 3px; align-items: center; flex-wrap: wrap; z-index: 5;
-  max-height: 40px; overflow: hidden; pointer-events: auto;
+  position: absolute; inset-inline-end: 0; bottom: calc(100% + 5px); display: none;
+  gap: 5px; align-items: center; flex-wrap: wrap; z-index: 5000;
+  width: max-content; max-width: 280px; padding: 7px; border-radius: 9px;
+  border: 1px solid #c4d6df; box-shadow: 0 10px 24px rgba(10,35,50,.25);
+  background: #fff; pointer-events: auto;
+}
+.calendar .calendar-task:hover .plan-study-tools,
+.calendar .calendar-task.plan-study-tools-open .plan-study-tools,
+.calendar .calendar-task:focus-within .plan-study-tools { display: flex; }
+.calendar .calendar-task[data-study-mode="test"]::after {
+  content: "تست تستی"; position: absolute; bottom: 3px; right: 4px; z-index: 2;
+  border-radius: 4px; padding: 1px 3px;
+  background: rgba(255,255,255,.85); color:#1d6171; font:700 8px Vazir,sans-serif;
 }
 .calendar .calendar-task .plan-study-tools button {
   flex: 0 0 auto; border: 1px solid rgba(13, 56, 70, .25);
@@ -12,8 +22,8 @@
 }
 .calendar .calendar-task .plan-study-tools button:focus-visible { outline: 2px solid #0c6177; }
 .calendar .calendar-task .plan-study-caption {
-  width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font: 700 9px/1.3 Vazir, sans-serif; color: #143640;
+  flex-basis: 100%; max-width: 260px; white-space: normal;
+  font: 700 10px/1.4 Vazir, sans-serif; color: #143640;
 }
 .plan-multi-backdrop {
   position: fixed; z-index: 300000; inset: 0; background: rgba(10,27,42,.65);
