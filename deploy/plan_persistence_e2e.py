@@ -173,6 +173,49 @@ def main() -> int:
             "volumetric PDF has the requested Persian title",
         )
 
+        layout_result = page.evaluate(
+            """async () => {
+              await document.fonts.ready;
+              const x = window.planPdfV2;
+              const start = window.planRuntimeState.start;
+              const days = x.collect(start).map((day, index) => ({...day, tasks:
+                Array.from({length: index === 0 ? 14 : 5}, (_, n) => ({
+                  title: 'شیمی دوازدهم',
+                  description: 'خواندن فصل واکنش‌ها و مرور درس ۳ و ۴ + ۲۵ تست آموزشی '.repeat(n === 0 ? 18 : 1),
+                  type: 'مطالعه', start: '۱۲:۰۰', end: '۱۳:۳۰', duration: 90, tests: 25,
+                  category: 'شیمی دوازدهم'
+                }))
+              }));
+              const pages = x.reportPages('week', days, start);
+              const host = document.createElement('div');
+              host.id = 'plan-spec-layout-proof';
+              host.className = 'plan-pdf-capture';
+              host.innerHTML = pages.join('');
+              document.body.appendChild(host);
+              const failures = [];
+              host.querySelectorAll('.plan-pdf-page').forEach((page, pageIndex) => {
+                const bounds = page.getBoundingClientRect();
+                page.querySelectorAll('.plan-pdf-task, .plan-pdf-table, .plan-pdf-footer').forEach(el => {
+                  const r = el.getBoundingClientRect();
+                  if (r.bottom > bounds.bottom - 10 || r.right > bounds.right || r.left < bounds.left)
+                    failures.push('page bounds ' + pageIndex);
+                  const day = el.closest('.plan-pdf-day');
+                  if (day && r.bottom > day.getBoundingClientRect().bottom - 3)
+                    failures.push('day clipping ' + pageIndex);
+                });
+              });
+              return {failures, pages: pages.length,
+                hasSummarySecond: pages[1].includes('برنامه‌ریزی به سبک حجمی'),
+                hasEditorControls: !!host.querySelector('select,button,input,textarea')};
+            }"""
+        )
+        require(not layout_result["failures"], f"busy and long-text PDF pages fit without clipping: {layout_result['failures']}")
+        require(layout_result["hasSummarySecond"], "volumetric report is page two even for busy weeks")
+        require(not layout_result["hasEditorControls"], "PDF pages contain no editor rectangles")
+        page.locator('#plan-spec-layout-proof .plan-pdf-page').nth(0).screenshot(path='plan-pdf-week-proof.png')
+        page.locator('#plan-spec-layout-proof .plan-pdf-page').nth(1).screenshot(path='plan-pdf-volume-proof.png')
+        page.evaluate("document.getElementById('plan-spec-layout-proof').remove()")
+
         visual_result = page.evaluate(
             """
             () => {

@@ -174,6 +174,12 @@
       const sameLessonId = lessonId && String($candidate.attr('data-lesson-id') || '') === lessonId;
       const sameTitle = !lessonId && sourceTitle && normalizeText(taskTitle($candidate)) === sourceTitle;
       if (sameLessonId || sameTitle || this === $source[0]) {
+        // Recover identity from the source even when the lesson palette is filtered out.
+        ['data-lesson-name', 'data-grade', 'data-lesson-type'].forEach(function (attribute) {
+          if (!$candidate.attr(attribute) && $source.attr(attribute)) {
+            $candidate.attr(attribute, $source.attr(attribute));
+          }
+        });
         repairStudyTaskColor($candidate, sourceColor);
       }
     });
