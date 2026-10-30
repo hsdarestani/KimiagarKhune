@@ -643,7 +643,9 @@
             };
           } else {
             task = {
-              title: sourceTitle,
+              title: $source.hasClass('other-plan-task')
+                ? String($source.data('lesson_name') || $source.attr('data-lesson-name') || sourceTitle)
+                : sourceTitle,
               box_type: 'مطالعه',
               lesson_id: $source.attr('data-lesson-id'),
               lesson_name: $source.attr('data-lesson-name'),
