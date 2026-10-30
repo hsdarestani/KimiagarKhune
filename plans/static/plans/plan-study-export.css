@@ -95,3 +95,12 @@
 .calendar .plan-study-tools .plan-mode-choice.is-selected {background:#174961;color:white;border-color:#174961}
 .plan-pdf-volume-item {line-height:1.8;text-align:right;margin:0 0 7px}
 .plan-pdf-large .plan-pdf-days {min-height:880px}
+/* The activity choices must remain clickable across adjacent day columns. */
+.calendar .day-column:has(.plan-study-tools-open),
+.calendar .day-column:has(.calendar-task:hover),
+.calendar .day-column:has(.calendar-task:focus-within) {
+  overflow: visible !important; position: relative !important; z-index: 10040 !important;
+}
+.calendar .calendar-task.plan-study-tools-open,
+.calendar .calendar-task:hover,
+.calendar .calendar-task:focus-within {z-index: 10041 !important;}
