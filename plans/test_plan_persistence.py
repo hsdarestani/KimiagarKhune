@@ -40,9 +40,9 @@ class PlanPersistenceRegressionTests(TestCase):
     def test_plan_page_loads_persistence_runtime(self):
         response = self.client.get("/plan/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "/static/plans/plan-persistence-fixes.js?v=20261030-2")
+        self.assertContains(response, "/static/plans/plan-persistence-fixes.js?v=20261030-3")
         self.assertContains(response, 'data-plan-persistence-fixes="true"')
-        self.assertContains(response, "/static/plans/plan-filename-fix.js?v=20261030-2")
+        self.assertContains(response, "/static/plans/plan-filename-fix.js?v=20261030-3")
         self.assertContains(response, 'data-plan-filename-fix="true"')
         self.assertContains(response, 'data-plan-study-options="true"')
         self.assertContains(response, 'data-plan-export-v2="true"')

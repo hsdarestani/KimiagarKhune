@@ -193,6 +193,7 @@ def main() -> int:
               host.style.position = 'absolute';
               host.innerHTML = pages.join('');
               document.body.appendChild(host);
+              host.querySelectorAll('.plan-pdf-page').forEach(el => x.fitPage(el));
               const failures = [];
               host.querySelectorAll('.plan-pdf-page').forEach((page, pageIndex) => {
                 const bounds = page.getBoundingClientRect();
@@ -373,6 +374,47 @@ def main() -> int:
             not page_errors,
             "persistence flow has no uncaught JavaScript errors: " + " | ".join(page_errors),
         )
+
+        # Read the exact requested production week; never save or alter this student's plan.
+        target = page.evaluate("""() => {
+          const norm = s => s.replace(/[\\s\\u200c]/g, '').replace(/ي/g,'ی').replace(/ك/g,'ک');
+          return Array.from(document.querySelector('#student-select').options)
+            .find(o => norm(o.text).includes('علیرضا') && norm(o.text).includes('رنجبران'))?.value || null;
+        }""")
+        require(bool(target), "requested student is available for read-only output review")
+        page.select_option('#student-select', value=target)
+        page.fill('#weekSelector', '1405-08-09')
+        page.evaluate("window.jQuery('#weekSelector').trigger('input').trigger('change')")
+        page.click('#loadWeek')
+        page.wait_for_function("window.planRuntimeState.loaded && !window.planRuntimeState.loading && window.planRuntimeState.start.format('jYYYY-jMM-jDD') === '1405-08-09'", timeout=30000)
+        requested = page.evaluate("""async () => {
+          await document.fonts.ready;
+          const x = window.planPdfV2, start = window.planRuntimeState.start;
+          const days = x.collect(start), schedule = x.schedulePages(days,start);
+          const host = document.createElement('div');
+          host.id = 'plan-requested-proof'; host.className = 'plan-pdf-capture';
+          host.style.position = 'absolute';
+          host.innerHTML = x.reportPages('week',days,start).join('');
+          document.body.appendChild(host);
+          host.querySelectorAll('.plan-pdf-page').forEach(el => x.fitPage(el));
+          const first = host.querySelector('.plan-pdf-page');
+          return {counts:days.map(day=>day.tasks.length), singleWeek: schedule.length === 1,
+            cards:first.querySelectorAll('.plan-pdf-task').length,
+            total:days.reduce((n,day)=>n+day.tasks.length,0),
+            branding:first.textContent.includes('kimiagarkhoone.com')};
+        }""")
+        require(requested['total'] > 0, "requested production week contains scheduled boxes")
+        require(requested['singleWeek'] and requested['cards'] == requested['total'],
+                "requested busy week keeps every box together without continuation halves")
+        require(requested['branding'], "requested output prints the correct website brand")
+        print('Requested week box counts by day:', requested['counts'])
+        page.locator('#plan-requested-proof .plan-pdf-page').nth(0).screenshot(path='plan-requested-week-proof.png')
+        page.locator('#plan-requested-proof .plan-pdf-page').nth(1).screenshot(path='plan-requested-volume-proof.png')
+        page.evaluate("document.getElementById('plan-requested-proof').remove()")
+        with page.expect_download(timeout=90000) as requested_download:
+            page.click('#download-week-output')
+        requested_download.value.save_as('plan-requested-student.pdf')
+        print('PASS: exact requested production week PDF downloaded without saving changes')
 
         context.close()
         browser.close()

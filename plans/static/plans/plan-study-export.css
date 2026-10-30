@@ -10,7 +10,7 @@
 .calendar .calendar-task.plan-study-tools-open .plan-study-tools,
 .calendar .calendar-task:focus-within .plan-study-tools { display: flex; }
 .calendar .calendar-task[data-study-mode="test"]::after {
-  content: "تست تستی"; position: absolute; bottom: 3px; right: 4px; z-index: 2;
+  content: "فقط تست"; position: absolute; bottom: 3px; right: 4px; z-index: 2;
   border-radius: 4px; padding: 1px 3px;
   background: rgba(255,255,255,.85); color:#1d6171; font:700 8px Vazir,sans-serif;
 }
@@ -71,8 +71,8 @@
 .plan-pdf-logo { font-weight: 900; letter-spacing: -.4px; color: #b88a41; font-size: 18px; }
 .plan-pdf-header h1 { margin: 0; font-size: 25px; color: #163b50; font-weight: 900; }
 .plan-pdf-meta { display: flex; gap: 12px; justify-content: space-between; font-size: 12px; color: #668293; padding: 12px 0; }
-.plan-pdf-days { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 7px; height: 574px; }
-.plan-pdf-day { min-width:0; border: 1px solid #d7e3e8; background: #f9fbfc; border-radius: 12px; overflow: hidden; }
+.plan-pdf-days { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 7px; min-height: 574px; height: auto; align-items: stretch; }
+.plan-pdf-day { min-width:0; border: 1px solid #d7e3e8; background: #f9fbfc; border-radius: 12px; overflow: visible; }
 .plan-pdf-day-head { padding: 10px; background: #153c51; color: #fff; font-size: 15px; font-weight: 900; }
 .plan-pdf-day-head small { display: block; font-size: 10px; font-weight: 400; color: #c2d6df; }
 .plan-pdf-task { background:#fff; border:1px solid #e1eaee; border-right: 3px solid #c6a15e; border-radius:8px; margin:5px; padding:6px; min-height: 62px; box-sizing:border-box; }
@@ -89,3 +89,9 @@
 .plan-pdf-table tr:nth-child(even) td { background:#f4f8fa; }
 .plan-pdf-table td:first-child, .plan-pdf-table th:first-child { width:21%; text-align:right; padding-right:7px; }
 .plan-pdf-empty { color:#8b9ca5; text-align:center; margin:30px 0; }
+
+.plan-mode-label {flex-basis:100%;font:700 11px Vazir,sans-serif;color:#244a60}
+.calendar .plan-study-tools .plan-mode-choice {font-size:11px;padding:5px 8px}
+.calendar .plan-study-tools .plan-mode-choice.is-selected {background:#174961;color:white;border-color:#174961}
+.plan-pdf-volume-item {line-height:1.8;text-align:right;margin:0 0 7px}
+.plan-pdf-large .plan-pdf-days {min-height:880px}

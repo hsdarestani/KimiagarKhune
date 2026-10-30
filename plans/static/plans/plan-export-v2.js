@@ -133,7 +133,7 @@
   }
   function page(title, inner, index, count, start) {
     var html = '<section class="plan-pdf-page">' +
-      '<header class="plan-pdf-header"><div class="plan-pdf-logo">KIMIAGARKHUNE</div>' +
+      '<header class="plan-pdf-header"><div class="plan-pdf-logo">kimiagarkhoone.com</div>' +
       '<h1>' + escapeHtml(title) + '</h1></header>' +
       '<div class="plan-pdf-meta"><span>دانش‌آموز: <b>' + escapeHtml(studentName()) + '</b></span>' +
       '<span>شروع برنامه: ' + escapeHtml(dateText(start)) + '</span>' +
@@ -154,49 +154,22 @@
         cards + '</div>';
     }).join('') + '</div>';
   }
-  function estimatedCardHeight(task) {
-    // Conservative narrow-column budget; long descriptions continue on later pages.
-    var titleLines = Math.max(1, Math.ceil(String(task.title || '').length / 13));
-    var descriptionLines = Math.max(1, Math.ceil(String(task.description || '').length / 18));
-    return 52 + titleLines * 17 + descriptionLines * 15;
-  }
   function schedulePages(days, start) {
-    var columns = days.map(function (day) {
-      var parts = [[]];
-      var height = 0;
-      day.tasks.forEach(function (task) {
-        var description = String(task.description || '');
-        var pieces = [];
-        while (description.length > 144) {
-          var cut = description.lastIndexOf(' ', 144);
-          if (cut < 1) cut = 144;
-          pieces.push(description.slice(0, cut));
-          description = description.slice(cut).trimStart();
-        }
-        pieces.push(description);
-        pieces.forEach(function (text, index) {
-          var card = Object.assign({}, task, {
-            title: task.title + (index ? ' (ادامه)' : ''), description: text
-          });
-          var size = estimatedCardHeight(card);
-          if (parts[parts.length - 1].length && height + size > 490) {
-            parts.push([]);
-            height = 0;
-          }
-          parts[parts.length - 1].push(card);
-          height += size;
-        });
-      });
-      return parts;
-    });
-    var count = Math.max.apply(null, columns.map(function (parts) { return parts.length; }));
-    return Array.from({length:count}, function (_, index) {
-      var group = days.map(function (day, column) {
-        return {day:day.day, date:day.date, tasks:columns[column][index] || []};
-      });
-      return page(index ? 'ادامه برنامه هفتگی' : 'برنامه هفتگی',
-        dayCards(group), index+1, count, start);
-    });
+    // Keep the complete week together; paper size adapts to real rendered content.
+    return [page('برنامه هفتگی', dayCards(days), 1, 1, start)];
+  }
+  function fitPage(element) {
+    element.style.width = '1122px';
+    element.style.minHeight = '794px';
+    element.style.height = 'auto';
+    if (element.getBoundingClientRect().height > 795) {
+      element.style.width = '1587px';
+      element.style.minHeight = '1122px';
+      element.classList.add('plan-pdf-large');
+    }
+    var bounds = element.getBoundingClientRect();
+    return {width:Math.ceil(bounds.width), height:Math.ceil(bounds.height),
+      millimeters:bounds.width > 1200 ? 420 : 297};
   }
   function reportPages(kind, days, start) {
     if (kind === 'summary') return summaryPages(days,start);
@@ -214,11 +187,12 @@
         var key = task.category;
         if (!result[key]) {
           result[key] = {title:key, days:Array.from({length:7}, function () {
-            return {tests:0,minutes:0};
+            return {tests:0,minutes:0,items:[]};
           }), tests:0, minutes:0};
         }
         result[key].days[i].tests += task.tests;
         result[key].days[i].minutes += task.duration;
+        result[key].days[i].items.push({minutes:task.duration, description:task.description});
         result[key].tests += task.tests;
         result[key].minutes += task.duration;
       });
@@ -235,9 +209,10 @@
     entries.forEach(function (entry) {
       html += '<tr><td><b>' + escapeHtml(entry.title) + '</b></td>';
       entry.days.forEach(function (item) {
-        html += '<td>' + (item.minutes || item.tests
-          ? persianDigits(item.tests) + ' تست / ' + persianDigits(item.minutes) + ' د'
-          : '—') + '</td>';
+        html += '<td>' + (((item.items || []).map(function (detail) {
+          return '<div class="plan-pdf-volume-item"><b>' + persianDigits(detail.minutes) +
+            ' دقیقه:</b> ' + escapeHtml(detail.description) + '</div>';
+        }).join('')) || '—') + '</td>';
       });
       html += '<td>' + persianDigits(entry.tests) + '</td><td>' +
         persianDigits(entry.minutes) + ' دقیقه</td></tr>';
@@ -251,7 +226,11 @@
     var groups = [];
     var usedHeight = 0;
     rows.forEach(function (row) {
-      var size = 38 + Math.ceil(row.title.length / 24) * 17;
+      var size = 38 + Math.max.apply(null, row.days.map(function (day) {
+        return (day.items || []).reduce(function (height, detail) {
+          return height + 22 + Math.ceil(detail.description.length / 15) * 16;
+        }, 0);
+      }));
       if (!groups.length || usedHeight + size > 400) { groups.push([]); usedHeight = 0; }
       groups[groups.length-1].push(row);
       usedHeight += size;
@@ -299,19 +278,25 @@
     button.dataset.planExportStatus = 'rendering';
     button.textContent = 'در حال آماده‌سازی PDF...';
     var $capture = $('<div class="plan-pdf-capture" aria-hidden="true"></div>').appendTo('body');
-    var pdf = new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
+    var pdf = null;
     try {
       for (var i=0; i<pages.length; i++) {
         var $page = $(pages[i]).appendTo($capture);
         $page.find('.plan-pdf-meta span').last().text('صفحه ' + persianDigits(i+1) + ' از ' + persianDigits(pages.length));
         await document.fonts.ready;
+        var size = fitPage($page[0]);
+        var widthMm = size.millimeters;
+        var heightMm = widthMm * size.height / size.width;
+        var orientation = widthMm >= heightMm ? 'landscape' : 'portrait';
         var canvas = await window.html2canvas($page[0], {
           scale: 1.6, useCORS: true, backgroundColor: '#ffffff',
-          width: 1122, height: 794, windowWidth: 1122, windowHeight: 794,
+          width: size.width, height: size.height, windowWidth: size.width, windowHeight: size.height,
           logging: false
         });
-        if (i) pdf.addPage();
-        pdf.addImage(canvas.toDataURL('image/jpeg',.88), 'JPEG', 0, 0, 297, 210);
+        if (!pdf) pdf = new window.jspdf.jsPDF({orientation:orientation,unit:'mm',
+          format:[widthMm,heightMm],compress:true});
+        else pdf.addPage([widthMm,heightMm],orientation);
+        pdf.addImage(canvas.toDataURL('image/jpeg',.88), 'JPEG', 0, 0, widthMm, heightMm);
         $page.remove();
       }
       button.dataset.planExportStatus = 'saving';
@@ -345,6 +330,6 @@
   }, true);
   window.planPdfV2 = {
     collect:collect, aggregate:aggregate, schedulePages:schedulePages,
-    summaryPages:summaryPages, reportPages:reportPages, fileName:fileName, taskInfo:taskInfo
+    summaryPages:summaryPages, reportPages:reportPages, fitPage:fitPage, fileName:fileName, taskInfo:taskInfo
   };
 })(window, document, window.jQuery);
