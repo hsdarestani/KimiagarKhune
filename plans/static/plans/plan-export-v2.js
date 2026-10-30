@@ -304,28 +304,23 @@
       button.textContent = oldText;
     }
   }
-  function bind() {
-    var buttons = {
-      'download-week-output':'week',
-      'download-week-summary':'summary',
-      'download-empty-matrix':'matrix',
-      'download-all-pdf':'all'
-    };
-    Object.keys(buttons).forEach(function (id) {
-      var old = document.getElementById(id);
-      if (!old || !old.parentNode) return;
-      // Replace legacy screenshot/popup handlers instead of stacking export listeners.
-      var fresh = old.cloneNode(true);
-      fresh.removeAttribute('data-plan-output-polish-bound');
-      fresh.parentNode.replaceChild(fresh,old);
-      fresh.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        download(buttons[id],fresh);
-      });
-    });
-  }
-  $(bind);
+  // Intercept the original legacy buttons during document capture. This keeps
+  // PDF v2 authoritative even when old jQuery callbacks rebuild toolbar nodes.
+  var PDF_ACTIONS = {
+    'download-week-output': 'week',
+    'download-week-summary': 'summary',
+    'download-empty-matrix': 'matrix',
+    'download-all-pdf': 'all'
+  };
+  document.addEventListener('click', function (event) {
+    var button = event.target && event.target.closest
+      ? event.target.closest('button[id]') : null;
+    if (!button || !Object.prototype.hasOwnProperty.call(PDF_ACTIONS, button.id)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    button.dataset.planExportStatus = 'clicked';
+    download(PDF_ACTIONS[button.id], button);
+  }, true);
   window.planPdfV2 = {
     collect:collect, aggregate:aggregate, schedulePages:schedulePages,
     summaryPages:summaryPages, fileName:fileName, taskInfo:taskInfo
