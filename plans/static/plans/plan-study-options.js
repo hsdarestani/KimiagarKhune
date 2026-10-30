@@ -215,6 +215,21 @@
     });
   }
 
+  function syncUsedSources() {
+    var used = {};
+    $('.calendar .calendar-task[data-source-detail-id]').each(function () {
+      var id = String($(this).attr('data-source-detail-id') || '');
+      if (id) used[id] = true;
+    });
+    $('#otherStudentTasks .other-plan-task').each(function () {
+      var $source = $(this);
+      var id = String($source.data('source_detail_id') ||
+        $source.attr('data-source-detail-id') || '');
+      var taken = !!(id && used[id]);
+      $source.toggleClass('plan-used-other-task', taken).toggle(!taken);
+    });
+  }
+
   $(document).on('click.planStudyTools', '.calendar .calendar-task[data-box-type="مطالعه"]', function (event) {
     if ($(event.target).closest('button,select,input,textarea,.select2-container,.plan-study-tools').length) return;
     $('.calendar-task').not(this).removeClass('plan-study-tools-open');
@@ -244,6 +259,11 @@
 
   $(function () {
     decorateAll();
+    syncUsedSources();
+    var otherList = document.getElementById('otherStudentTasks');
+    if (otherList) {
+      new MutationObserver(syncUsedSources).observe(otherList, {childList: true});
+    }
     var calendar = document.querySelector('.calendar');
     if (calendar) {
       new MutationObserver(function (changes) {
@@ -255,8 +275,9 @@
             $node.find('.calendar-task').each(function () { decorate($(this)); });
           });
         });
+        syncUsedSources();
       }).observe(calendar, {childList: true, subtree: true});
     }
-    window.planStudyOptions = {itemsFor: itemsFor, taskCaption: taskCaption, decorate: decorate};
+    window.planStudyOptions = {itemsFor: itemsFor, taskCaption: taskCaption, decorate: decorate, syncUsedSources: syncUsedSources};
   });
 })(window, document, window.jQuery);
