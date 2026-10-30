@@ -394,6 +394,10 @@
     if (task.lesson_type) {
       $task.attr('data-lesson-type', task.lesson_type);
     }
+    if (type === 'مطالعه') {
+      $task.attr('data-study-mode', task.study_mode === 'test' ? 'test' : 'study');
+      $task.attr('data-study-items', JSON.stringify(Array.isArray(task.study_items) ? task.study_items : []));
+    }
 
     $task.append(createButton('remove-btn', '✖', 'حذف'));
 
@@ -453,6 +457,8 @@
       chapter_id: $task.find('.task-chapter').val() || null,
       chapter_text: $task.find('.task-chapter option:selected').text() || '',
       optional_tests_count: Number($task.find('.task-extra').val()) || 0,
+      study_mode: $task.attr('data-study-mode') === 'test' ? 'test' : 'study',
+      study_items: (function () { try { return JSON.parse($task.attr('data-study-items') || '[]'); } catch (error) { return []; } })(),
       duration_minutes: duration,
       top: top
     };
@@ -655,7 +661,7 @@
           }
           $target.append($newTask);
           initCalendarTask($newTask);
-          if (consumeSource) {
+          if (consumeSource || $source.hasClass('other-plan-task')) {
             $source.remove();
           }
         }
