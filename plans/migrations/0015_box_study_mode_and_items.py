@@ -18,4 +18,9 @@ class Migration(migrations.Migration):
             name="study_items",
             field=models.JSONField(blank=True, default=list),
         ),
+        migrations.AddField(
+            model_name="box",
+            name="source_detail_id",
+            field=models.PositiveIntegerField(blank=True, null=True),
+        ),
     ]
