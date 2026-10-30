@@ -671,7 +671,10 @@
           }
           $target.append($newTask);
           initCalendarTask($newTask);
-          if (consumeSource || $source.hasClass('other-plan-task')) {
+          if ($source.hasClass('other-plan-task')) {
+            // Keep a hidden source so undoing a calendar placement can restore it.
+            $source.addClass('plan-used-other-task').hide();
+          } else if (consumeSource) {
             $source.remove();
           }
         }
