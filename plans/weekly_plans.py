@@ -170,6 +170,7 @@ def _serialize_detail(detail: WeeklyReportDetail) -> dict[str, Any]:
         ),
         "study_mode": box.study_mode or "study",
         "study_items": box.study_items or [],
+        "source_detail_id": box.source_detail_id,
         "optional_tests_count": box.optional_tests_count or 0,
         "extra": box.optional_tests_count or 0,
         "duration_minutes": box.duration_minutes or int(
