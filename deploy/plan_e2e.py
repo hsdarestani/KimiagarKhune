@@ -422,6 +422,37 @@ def main() -> int:
         }""")
         require(report_contract, "weekly PDF starts with seven days then volumetric planning")
 
+        study.locator('.task-title').click()
+        page.keyboard.press('KeyD')
+        original_top = study.evaluate("el => Number.parseFloat(el.style.top)")
+        study.locator('.copy-box-btn').click()
+        copy_payload = page.evaluate("window.jQuery('.plan-copied-palette').first().data('planCopyPayload')")
+        require(copy_payload['study_mode'] == 'review' and copy_payload['optional_tests_count'] == 40,
+                'copy creates a palette snapshot with the exact activity and count')
+        require(len(copy_payload['study_items']) == 1,
+                'copy palette snapshot includes combined chapters')
+        study.locator('.plan-mode-choice[data-mode="study"]').click()
+        drop_palette(page, '.plan-copied-palette', 4, int(original_top))
+        require(page.locator('.plan-copied-palette').count() == 1,
+                'a rejected overlapping drop keeps the copied palette box')
+        drop_palette(page, '.plan-copied-palette', 5, 500)
+        pasted = page.locator('.calendar .day-column').nth(5).locator('.calendar-task[data-box-type="مطالعه"]').last
+        require(pasted.get_attribute('data-study-mode') == 'review' and
+                pasted.locator('.task-extra').input_value() == '40' and
+                __import__('json').loads(pasted.get_attribute('data-study-items')) == copy_payload['study_items'] and
+                pasted.get_attribute('data-duration-minutes') == str(copy_payload['duration_minutes']),
+                'dropping a copied study box preserves chapters, activity, count and duration')
+        require(study.get_attribute('data-study-mode') == 'study' and
+                study.evaluate("el => Number.parseFloat(el.style.top)") == original_top,
+                'the original study box stays independent and in place')
+        require(page.locator('.plan-copied-palette').count() == 0,
+                'successful placement consumes only the copied palette box')
+        event.locator('.copy-box-btn').click()
+        require(page.evaluate("window.jQuery('.plan-copied-palette').first().data('planCopyPayload').title") == 'جلسه E2E',
+                'event copies capture the live edited title')
+        drop_palette(page, '.plan-copied-palette', 5, 350)
+        require(page.locator('.calendar .day-column').nth(5).locator('.calendar-task[data-box-type="ایونت"]').count() == 1,
+                'event copies retain their event type when dropped from the assignment palette')
         before_repeat = page.locator(
             '.calendar-task[data-box-type="مطالعه"]'
         ).count()

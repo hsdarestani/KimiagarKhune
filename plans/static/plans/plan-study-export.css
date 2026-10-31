@@ -113,3 +113,6 @@
 .plan-chapter-option-row .plan-chapter-option-text {flex:1;min-width:0}
 .plan-chapter-add {flex:0 0 28px;width:28px;height:28px;border:1px solid #a5dac0;border-radius:7px;background:#e9f8ef;color:#14844a;font:bold 20px/1 sans-serif;cursor:pointer}
 .plan-chapter-add.is-selected {background:#16834d;color:white}
+
+.calendar .calendar-task .copy-box-btn {position:absolute;top:2px;left:57px;z-index:4;min-height:20px;padding:2px 5px;font:800 8px Vazir,sans-serif;border:1px solid #bddad5;border-radius:7px;background:#effaf6;color:#0f766e;cursor:pointer}
+.plan-copied-palette {border:1px dashed #478d79!important;cursor:grab;white-space:normal!important;overflow-wrap:anywhere;font-size:11px!important}

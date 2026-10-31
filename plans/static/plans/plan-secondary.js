@@ -127,6 +127,7 @@
 
     $task.append($('<button type="button" class="remove-btn" title="حذف">✖</button>'));
     $task.append($('<button type="button" class="repeat-btn" title="تکرار شونده">تکرار</button>'));
+    $task.append($('<button type="button" class="copy-box-btn" title="کپی در باکس‌های بالای تقویم">کپی</button>'));
     $task.append($('<div class="task-title"></div>').text(lessonName));
 
     const $info = $('<div class="task-info"></div>');
