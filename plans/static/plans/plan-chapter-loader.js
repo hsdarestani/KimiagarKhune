@@ -31,7 +31,8 @@
   }
   function chapterTemplate(item, $task) {
     if (!item || item.loading || !item.id) return item && item.text ? item.text : '';
-    const $row = $('<span class="plan-chapter-option-row"></span>');
+    const $row = $('<span class="plan-chapter-option-row"></span>')
+      .attr('data-chapter-id',item.id).attr('data-chapter-text',item.text).data('planTask',$task[0]);
     $row.append($('<span class="plan-chapter-option-text"></span>').text(String(item.text || '').trim()));
     const selected = String($task.find('.task-chapter').val() || '') === String(item.id) ||
       extraChapters($task).some(entry => String(entry.lesson_id) === String($task.attr('data-lesson-id')) && String(entry.chapter_id) === String(item.id));
@@ -75,9 +76,19 @@
   // Capture before Select2's row-level mouseup handler closes/selects the result.
   ['mousedown','mouseup','click'].forEach(type => document.addEventListener(type, function (event) {
     const button = event.target.closest && event.target.closest('.plan-chapter-add');
-    if (!button) return;
+    const row = event.target.closest && event.target.closest('.plan-chapter-option-row');
+    if (!button && !row) return;
     event.preventDefault(); event.stopImmediatePropagation();
-    if (type === 'click') appendChapter(button);
+    if (button) { if (type === 'click') appendChapter(button); return; }
+    if (type !== 'mouseup' || window.readOnlyMode) return;
+    const $row = $(row), $task = $($row.data('planTask'));
+    const $select = $task.find('.task-chapter').first();
+    const id = $row.attr('data-chapter-id'), text = $row.attr('data-chapter-text');
+    if (!$select.find('option').filter(function () { return this.value === String(id); }).length)
+      $select.append(new Option(text,id));
+    $select.val(id).trigger('change');
+    $select.select2('close');
+    $select.trigger({type:'select2:select', params:{data:{id:id,text:text}}});
   }, true));
 
   function activeChapterDropdown() {
