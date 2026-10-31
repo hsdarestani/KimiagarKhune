@@ -216,6 +216,9 @@
     if (!$task || !$task.length) {
       return;
     }
+    if (!$task.children('.copy-box-btn').length) {
+      $task.append(createButton('copy-box-btn', 'کپی', 'کپی در باکس‌های بالای تقویم'));
+    }
 
     if ($task.hasClass('ui-draggable')) {
       $task.draggable('destroy');
@@ -440,6 +443,7 @@
       $task.css('background-color', window.subjectColors[task.lesson_name]);
     }
 
+    if (task.copy_color) $task.css('background-color', task.copy_color);
     initCalendarTask($task);
     return $task;
   }
@@ -455,6 +459,7 @@
       end: formatClock(startMinutes + duration) + ':00',
       box_type: $task.attr('data-box-type') || 'مطالعه',
       lesson_id: $task.attr('data-lesson-id') || null,
+      lesson_name: $task.attr('data-lesson-name') || '',
       lesson_type: $task.attr('data-lesson-type') || '',
       grade: $task.attr('data-grade') || null,
       chapter_id: $task.find('.task-chapter').val() || null,
@@ -611,7 +616,10 @@
           let consumeSource = false;
           const sourceTitle = String($source.text() || '').trim();
 
-          if ($source.hasClass('exam-task')) {
+          if ($source.hasClass('plan-copied-palette')) {
+            task = Object.assign({}, $source.data('planCopyPayload'), {top:desiredTop, source_detail_id:null});
+            consumeSource = true;
+          } else if ($source.hasClass('exam-task')) {
             task = {
               title: sourceTitle,
               box_type: 'ایونت',
@@ -814,6 +822,7 @@
         ? moment(check.week_end, 'YYYY-MM-DD')
         : start.clone().add(6, 'days');
 
+      if (state.studentId && state.studentId !== String(studentId)) $('.plan-copied-palette').remove();
       state.studentId = String(studentId);
       state.start = start.clone();
       state.end = end.clone();
@@ -969,6 +978,30 @@
           .text('آمادگی و تکلیف ' + title);
         $('.assignments-box .task-list').append($assignment);
         initializePaletteDraggable($assignment);
+      })
+      .off('click.planRuntimeCopy', '.copy-box-btn')
+      .on('click.planRuntimeCopy', '.copy-box-btn', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (window.readOnlyMode || !state.loaded) return;
+        const $source = $(this).closest('.calendar-task');
+        const snapshot = JSON.parse(JSON.stringify(taskDataFromElement($source)));
+        snapshot.source_detail_id = null;
+        snapshot.copy_color = window.getComputedStyle($source[0]).backgroundColor;
+        const mode = {study:'مطالعه + تست آموزشی', test:'فقط تست', review:'مرور'}[snapshot.study_mode];
+        const label = [snapshot.title, snapshot.chapter_text,
+          (snapshot.study_items || []).map(item => item.chapter_text || item.lesson_name).filter(Boolean).join('، '),
+          snapshot.box_type === 'مطالعه' ? mode : '',
+          snapshot.optional_tests_count ? snapshot.optional_tests_count + ' تست' : '',
+          snapshot.duration_minutes + ' دقیقه'].filter(Boolean).join(' · ');
+        const $copy = $('<div class="task plan-copied-palette"></div>')
+          .text(label).attr('title',label).attr('data-box-type',snapshot.box_type)
+          .attr('data-duration-minutes',snapshot.duration_minutes)
+          .css('background-color',snapshot.copy_color).data('planCopyPayload',snapshot);
+        $('.assignments-box .task-list').append($copy);
+        initializePaletteDraggable($copy);
+        const $button = $(this).text('کپی شد');
+        window.setTimeout(function () { $button.text('کپی'); },900);
       })
       .off('click', '.repeat-btn')
       .on('click.planRuntime', '.repeat-btn', function (event) {
