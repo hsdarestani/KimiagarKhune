@@ -25,19 +25,60 @@
       .removeAttr('data-plan-chapter-error');
   }
 
-  function chapterTemplate(item) {
-    if (!item || item.loading) {
-      return item && item.text ? item.text : '';
-    }
-    return $('<span class="plan-chapter-option-text"></span>').text(
-      String(item.text || '').trim()
-    );
+  function extraChapters($task) {
+    try { return JSON.parse($task.attr('data-study-items') || '[]'); }
+    catch (_error) { return []; }
   }
-
+  function chapterTemplate(item, $task) {
+    if (!item || item.loading || !item.id) return item && item.text ? item.text : '';
+    const $row = $('<span class="plan-chapter-option-row"></span>');
+    $row.append($('<span class="plan-chapter-option-text"></span>').text(String(item.text || '').trim()));
+    const selected = String($task.find('.task-chapter').val() || '') === String(item.id) ||
+      extraChapters($task).some(entry => String(entry.lesson_id) === String($task.attr('data-lesson-id')) && String(entry.chapter_id) === String(item.id));
+    $row.append($('<button type="button" class="plan-chapter-add"></button>')
+      .text(selected ? '✓' : '+').attr('aria-label', 'اضافه کردن فصل ' + item.text)
+      .attr('data-chapter-id',item.id).attr('data-chapter-text',item.text)
+      .toggleClass('is-selected',selected).data('planTask',$task[0]));
+    return $row;
+  }
   function chapterSelection(item) {
     const text = String((item && item.text) || '').trim();
-    return text || 'انتخاب سرفصل';
+    const $task = $(this).closest('.calendar-task');
+    const extras = extraChapters($task).filter(entry => String(entry.lesson_id) === String($task.attr('data-lesson-id')));
+    return (text || 'انتخاب سرفصل') + extras.map(entry => ' + ' + entry.chapter_text).join('');
   }
+  function appendChapter(button) {
+    const $button = $(button), $task = $($button.data('planTask'));
+    if (!$task.length || window.readOnlyMode) return;
+    const $select = $task.find('.task-chapter').first();
+    const id = String($button.attr('data-chapter-id'));
+    const text = $button.attr('data-chapter-text');
+    const lesson = String($task.attr('data-lesson-id'));
+    if (!$select.val()) {
+      $select.append(new Option(text,id,true,true)).trigger('change');
+    } else if (String($select.val()) !== id) {
+      const items = extraChapters($task);
+      const index = items.findIndex(entry => String(entry.lesson_id) === lesson && String(entry.chapter_id) === id);
+      if (index >= 0) items.splice(index,1);
+      else {
+        if (items.length >= 12) { window.alert('حداکثر ۱۲ فصل یا درس اضافه قابل انتخاب است.'); return; }
+        items.push({lesson_id:lesson, lesson_name:$task.attr('data-lesson-name') || $task.find('.task-title').text(),
+          grade_id:$task.attr('data-grade'), chapter_id:id, chapter_text:text});
+      }
+      $task.attr('data-study-items',JSON.stringify(items));
+    }
+    const selected = String($select.val()) === id || extraChapters($task).some(entry => String(entry.lesson_id) === lesson && String(entry.chapter_id) === id);
+    $button.text(selected ? '✓' : '+').toggleClass('is-selected',selected);
+    $select.trigger('change.select2');
+    if (window.planStudyOptions) window.planStudyOptions.refresh($task);
+  }
+  // Capture before Select2's row-level mouseup handler closes/selects the result.
+  ['mousedown','mouseup','click'].forEach(type => document.addEventListener(type, function (event) {
+    const button = event.target.closest && event.target.closest('.plan-chapter-add');
+    if (!button) return;
+    event.preventDefault(); event.stopImmediatePropagation();
+    if (type === 'click') appendChapter(button);
+  }, true));
 
   function activeChapterDropdown() {
     return $('.select2-dropdown.plan-chapter-dropdown:visible').last();
@@ -172,8 +213,8 @@
       width: '100%',
       theme: 'bootstrap-5',
       allowClear: true,
-      templateResult: chapterTemplate,
-      templateSelection: chapterSelection,
+      templateResult: function (item) { return chapterTemplate(item, $task); },
+      templateSelection: function (item) { return chapterSelection.call($select[0], item); },
       escapeMarkup: function (markup) { return markup; },
       language: {
         errorLoading: function () { return 'بارگذاری سرفصل‌ها انجام نشد'; },
@@ -220,7 +261,19 @@
 
     $select
       .off('.planChapterVisibility')
-      .on('select2:open.planChapterVisibility', settleChapterDropdown);
+      .on('select2:open.planChapterVisibility', settleChapterDropdown)
+      .on('select2:select.planChapterVisibility', function () {
+        const lesson = String($task.attr('data-lesson-id'));
+        $task.attr('data-study-items',JSON.stringify(extraChapters($task).filter(entry => String(entry.lesson_id) !== lesson)));
+        if (window.planStudyOptions) window.planStudyOptions.refresh($task);
+        $select.trigger('change.select2');
+        window.setTimeout(function () {
+          if (window.readOnlyMode) return;
+          const $tests = $task.find('.task-extra').first();
+          if ($tests.hasClass('select2-hidden-accessible')) $tests.select2('open');
+          else $tests.trigger('focus');
+        }, 0);
+      });
 
     $select.attr('data-plan-chapter-loader-version', VERSION);
   }

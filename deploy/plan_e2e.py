@@ -388,6 +388,22 @@ def main() -> int:
           return !$task.find('.task-extra').val();
         }""")
         require(selected_chapter, 'selecting a chapter does not automatically assign 25 tests')
+        study.locator('.select2-selection').first.click()
+        page.locator('.plan-chapter-add').nth(2).wait_for(state='visible')
+        page.locator('.plan-chapter-add').nth(1).click()
+        require(page.locator('.plan-chapter-add').nth(2).is_visible(),
+                'green plus keeps the chapter list open')
+        page.locator('.plan-chapter-add').nth(2).click()
+        require(len(__import__('json').loads(study.get_attribute('data-study-items') or '[]')) == 2,
+                'two green plus clicks add two chapters to the primary chapter')
+        page.locator('.plan-chapter-option-text').first.click()
+        require(study.get_attribute('data-study-items') == '[]',
+                'clicking the chapter name selects that chapter alone')
+        page.keyboard.press('Escape')
+        study.locator('.select2-selection').first.click()
+        page.locator('.plan-chapter-add').nth(1).wait_for(state='visible')
+        page.locator('.plan-chapter-add').nth(1).click()
+        page.keyboard.press('Escape')
         study.locator('.task-extra').select_option('40')
         page.keyboard.press('Tab')
         study.locator('.task-title').click()
@@ -505,6 +521,14 @@ def main() -> int:
             "reloaded boxes remain draggable and resizable",
         )
 
+        first_study = page.locator('.calendar-task[data-box-type="مطالعه"]').first
+        first_study.locator('.task-title').click()
+        first_study.locator('.plan-multi-edit').click()
+        page.locator('.plan-multi-panel').wait_for(state='visible')
+        lesson_labels = ' '.join(page.locator('.plan-multi-lesson option').all_text_contents())
+        require(all(grade in lesson_labels for grade in ['دهم','یازدهم','دوازدهم']),
+                'additional lesson chooser includes every allowed grade for a twelfth-grade student')
+        page.get_by_role('button', name='انصراف', exact=True).click()
         page.select_option("#otherStudentSelect", label=STUDENT_LABEL)
         page.wait_for_function(
             "window.jQuery('#otherStudentTasks .other-plan-task').length > 0",
@@ -521,6 +545,11 @@ def main() -> int:
             """,
             timeout=10_000,
         )
+        source_origin = page.evaluate("""() => {
+          const $source = window.jQuery('#otherStudentTasks .other-plan-task').first();
+          $source.data('study_mode','review');
+          return String($source.data('source_detail_id'));
+        }""")
         before_other_drop = page.locator(
             '.calendar-task[data-box-type="مطالعه"]'
         ).count()
@@ -547,6 +576,12 @@ def main() -> int:
             "another student's box keeps chapter and test controls",
         )
 
+        require(copied_study.get_attribute('data-study-mode') == 'review',
+                'real other-student drop preserves review mode')
+        require(copied_study.get_attribute('data-source-detail-id') == source_origin,
+                'real other-student drop preserves the source identity')
+        require(not page.locator('#otherStudentTasks .other-plan-task').first.is_visible(),
+                'successfully reused source is removed from the visible lesson list')
         assert_report_download(page, "#download-week-output", "")
         assert_report_download(page, "#download-week-summary", "حجمی")
         assert_report_download(page, "#download-empty-matrix", "ماتریس")

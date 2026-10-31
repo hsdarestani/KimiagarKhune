@@ -108,3 +108,8 @@
 .calendar .calendar-task.plan-study-selected {outline:2px solid #174961;outline-offset:1px}
 .calendar .plan-study-tools kbd {font:700 10px monospace;padding:1px 4px;border:1px solid currentColor;border-radius:3px;margin-inline-start:4px}
 .calendar .calendar-task[data-study-mode="review"]::after {content:"مرور";position:absolute;bottom:3px;right:4px;background:#fff;color:#174961;font:700 8px Vazir,sans-serif;padding:1px 3px;border-radius:4px}
+
+.plan-chapter-option-row {display:flex;direction:rtl;align-items:center;gap:10px;width:100%}
+.plan-chapter-option-row .plan-chapter-option-text {flex:1;min-width:0}
+.plan-chapter-add {flex:0 0 28px;width:28px;height:28px;border:1px solid #a5dac0;border-radius:7px;background:#e9f8ef;color:#14844a;font:bold 20px/1 sans-serif;cursor:pointer}
+.plan-chapter-add.is-selected {background:#16834d;color:white}
