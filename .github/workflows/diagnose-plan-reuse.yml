@@ -1,0 +1,36 @@
+name: Diagnose successive Plan reuse
+on:
+  pull_request:
+    paths:
+      - 'deploy/plan_reuse_sequence_e2e.py'
+      - '.github/workflows/diagnose-plan-reuse.yml'
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: |
+          pip install -q playwright
+          python -m playwright install --with-deps chromium
+      - name: Read-only real mouse sequence on deployed app
+        env:
+          PLAN_BASE_URL: https://panel.kimiagarkhoone.com
+          PLAN_USERNAME: ${{ secrets.DJANGO_ADMIN_USERNAME }}
+          PLAN_PASSWORD: ${{ secrets.DJANGO_ADMIN_PASSWORD }}
+          PLAN_TEST_WEEK: 1499-04-01
+          PLAN_STUDENT_LABEL: نمونه تجربی دوازدهم
+        run: python deploy/plan_reuse_sequence_e2e.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: plan-reuse-sequence
+          path: |
+            plan-reuse-sequence.png
+            plan-reuse-sequence.json
+          retention-days: 3
