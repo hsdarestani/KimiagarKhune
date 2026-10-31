@@ -21,7 +21,8 @@ def main():
         clear_calendar(page)
         source = page.evaluate("""() => Array.from(document.querySelector('#otherStudentSelect').options).find(o=>o.text.includes('الزهرا') && o.text.includes('تجربی'))?.value""")
         if not source: raise AssertionError('Requested Alzahra experimental source was not found')
-        page.select_option('#otherStudentSelect',value=source)
+        page.click('#other-plan-tab')
+        page.select_option('#otherStudentSelect',value=source,force=True)
         page.wait_for_function("window.jQuery('#otherStudentTasks > .other-plan-task').length >= 4")
         page.wait_for_load_state('networkidle')
         page.evaluate("""() => {
