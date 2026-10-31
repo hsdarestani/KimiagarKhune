@@ -9,7 +9,7 @@ from plan_e2e import load_test_week, clear_calendar
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width":1800,"height":1200}, locale="fa-IR")
+        page = browser.new_page(viewport={"width":1280,"height":800}, locale="fa-IR")
         page.on('dialog', lambda d: d.accept())
         page.goto(os.environ.get('PLAN_BASE_URL','https://panel.kimiagarkhoone.com')+'/login/',wait_until='domcontentloaded')
         page.fill('#username',os.environ.get('PLAN_USERNAME') or 'admin')
