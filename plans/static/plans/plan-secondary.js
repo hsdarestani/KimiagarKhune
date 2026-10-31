@@ -116,6 +116,9 @@
       .attr('data-lesson-name', lessonName)
       .attr('data-lesson-type', taskData.lesson_type || $source.attr('data-lesson-type') || 'عمومی')
       .attr('data-grade', taskData.grade_id || taskData.grade || $source.attr('data-grade') || '')
+      .attr('data-study-mode', ['test', 'review'].includes(taskData.study_mode) ? taskData.study_mode : 'study')
+      .attr('data-study-items', JSON.stringify(Array.isArray(taskData.study_items) ? taskData.study_items : []))
+      .attr('data-source-detail-id', taskData.source_detail_id || $source.attr('data-source-detail-id') || '')
       .css({
         top: top + 'px',
         height: height + 'px',
@@ -154,6 +157,7 @@
     $('#otherStudentTasks .other-plan-task').each(function () {
       const $task = $(this);
       const data = $task.data() || {};
+      if (data.source_detail_id) $task.attr('data-source-detail-id', data.source_detail_id);
       if (data.lesson_id) $task.attr('data-lesson-id', data.lesson_id);
       if (data.lesson_name) $task.attr('data-lesson-name', data.lesson_name);
       if (data.lesson_type) $task.attr('data-lesson-type', data.lesson_type);

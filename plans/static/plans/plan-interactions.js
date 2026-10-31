@@ -310,6 +310,7 @@
           const $created = window.planSecondaryBuildOtherPlanTask($source, $target, top);
           if ($created && $created.length) {
             initializeTask($created);
+            $source.data('planDropAccepted', true).addClass('plan-used-other-task').hide();
             return true;
           }
         }

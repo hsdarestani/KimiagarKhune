@@ -160,3 +160,21 @@ class PlanStudyOptionsTests(TestCase):
             self.assertEqual(task["study_mode"], "review")
             self.assertEqual(task["optional_tests_count"], 0)
             self.assertEqual(task["study_items"][0]["chapter_id"], self.reactions.pk)
+
+    def test_multiple_chapters_of_one_lesson_keep_activity_and_source(self):
+        second = Chapter.objects.create(lesson=self.physics, chapter_number=2, name="دینامیک")
+        third = Chapter.objects.create(lesson=self.physics, chapter_number=3, name="انرژی")
+        items = [{"lesson_id": self.physics.pk, "chapter_id": chapter.pk} for chapter in (second,third)]
+        for mode in ("study", "test", "review"):
+            with self.subTest(mode=mode):
+                payload = self.payload(mode=mode, items=items)
+                payload["days"][0]["tasks"][0]["source_detail_id"] = 321
+                response = self.save(payload)
+                self.assertEqual(response.status_code, 200, response.content)
+                for endpoint, params in [
+                    ("/get-weekly-report-details/", {"student_id":self.student.pk,"week_start":"2039-01-01"}),
+                    ("/get-last-weekly-report/", {"student_id":self.student.pk}),
+                ]:
+                    task = self.client.get(endpoint,params).json()["tasks"][0]
+                    self.assertEqual(task["study_mode"],mode)
+                    self.assertEqual([item["chapter_id"] for item in task["study_items"]],[second.pk,third.pk])

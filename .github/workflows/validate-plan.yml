@@ -34,6 +34,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Use the supported Django Python runtime
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
       - name: Validate Plan source syntax
         run: |
           node --check plans/static/plans/plan-performance-guard.js

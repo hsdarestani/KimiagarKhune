@@ -156,9 +156,20 @@
     }
   }
 
-  function showEditor($task) {
+  async function showEditor($task) {
     $('.plan-multi-backdrop').remove();
-    var options = lessonOptions();
+    var studentId = String((window.planRuntimeState || {}).studentId || $('#student-select').val() || '');
+    var options;
+    try {
+      var catalog = await $.getJSON('/get-lessons-for-student/', {student_id:studentId});
+      if (studentId !== String((window.planRuntimeState || {}).studentId || $('#student-select').val() || '')) return;
+      options = (catalog.specialized_lessons || []).concat(catalog.general_lessons || []).map(function (lesson) {
+        return {lesson_id:String(lesson.id), lesson_name:lesson.name, grade_id:lesson.grade_id, grade:lesson.grade};
+      });
+    } catch (_error) {
+      window.alert('بارگذاری فهرست کامل درس‌ها انجام نشد؛ دوباره تلاش کنید.');
+      return;
+    }
     if (!options.length) {
       window.alert('اول فهرست درس‌های دانش‌آموز را بارگذاری کنید.');
       return;
@@ -307,6 +318,6 @@
         syncUsedSources();
       }).observe(calendar, {childList: true, subtree: true});
     }
-    window.planStudyOptions = {itemsFor: itemsFor, taskCaption: taskCaption, decorate: decorate, syncUsedSources: syncUsedSources};
+    window.planStudyOptions = {itemsFor: itemsFor, taskCaption: taskCaption, decorate: decorate, syncUsedSources: syncUsedSources, refresh: updateControls};
   });
 })(window, document, window.jQuery);
