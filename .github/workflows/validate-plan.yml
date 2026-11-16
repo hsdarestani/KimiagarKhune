@@ -116,6 +116,7 @@ jobs:
           .venv/bin/python manage.py test \
             plans.test_plan_runtime \
             plans.test_plan_persistence \
+            plans.test_school_event_sync \
             plans.test_study_options \
             plans.test_plan_secondary \
             plans.test_plan_defaults \
