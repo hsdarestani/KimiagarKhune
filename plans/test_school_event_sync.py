@@ -28,12 +28,12 @@ class SchoolScheduleRegressionTests(TestCase):
         )
         self.client.force_login(user)
 
-    def save(self, start, end, event_tasks, events_were_loaded=False):
+    def save(self, start, end, event_tasks, removed_days=None):
         payload = {
             "student_id": self.student.pk,
             "week_start": start,
             "week_end": end,
-            "events_were_loaded": events_were_loaded,
+            "removed_recurring_event_days": removed_days or [],
             "days": [
                 {
                     "day": day,
@@ -80,9 +80,9 @@ class SchoolScheduleRegressionTests(TestCase):
             report=first, box__name="مدرسه قدیمی"
         ).exists())
 
-        # Saving a subsequent week with no events deactivates all old classes,
+        # Explicitly removing the loaded event on Monday deactivates that class,
         # without destroying historical reports or reintroducing legacy events.
-        self.save("2039-04-16", "2039-04-22", [], events_were_loaded=True)
+        self.save("2039-04-16", "2039-04-22", [], removed_days=["دوشنبه"])
         self.assertEqual(self.default_events(), [])
         self.assertTrue(WeeklyReportDetail.objects.filter(
             report=first, box__name="مدرسه قدیمی"
@@ -100,7 +100,7 @@ class SchoolScheduleRegressionTests(TestCase):
             "start_time": "08:00", "end_time": "09:00",
         }])
 
-    def test_complete_week_save_updates_other_days_recurring(self):
+    def test_adding_monday_class_preserves_thursday_recurrence(self):
         DefaultEvent.objects.create(
             student=self.student,
             name="کلاس پنجشنبه",
@@ -112,8 +112,8 @@ class SchoolScheduleRegressionTests(TestCase):
             "title": "کلاس دوشنبه",
             "start": "10:00", "end": "11:00", "box_type": "ایونت",
         }])
-        # A complete seven-day save intentionally replaces Thursday too.
-        self.assertFalse(DefaultEvent.objects.get(
+        # An event added on Monday must never erase Thursdays recurring class.
+        self.assertTrue(DefaultEvent.objects.get(
             student=self.student, name="کلاس پنجشنبه"
         ).is_active)
 
