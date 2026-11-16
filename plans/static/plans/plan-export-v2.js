@@ -116,7 +116,8 @@
     };
   }
   function collect(start) {
-    var $columns = $('.calendar-wrapper .day-column');
+    // Export only the actual interactive calendar, not a stale clone.
+    var $columns = $('.calendar > .day-column');
     var byName = {};
     $columns.each(function () {
       byName[normalize($(this).attr('data-day'))] = this;
@@ -262,6 +263,12 @@
     return [page('ماتریس ثبت عملکرد',html,1,1,start)];
   }
   async function download(kind, button) {
+    var runtime = window.planRuntimeState || {};
+    if (runtime.loading || runtime.saving ||
+        String(runtime.studentId || '') !== String($('#student-select').val() || '')) {
+      window.alert('ابتدا برنامه همین دانش‌آموز را کامل بارگذاری کنید و ذخیره را به پایان برسانید.');
+      return;
+    }
     var start = selectedStart();
     if (!start) {
       window.alert('ابتدا هفته و دانش‌آموز را بارگذاری کنید.');
