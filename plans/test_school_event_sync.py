@@ -28,11 +28,12 @@ class SchoolScheduleRegressionTests(TestCase):
         )
         self.client.force_login(user)
 
-    def save(self, start, end, event_tasks):
+    def save(self, start, end, event_tasks, removed_days=None):
         payload = {
             "student_id": self.student.pk,
             "week_start": start,
             "week_end": end,
+            "removed_recurring_event_days": removed_days or [],
             "days": [
                 {
                     "day": day,
@@ -57,6 +58,13 @@ class SchoolScheduleRegressionTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         return response.json()
 
+    def monday_events(self):
+        """Only the updated school day; other days are intentionally retained."""
+        return [
+            event for event in self.default_events()
+            if event["day_of_week"] == "دوشنبه"
+        ]
+
     def test_rescheduling_school_class_does_not_restore_old_schedule(self):
         first = self.save("2039-04-02", "2039-04-08", [{
             "title": "مدرسه قدیمی",
@@ -66,7 +74,7 @@ class SchoolScheduleRegressionTests(TestCase):
             "title": "مدرسه جدید",
             "start": "09:15", "end": "10:45", "box_type": "ایونت",
         }])
-        self.assertEqual(self.default_events(), [{
+        self.assertEqual(self.monday_events(), [{
             "name": "مدرسه جدید",
             "day_of_week": "دوشنبه",
             "start_time": "09:15",
@@ -79,15 +87,27 @@ class SchoolScheduleRegressionTests(TestCase):
             report=first, box__name="مدرسه قدیمی"
         ).exists())
 
-        # Saving a subsequent week with no events deactivates all old classes,
+        # Explicitly removing the loaded event on Monday deactivates that class,
         # without destroying historical reports or reintroducing legacy events.
-        self.save("2039-04-16", "2039-04-22", [])
-        self.assertEqual(self.default_events(), [])
+        self.save("2039-04-16", "2039-04-22", [], removed_days=["دوشنبه"])
+        self.assertEqual(self.monday_events(), [])
         self.assertTrue(WeeklyReportDetail.objects.filter(
             report=first, box__name="مدرسه قدیمی"
         ).exists())
 
-    def test_complete_week_save_updates_other_days_recurring(self):
+    def test_study_only_week_does_not_clear_existing_school_recurrence(self):
+        self.save("2039-04-02", "2039-04-08", [{
+            "title": "مدرسه ثابت",
+            "start": "08:00", "end": "09:00", "box_type": "ایونت",
+        }])
+        self.save("2039-04-09", "2039-04-15", [])
+        self.assertEqual(self.monday_events(), [{
+            "name": "مدرسه ثابت",
+            "day_of_week": "دوشنبه",
+            "start_time": "08:00", "end_time": "09:00",
+        }])
+
+    def test_adding_monday_class_preserves_thursday_recurrence(self):
         DefaultEvent.objects.create(
             student=self.student,
             name="کلاس پنجشنبه",
@@ -99,8 +119,8 @@ class SchoolScheduleRegressionTests(TestCase):
             "title": "کلاس دوشنبه",
             "start": "10:00", "end": "11:00", "box_type": "ایونت",
         }])
-        # A complete seven-day save intentionally replaces Thursday too.
-        self.assertFalse(DefaultEvent.objects.get(
+        # An event added on Monday must never erase Thursdays recurring class.
+        self.assertTrue(DefaultEvent.objects.get(
             student=self.student, name="کلاس پنجشنبه"
         ).is_active)
 

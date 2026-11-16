@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 
 from plans import lesson_catalog, weekly_plans_v2
 from plans.models import DefaultEvent, WeeklyReport, WeeklyReportDetail
-from plans.weekly_plans import _parse_clock
+from plans.weekly_plans import _parse_clock, normalize_day_name
 
 
 def _sync_recurring_events(student_id: int, payload: dict) -> None:
@@ -20,8 +20,9 @@ def _sync_recurring_events(student_id: int, payload: dict) -> None:
     """
     desired = set()
     submitted_days = set()
+    available_days = set()
     for day_name, _is_disabled, tasks in weekly_plans_v2._normalized_days(payload):
-        submitted_days.add(day_name)
+        available_days.add(day_name)
         for task in tasks:
             if not isinstance(task, dict):
                 continue
@@ -31,12 +32,24 @@ def _sync_recurring_events(student_id: int, payload: dict) -> None:
             end_time = _parse_clock(task.get("end"))
             if start_time is None or end_time is None:
                 continue
+            submitted_days.add(day_name)
             desired.add((
                 str(task.get("title") or "").strip() or "ایونت",
                 day_name,
                 start_time,
                 end_time,
             ))
+
+    # Clearing the last event on a day must be explicit. An unrelated
+    # study-only week must not deactivate the student's recurring school class.
+    cleared_days = payload.get("removed_recurring_event_days") or []
+    if isinstance(cleared_days, list):
+        for raw_day in cleared_days:
+            canonical_day = normalize_day_name(raw_day)
+            if canonical_day in available_days:
+                submitted_days.add(canonical_day)
+    if not submitted_days:
+        return
 
     retained_ids = []
     for name, day_name, start_time, end_time in sorted(desired):
@@ -53,11 +66,12 @@ def _sync_recurring_events(student_id: int, payload: dict) -> None:
             event.save(update_fields=["is_active"])
         retained_ids.append(event.pk)
 
-    # Each submitted day is authoritative, even when all its events were removed.
-    # Partial-day saves leave recurring events on other days untouched.
+    # Only days containing an event or explicitly cleared are authoritative;
+    # all unrelated recurring days stay untouched.
     DefaultEvent.objects.filter(
         student_id=student_id, day_of_week__in=submitted_days
     ).exclude(pk__in=retained_ids).update(is_active=False)
+
 
 @login_required
 @require_POST
