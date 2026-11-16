@@ -87,7 +87,7 @@ class SchoolScheduleRegressionTests(TestCase):
             report=first, box__name="مدرسه قدیمی"
         ).exists())
 
-    def test_partial_day_save_leaves_other_days_recurring(self):
+    def test_complete_week_save_updates_other_days_recurring(self):
         DefaultEvent.objects.create(
             student=self.student,
             name="کلاس پنجشنبه",
