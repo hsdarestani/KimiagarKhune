@@ -42,6 +42,7 @@
     loaded: false,
     loading: false,
     saving: false,
+    hadLoadedEvents: false,
     reportId: null,
     studentId: null,
     start: null,
@@ -867,6 +868,7 @@
       }
 
       initializeDroppables();
+      state.hadLoadedEvents = $('.calendar > .day-column .calendar-task[data-box-type="ایونت"]').length > 0;
       $('#pageOverlay').remove();
       $('.save-btn').prop('disabled', false).text('ذخیره');
     } catch (error) {
@@ -905,6 +907,7 @@
       week_start: state.start.format('YYYY-MM-DD'),
       week_end: state.end.format('YYYY-MM-DD'),
       important_events: $('#important-events').val() || '',
+      events_were_loaded: state.hadLoadedEvents,
       days: days
     };
   }
@@ -945,6 +948,9 @@
         data: JSON.stringify(payload)
       });
       state.reportId = response.report_id || state.reportId;
+      state.hadLoadedEvents = payload.days.some(function (day) {
+        return day.tasks.some(function (task) { return task.box_type === 'ایونت'; });
+      });
       window.alert('برنامه با موفقیت ذخیره شد.');
     } catch (error) {
       console.error(error);
