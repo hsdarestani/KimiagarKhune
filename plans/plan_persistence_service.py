@@ -38,6 +38,12 @@ def _sync_recurring_events(student_id: int, payload: dict) -> None:
                 end_time,
             ))
 
+    # A study-only week without any previously loaded school events does not
+    # redefine the recurring timetable. In particular it must not erase
+    # recurring classes on unrelated school weeks.
+    if not desired and payload.get("events_were_loaded") is not True:
+        return
+
     retained_ids = []
     for name, day_name, start_time, end_time in sorted(desired):
         event, created = DefaultEvent.objects.get_or_create(
@@ -58,6 +64,7 @@ def _sync_recurring_events(student_id: int, payload: dict) -> None:
     DefaultEvent.objects.filter(
         student_id=student_id, day_of_week__in=submitted_days
     ).exclude(pk__in=retained_ids).update(is_active=False)
+
 
 @login_required
 @require_POST
