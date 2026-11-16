@@ -42,7 +42,7 @@
     loaded: false,
     loading: false,
     saving: false,
-    hadLoadedEvents: false,
+    loadedEventDays: [],
     reportId: null,
     studentId: null,
     start: null,
@@ -868,7 +868,9 @@
       }
 
       initializeDroppables();
-      state.hadLoadedEvents = $('.calendar > .day-column .calendar-task[data-box-type="ایونت"]').length > 0;
+      state.loadedEventDays = $('.calendar > .day-column').filter(function () {
+        return $(this).find('.calendar-task[data-box-type="ایونت"]').length > 0;
+      }).map(function () { return normalizeDay($(this).attr('data-day')); }).get();
       $('#pageOverlay').remove();
       $('.save-btn').prop('disabled', false).text('ذخیره');
     } catch (error) {
@@ -907,7 +909,10 @@
       week_start: state.start.format('YYYY-MM-DD'),
       week_end: state.end.format('YYYY-MM-DD'),
       important_events: $('#important-events').val() || '',
-      events_were_loaded: state.hadLoadedEvents,
+      removed_recurring_event_days: days.filter(function (day) {
+        return state.loadedEventDays.includes(day.day) &&
+          !day.tasks.some(function (task) { return task.box_type === 'ایونت'; });
+      }).map(function (day) { return day.day; }),
       days: days
     };
   }
@@ -948,9 +953,9 @@
         data: JSON.stringify(payload)
       });
       state.reportId = response.report_id || state.reportId;
-      state.hadLoadedEvents = payload.days.some(function (day) {
+      state.loadedEventDays = payload.days.filter(function (day) {
         return day.tasks.some(function (task) { return task.box_type === 'ایونت'; });
-      });
+      }).map(function (day) { return day.day; });
       window.alert('برنامه با موفقیت ذخیره شد.');
     } catch (error) {
       console.error(error);
