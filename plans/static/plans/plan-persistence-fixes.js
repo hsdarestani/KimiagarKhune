@@ -269,7 +269,8 @@
 
   function initialize() {
     bindExportTitleSync();
-    bindRecurringReload();
+    // The canonical runtime owns event loading. Do not asynchronously
+    // merge today's defaults into a saved report or a just-edited calendar.
     synchronizeTitlesForExport();
 
     window.planPersistenceFixes = {
