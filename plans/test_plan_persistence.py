@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from accounts.models import Student
 from plans.default_plan_data import ensure_advisor_for_user, seed_plan_defaults
+from plans.plan_page import ASSET_VERSION
 from plans.models import (
     Box,
     BoxType,
@@ -40,9 +41,9 @@ class PlanPersistenceRegressionTests(TestCase):
     def test_plan_page_loads_persistence_runtime(self):
         response = self.client.get("/plan/")
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "/static/plans/plan-persistence-fixes.js?v=20261117-2")
+        self.assertContains(response, f"/static/plans/plan-persistence-fixes.js?v={ASSET_VERSION}")
         self.assertContains(response, 'data-plan-persistence-fixes="true"')
-        self.assertContains(response, "/static/plans/plan-filename-fix.js?v=20261117-2")
+        self.assertContains(response, f"/static/plans/plan-filename-fix.js?v={ASSET_VERSION}")
         self.assertContains(response, 'data-plan-filename-fix="true"')
         self.assertContains(response, 'data-plan-study-options="true"')
         self.assertContains(response, 'data-plan-export-v2="true"')
