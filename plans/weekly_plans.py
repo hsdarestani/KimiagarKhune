@@ -240,7 +240,9 @@ def get_weekly_report_details(request: HttpRequest):
         WeeklyReport.objects.filter(student=student, week_start__date=selected_date)
         .order_by("-week_start")
         .first()
-    ) or _report_covering(student, selected_date)
+    )
+    if report is None and request.GET.get("exact_start") != "1":
+        report = _report_covering(student, selected_date)
 
     if report is None:
         return JsonResponse(

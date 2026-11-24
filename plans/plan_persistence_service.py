@@ -21,7 +21,9 @@ def _sync_recurring_events(student_id: int, payload: dict) -> None:
     desired = set()
     submitted_days = set()
     available_days = set()
-    for day_name, _is_disabled, tasks in weekly_plans_v2._normalized_days(payload):
+    for day_name, is_disabled, tasks in weekly_plans_v2._normalized_days(payload):
+        if is_disabled:
+            continue
         available_days.add(day_name)
         for task in tasks:
             if not isinstance(task, dict):
@@ -85,7 +87,13 @@ def save_weekly_report(request: HttpRequest):
 
     payload = json.loads(request.body or "{}")
     student_id = int(payload["student_id"])
-    _sync_recurring_events(student_id, payload)
+    # Re-saving a historical report must not resurrect its former school
+    # timetable over a newer saved week.
+    report = WeeklyReport.objects.get(pk=json.loads(response.content)["report_id"])
+    if not WeeklyReport.objects.filter(
+        student_id=student_id, week_start__gt=report.week_start
+    ).exists():
+        _sync_recurring_events(student_id, payload)
     return response
 
 

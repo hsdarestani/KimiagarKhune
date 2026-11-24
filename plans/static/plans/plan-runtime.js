@@ -44,6 +44,7 @@
     saving: false,
     loadedEventDays: [],
     reportId: null,
+    transitionFromReportId: null,
     studentId: null,
     start: null,
     end: null,
@@ -816,10 +817,18 @@
         return;
       }
 
-      const start = check.exists === 'current'
+      const insideExisting = check.exists === 'current' &&
+        check.week_start !== selected.format('YYYY-MM-DD');
+      const newStart = insideExisting && window.confirm(
+        'این تاریخ داخل برنامه قبلی است. آیا برنامه جدید دقیقاً از تاریخ انتخابی شروع شود؟ ' +
+        'برنامه قبلی در سوابق باقی می‌ماند و از تاریخ جدید، برنامه جدید ملاک است. ' +
+        'برای باز کردن برنامه قبلی، لغو را بزنید.'
+      );
+      const openExisting = check.exists === 'current' && !newStart;
+      const start = openExisting
         ? moment(check.week_start, 'YYYY-MM-DD')
         : selected.clone().startOf('day');
-      const end = check.exists === 'current'
+      const end = openExisting
         ? moment(check.week_end, 'YYYY-MM-DD')
         : start.clone().add(6, 'days');
 
@@ -827,8 +836,9 @@
       state.studentId = String(studentId);
       state.start = start.clone();
       state.end = end.clone();
-      state.reportId = check.report_id || null;
-      state.loaded = true;
+      state.reportId = openExisting ? check.report_id : null;
+      state.transitionFromReportId = newStart ? check.report_id : null;
+      state.loaded = false;
       window.readOnlyMode = false;
 
       resetCalendar();
@@ -842,7 +852,8 @@
         dataType: 'json',
         data: {
           week_start: start.format('YYYY-MM-DD'),
-          student_id: studentId
+          student_id: studentId,
+          exact_start: '1'
         }
       });
 
@@ -851,7 +862,9 @@
       (report.tasks || []).forEach(renderTask);
       applyDisabledDays(report.disabled_days || []);
 
-      if (!report.tasks || !report.tasks.length) {
+      // Saved reports are snapshots, including intentionally empty days.
+      // Only a new report gets the current recurring timetable.
+      if (!report.report_id) {
         const defaults = await ajaxJson({
           url: '/get_default_events/',
           method: 'GET',
@@ -871,6 +884,7 @@
       state.loadedEventDays = $('.calendar > .day-column').filter(function () {
         return $(this).find('.calendar-task[data-box-type="ایونت"]').length > 0;
       }).map(function () { return normalizeDay($(this).attr('data-day')); }).get();
+      state.loaded = true;
       $('#pageOverlay').remove();
       $('.save-btn').prop('disabled', false).text('ذخیره');
     } catch (error) {
@@ -908,9 +922,10 @@
       student_id: state.studentId,
       week_start: state.start.format('YYYY-MM-DD'),
       week_end: state.end.format('YYYY-MM-DD'),
+      transition_from_report_id: state.transitionFromReportId,
       important_events: $('#important-events').val() || '',
       removed_recurring_event_days: days.filter(function (day) {
-        return state.loadedEventDays.includes(day.day) &&
+        return !day.disabled && state.loadedEventDays.includes(day.day) &&
           !day.tasks.some(function (task) { return task.box_type === 'ایونت'; });
       }).map(function (day) { return day.day; }),
       days: days
@@ -953,6 +968,7 @@
         data: JSON.stringify(payload)
       });
       state.reportId = response.report_id || state.reportId;
+      state.transitionFromReportId = null;
       state.loadedEventDays = payload.days.filter(function (day) {
         return day.tasks.some(function (task) { return task.box_type === 'ایونت'; });
       }).map(function (day) { return day.day; });

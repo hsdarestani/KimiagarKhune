@@ -156,3 +156,55 @@ class SchoolScheduleRegressionTests(TestCase):
         self.assertIn("$('.calendar > .day-column')", source)
         self.assertNotIn("$('.calendar-wrapper .day-column')", source)
         self.assertIn("runtime.studentId", source)
+
+    def test_historical_resave_cannot_restore_old_school_events(self):
+        old_event = [{"title": "مدرسه قدیمی", "start": "07:30", "end": "09:00", "box_type": "ایونت"}]
+        self.save("2039-04-02", "2039-04-08", old_event)
+        self.save("2039-04-09", "2039-04-15", [
+            {"title": "مدرسه جدید", "start": "09:15", "end": "10:45", "box_type": "ایونت"}
+        ])
+        self.save("2039-04-02", "2039-04-08", old_event)
+        self.assertEqual([event["name"] for event in self.monday_events()], ["مدرسه جدید"])
+
+    def test_explicit_start_inside_previous_week_preserves_history(self):
+        first = self.save("2039-04-02", "2039-04-08", [
+            {"title": "مدرسه قبلی", "start": "08:00", "end": "09:00", "box_type": "ایونت"}
+        ])
+        selected = "2039-04-05"
+        check = self.client.get("/check-weekly-report/", {
+            "student_id": self.student.pk, "selected_date": selected,
+        }).json()
+        self.assertEqual(check["report_id"], first.pk)
+        details = self.client.get("/get-weekly-report-details/", {
+            "student_id": self.student.pk, "week_start": selected, "exact_start": "1",
+        }).json()
+        self.assertIsNone(details["report_id"])
+        self.assertEqual(details["tasks"], [])
+        payload = {
+            "student_id": self.student.pk, "week_start": selected,
+            "week_end": "2039-04-11", "days": [],
+        }
+        def submit():
+            return self.client.post("/save-weekly-report/", data=json.dumps(payload),
+                                    content_type="application/json")
+        self.assertEqual(submit().status_code, 409)
+        payload["transition_from_report_id"] = first.pk
+        response = submit()
+        self.assertEqual(response.status_code, 200, response.content)
+        new_id = response.json()["report_id"]
+        self.assertNotEqual(new_id, first.pk)
+        self.assertTrue(WeeklyReportDetail.objects.filter(report=first, box__name="مدرسه قبلی").exists())
+        self.assertEqual(self.client.get("/check-weekly-report/", {
+            "student_id": self.student.pk, "selected_date": selected,
+        }).json()["report_id"], new_id)
+        self.assertEqual(self.client.get("/check-weekly-report/", {
+            "student_id": self.student.pk, "selected_date": "2039-04-04",
+        }).json()["report_id"], first.pk)
+
+    def test_new_week_cannot_overlap_future_report(self):
+        self.save("2039-04-09", "2039-04-15", [])
+        response = self.client.post("/save-weekly-report/", data=json.dumps({
+            "student_id": self.student.pk, "week_start": "2039-04-05",
+            "week_end": "2039-04-11", "days": [],
+        }), content_type="application/json")
+        self.assertEqual(response.status_code, 409)

@@ -134,13 +134,31 @@ def save_weekly_report(request: HttpRequest):
 
     try:
         with transaction.atomic():
+            # Serialize creation for this student even when no report row exists.
+            type(student).objects.select_for_update().get(pk=student.pk)
             report = (
                 WeeklyReport.objects.select_for_update()
                 .filter(student=student, week_start__date=week_start_date)
                 .first()
             )
             created = report is None
-            if report is None:
+            if created:
+                overlaps = WeeklyReport.objects.filter(
+                    student=student,
+                    week_start__date__lte=week_end_date,
+                    week_end__date__gte=week_start_date,
+                )
+                prior = _report_covering(student, week_start_date)
+                # Only an explicit transition from the covering report may
+                # supersede earlier dates. Never overwrite a future report.
+                transition_id = payload.get("transition_from_report_id")
+                if overlaps.filter(week_start__date__gte=week_start_date).exists() or (
+                    prior is not None and str(transition_id) != str(prior.pk)
+                ):
+                    return JsonResponse({
+                        "status": "error",
+                        "message": "بازه انتخاب‌شده با برنامه دیگری تداخل دارد. هفته را دوباره بارگذاری کنید.",
+                    }, status=409)
                 report = WeeklyReport(
                     student=student,
                     week_start=_midnight(week_start_date),
@@ -161,6 +179,7 @@ def save_weekly_report(request: HttpRequest):
                 {
                     "week_start": week_start_date.isoformat(),
                     "week_end": week_end_date.isoformat(),
+                    "transition_from_report_id": payload.get("transition_from_report_id") if created else None,
                 },
                 request=request,
             )
